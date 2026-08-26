@@ -34,6 +34,23 @@ There is deliberately **no single universal weighting**.
 omni-agent config mode smart
 ```
 
+The preset governs **the agent's own model too**, not only the routing this product does
+internally. Changing it rewrites `model` in the OpenCode config to the combo the preset
+resolves to, and the command says so:
+
+```
+Routing mode set to Smart.
+The agent will run on: auto/pro-coding
+Restart the agent for this to take effect.
+```
+
+The restart line is not boilerplate — OpenCode reads its configuration at launch and does
+not hot-reload it.
+
+> Left unpinned, OpenCode picks a model itself — observed choosing `oc/big-pickle`, one
+> specific free model — which meant the preset chosen during setup governed nothing the
+> agent actually did.
+
 ## Intent × preset
 
 Every internal task maps to an intent; the intent and the preset together choose a gateway

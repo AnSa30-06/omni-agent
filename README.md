@@ -69,7 +69,7 @@ Be aware of this before you start:
 
 | Component | Size | When |
 |---|---|---|
-| The installer itself | ~90 MB | download |
+| The installer itself | ~52 MB | download |
 | Node.js runtime | ~80 MB | bundled in the installer |
 | Model gateway (OmniRoute) | ~2.7 GB | first run |
 | Agent harness (OpenCode) | ~514 MB | first run |
@@ -118,6 +118,10 @@ The agent routes automatically. Five modes:
 ```bash
 omni-agent config mode smart
 ```
+
+The mode picks the agent's own model as well as the models it uses internally, so changing
+it prints which model you will be on and asks you to restart — OpenCode reads its
+configuration at launch and does not reload it.
 
 Or ask it: *"switch to the cheapest model"*. To pin one specific model, `omni-agent models`
 lists what is available right now, and the agent's `agent_status` tool can pin it.
