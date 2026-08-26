@@ -4,6 +4,7 @@
   "profiles": {
     "standard": {
       "label": "Standard",
+      "$note": "Creating and copying files is not more dangerous than the `edit` tool, which this profile already allows, so mkdir/cp/touch are allowed outright. Asking about `mkdir` spends the interruption budget on nothing - measured 2026-08-27: a research task failed outright because `mkdir -p notes` was refused. Deleting, moving over the top and installing packages stay in the default `ask`. Only keys under `permission` reach OpenCode; this one does not.",
       "description": "Reading, searching, browsing and writing files happen without asking. Anything that changes the wider system, reaches outside the project, or has an external side effect asks first. Genuinely destructive commands are refused outright.",
       "permission": {
         "read": "allow",
@@ -35,6 +36,18 @@
           "echo *": "allow",
           "pwd": "allow",
           "type *": "allow",
+          "where *": "allow",
+          "diff *": "allow",
+          "sort *": "allow",
+          "date*": "allow",
+          "printf *": "allow",
+          "tasklist*": "allow",
+
+          "mkdir*": "allow",
+          "md *": "allow",
+          "cp *": "allow",
+          "copy *": "allow",
+          "touch *": "allow",
 
           "git status*": "allow",
           "git diff*": "allow",

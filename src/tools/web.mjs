@@ -171,7 +171,7 @@ export async function scrapeUrl(url, opts = {}) {
       }
 
       if (provider === "browser") {
-        const { renderPage } = await import("./browser.mjs");
+        const { renderPage } = await import("./browser-proxy.mjs");
         const rendered = await renderPage(url, { timeoutMs: opts.timeoutMs });
         const article = await htmlToArticle(rendered.html, rendered.finalUrl);
         return {

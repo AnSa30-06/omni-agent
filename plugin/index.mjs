@@ -13,7 +13,7 @@ import { tool } from "@opencode-ai/plugin";
 
 import { webSearch, availableProviders } from "../src/tools/search.mjs";
 import { webFetch, scrapeUrl, crawlSite } from "../src/tools/web.mjs";
-import * as browser from "../src/tools/browser.mjs";
+import * as browser from "../src/tools/browser-proxy.mjs";
 import { readDocument, writeDocument, analyzeData } from "../src/tools/documents.mjs";
 import { buildDashboard, renderDashboard } from "../src/usage/dashboard.mjs";
 import { selectModel, PRESETS } from "../src/routing/select.mjs";

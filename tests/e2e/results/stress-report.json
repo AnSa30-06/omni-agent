@@ -1,15 +1,23 @@
 {
-  "ranAt": "2026-08-26T22:08:33.926Z",
+  "ranAt": "2026-08-26T22:51:05.483Z",
   "results": [
     {
-      "name": "coding",
-      "label": "Coding - write a working program",
+      "name": "browser",
+      "label": "Browser - fill a real form from a local file, STOP before submitting",
       "pass": true,
-      "detail": "program runs and reports the correct totals",
-      "elapsedMs": 67570,
+      "detail": "name:true email:true size:true stopped-before-submit:true",
+      "elapsedMs": 91883,
+      "exitCode": 0
+    },
+    {
+      "name": "general",
+      "label": "General - a multi-step task unrelated to any of the above",
+      "pass": true,
+      "detail": "version-in-md:true nodejs.org-cited:true csv-well-formed:true",
+      "elapsedMs": 72422,
       "exitCode": 0
     }
   ],
-  "passed": 1,
-  "total": 1
+  "passed": 2,
+  "total": 2
 }

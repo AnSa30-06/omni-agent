@@ -268,7 +268,7 @@ const PROVIDERS = {
     // JavaScript shell over HTTP and carries no results without rendering.)
     credential: () => "keyless",
     async run(query, { count }) {
-      const { renderPage } = await import("./browser.mjs");
+      const { renderPage } = await import("./browser-proxy.mjs");
       const url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}&ia=web`;
       const rendered = await renderPage(url, { timeoutMs: 45_000 });
       const { parseHTML } = await import("linkedom");

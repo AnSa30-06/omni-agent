@@ -156,6 +156,11 @@ function verifyStagedApp(appStage) {
     ["node_modules/@opencode-ai/plugin/dist/tool.js", "the plugin contract"],
     ["bin/omni-agent.mjs", "the launcher"],
     ["plugin/index.mjs", "the tool layer"],
+    // The plugin cannot drive Chromium itself; it forwards to this, run under
+    // the bundled Node. Without it the browser is dead in the shipped product
+    // while every Node-side test still passes.
+    ["src/tools/browser-host.mjs", "browser control from the plugin"],
+    ["src/tools/browser-proxy.mjs", "browser control from the plugin"],
     ["skills", "the skill library"],
     ["config/models/metadata.json", "model metadata"],
   ];

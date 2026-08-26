@@ -55,6 +55,13 @@ export function chromiumInstalled() {
   }
 }
 
+/**
+ * Launch (or reuse) the browser.
+ *
+ * MUST run under Node. Playwright cannot reach Chromium from OpenCode's
+ * embedded Bun - see browser-host.mjs. Anything that might run inside the
+ * plugin imports browser-proxy.mjs instead of this module.
+ */
 export async function launch({ headless } = {}) {
   if (_browser && _browser.isConnected()) return _browser;
   ensureDirs();
