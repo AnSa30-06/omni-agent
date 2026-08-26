@@ -1,5 +1,5 @@
 MODEL GATEWAY
-  Running at http://127.0.0.1:20129 (OmniRoute 3.8.49, up 1352s)
+  Running at http://127.0.0.1:20129 (OmniRoute 3.8.49, up 3936s)
   Routing mode: balanced
 
 PROVIDER QUOTA / BALANCE
@@ -15,17 +15,17 @@ GATEWAY FREE TIER
 
 TOKEN USAGE (measured on this machine)
   Source: gateway-call-log - Every call routed through the gateway, including the agent's own.
-  Since gateway start: 507741 in / 8390 out / 516131 total  (13 calls)
-  Today:        529968 in / 8715 out / 538683 total  (31 calls)
-  Last 30 days: 538683 total  (31 calls, 14 errors)
+  Since gateway start: 2969368 in / 54563 out / 3023931 total  (193 calls)
+  Today:        3602438 in / 66315 out / 3668753 total  (248 calls)
+  Last 30 days: 3668753 total  (248 calls, 62 errors)
   Token counts are provider-reported.
 
   Per model (30d):
-    opencode/big-pickle             538639 tok  18 calls  47.93 tok/s measured over 16 calls
-    big-pickle                      538639 tok  18 calls  47.93 tok/s measured over 16 calls
-    opencode/hy3-free                   44 tok  1 calls  7.91 tok/s measured over 1 calls
-    hy3-free                            44 tok  1 calls  7.91 tok/s measured over 1 calls
-    opencode/north-mini-code-free         0 tok  1 calls  throughput not measured yet
-    north-mini-code-free                 0 tok  1 calls  throughput not measured yet
-    felo-web/felo-chat                   0 tok  2 calls  throughput not measured yet
-    felo-chat                            0 tok  2 calls  throughput not measured yet
+    opencode/big-pickle            3668289 tok  193 calls  42.14 tok/s measured over 175 calls
+    big-pickle                     3668289 tok  193 calls  42.14 tok/s measured over 175 calls
+    opencode/hy3-free                  464 tok  11 calls  10.24 tok/s measured over 11 calls
+    hy3-free                           464 tok  11 calls  10.24 tok/s measured over 11 calls
+    opencode/north-mini-code-free         0 tok  3 calls  throughput not measured yet
+    north-mini-code-free                 0 tok  3 calls  throughput not measured yet
+    felo-web/felo-chat                   0 tok  5 calls  throughput not measured yet
+    felo-chat                            0 tok  5 calls  throughput not measured yet

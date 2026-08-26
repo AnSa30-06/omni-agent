@@ -30,6 +30,11 @@ const RESULTS_DIR = path.join(HERE, "results");
 const WORKSPACE = path.join(PATHS.workspace, "e2e");
 const RESULTS_JSON = path.join(WORKSPACE, "internships.json");
 const EVIDENCE = path.join(WORKSPACE, "evidence.md");
+// A spreadsheet is the one deliverable OpenCode's own file tools cannot write,
+// so asking for one is what actually exercises document_write. Without it the
+// agent reasonably reached for the built-in Write tool and the check that
+// document_write works never ran.
+const RESULTS_XLSX = path.join(WORKSPACE, "internships.xlsx");
 
 const args = process.argv.slice(2);
 const VERIFY_ONLY = args.includes("--verify-only");
@@ -60,6 +65,8 @@ Rules you must follow:
 
 Save the results as JSON to exactly this path: ${RESULTS_JSON.replace(/\\/g, "/")}
 The JSON must be an array of objects with keys: organization, role, location, deadline, eligibility, source_url, description, verified (true only if you actually fetched the page).
+
+Also save the same ten opportunities as a spreadsheet at ${RESULTS_XLSX.replace(/\\/g, "/")}, one row per opportunity, with a header row.
 
 Also save a short note to ${EVIDENCE.replace(/\\/g, "/")} describing which tools you used, which sources you rejected and why, and anything you could not verify.`;
 
@@ -101,8 +108,17 @@ function runAgent() {
   });
 }
 
+// Deliberately a wide net. This exists to catch an agent that came back with
+// marketing internships, not to grade its vocabulary.
+//
+// Two genuine results failed the first version of this list. CERN openlab's
+// "Summer Student - Computing / IT Projects" matched nothing, because the list
+// carried `computer science` but not `comput`. NASA's "OSTEM Internship
+// Program" matched nothing, because `intern\b` does not match "Internship" and
+// `program(ming|mer)` does not match "Program". An internship failing an
+// is-this-an-internship check is a fault in the check, not in the result.
 const CS_TERMS =
-  /\b(software|computer science|cs\b|engineer|developer|program(ming|mer)|data|machine learning|ml\b|ai\b|research|intern|graduate|swe\b|backend|frontend|full[- ]stack|security|cloud|robotics|systems)\b/i;
+  /\b(software|computer science|comput\w*|informatics|cs\b|engineer|developer|program(ming|mer)|data|machine learning|ml\b|ai\b|research|intern\w*|graduate|swe\b|backend|frontend|full[- ]stack|security|cloud|robotics|systems)\b/i;
 
 function normaliseUrl(u) {
   try {
@@ -191,6 +207,21 @@ async function verifyResults() {
 
   add("Evidence note written", fs.existsSync(EVIDENCE),
     fs.existsSync(EVIDENCE) ? `${fs.statSync(EVIDENCE).size} bytes` : "missing");
+
+  // Read the spreadsheet back rather than trusting that a file appeared.
+  if (!fs.existsSync(RESULTS_XLSX)) {
+    add("Spreadsheet written and readable", false, "internships.xlsx is missing");
+  } else {
+    try {
+      const { readDocument } = await import("../../src/tools/documents.mjs");
+      const book = await readDocument(RESULTS_XLSX);
+      const rows = book.sheets?.[0]?.records ?? [];
+      add("Spreadsheet written and readable", rows.length >= 10,
+        `${rows.length} data row(s) across ${book.sheetCount ?? 0} sheet(s)`);
+    } catch (err) {
+      add("Spreadsheet written and readable", false, `could not be read back: ${err.message}`);
+    }
+  }
 
   return { checks, records, resolution };
 }

@@ -1,13 +1,63 @@
 {
-  "ranAt": "2026-08-26T20:33:36.152Z",
-  "elapsedMs": 0,
-  "recordCount": 0,
+  "ranAt": "2026-08-26T23:09:14.845Z",
+  "elapsedMs": 682193,
+  "recordCount": 10,
   "checks": {
     "Research output": [
       {
-        "name": "Results file written",
+        "name": "Results file is valid JSON",
+        "pass": true,
+        "detail": "10 records"
+      },
+      {
+        "name": "At least 10 opportunities",
+        "pass": true,
+        "detail": "10 found"
+      },
+      {
+        "name": "Every result has an absolute source URL",
+        "pass": true,
+        "detail": "10/10"
+      },
+      {
+        "name": "No duplicate source URLs",
+        "pass": true,
+        "detail": "all distinct"
+      },
+      {
+        "name": "No duplicate organization+role pairs",
+        "pass": true,
+        "detail": "all distinct"
+      },
+      {
+        "name": "Sources span multiple websites",
+        "pass": true,
+        "detail": "10 distinct hosts: openlab.cern, www.google.com, www.microsoft.com, www.ll.mit.edu, www.cis.mpg.de, www.nvidia.com, www.amazon.jobs, www.sandia.gov"
+      },
+      {
+        "name": "Results are CS/internship relevant",
         "pass": false,
-        "detail": "agent did not create C:\\Users\\Abc\\OmniAgent Workspace\\e2e\\internships.json"
+        "detail": "8/10"
+      },
+      {
+        "name": "Source URLs resolve",
+        "pass": true,
+        "detail": "10/10 returned < 400"
+      },
+      {
+        "name": "Agent marked results as verified",
+        "pass": true,
+        "detail": "10 marked verified"
+      },
+      {
+        "name": "Agent used null rather than inventing missing deadlines",
+        "pass": true,
+        "detail": "0/10 have no stated deadline (this is expected and honest)"
+      },
+      {
+        "name": "Evidence note written",
+        "pass": true,
+        "detail": "3952 bytes"
       }
     ],
     "Tool usage": [
@@ -41,7 +91,7 @@
       {
         "name": "Token usage was recorded",
         "pass": true,
-        "detail": "0 new call(s) recorded this run, 538683 tokens total today"
+        "detail": "39 new call(s) recorded this run, 3668753 tokens total today"
       },
       {
         "name": "Token counts are provider-reported",
@@ -70,40 +120,91 @@
       }
     ]
   },
-  "resolution": [],
+  "resolution": [
+    {
+      "url": "https://openlab.cern/call-for-applications-is-open-apply-now-to-the-2026-edition-of-the-cern-openlab-summer-student-programme/",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.google.com/about/careers/applications/jobs/results/132362676918461126-student-researcher-bsms-fall-2026",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.microsoft.com/en-us/research/academic-program/undergraduate-research-internship-computing/",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.ll.mit.edu/careers/student-opportunities/summer-research-program",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.cis.mpg.de/internships/",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.nvidia.com/en-us/about-nvidia/careers/university-recruiting/",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.amazon.jobs/content/en/career-programs/university/internships-for-students",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.sandia.gov/careers/career-possibilities/students-and-postdocs/internships-co-ops/institute-programs/computer-science-research-institute/",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://www.nasa.gov/learning-resources/internship-programs/",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://apply.careers.microsoft.com/careers/job/1970393556978221",
+      "status": 200,
+      "ok": true
+    }
+  ],
   "telemetry": {
     "source": "gateway-call-log",
-    "calls": 31,
-    "errors": 14,
-    "inputTokens": 529968,
-    "outputTokens": 8715,
-    "totalTokens": 538683,
-    "cachedInputTokens": 454720,
-    "reasoningTokens": 21,
+    "calls": 248,
+    "errors": 62,
+    "inputTokens": 3602438,
+    "outputTokens": 66315,
+    "totalTokens": 3668753,
+    "cachedInputTokens": 3132480,
+    "reasoningTokens": 257,
     "allProviderReported": true,
     "byModel": {
       "opencode/big-pickle": {
-        "calls": 18,
-        "inputTokens": 529948,
-        "outputTokens": 8691,
-        "totalTokens": 538639,
+        "calls": 193,
+        "inputTokens": 3602263,
+        "outputTokens": 66026,
+        "totalTokens": 3668289,
         "provider": "opencode",
-        "outputTokensPerSec": 47.93,
-        "meanLatencyMs": 11334,
-        "samples": 16
+        "outputTokensPerSec": 42.14,
+        "meanLatencyMs": 8953,
+        "samples": 175
       },
       "big-pickle": {
-        "calls": 18,
-        "inputTokens": 529948,
-        "outputTokens": 8691,
-        "totalTokens": 538639,
+        "calls": 193,
+        "inputTokens": 3602263,
+        "outputTokens": 66026,
+        "totalTokens": 3668289,
         "provider": "opencode",
-        "outputTokensPerSec": 47.93,
-        "meanLatencyMs": 11334,
-        "samples": 16
+        "outputTokensPerSec": 42.14,
+        "meanLatencyMs": 8953,
+        "samples": 175
       },
       "opencode/north-mini-code-free": {
-        "calls": 1,
+        "calls": 3,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -113,7 +214,7 @@
         "samples": 0
       },
       "north-mini-code-free": {
-        "calls": 1,
+        "calls": 3,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -123,7 +224,7 @@
         "samples": 0
       },
       "felo-web/felo-chat": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -133,7 +234,7 @@
         "samples": 0
       },
       "felo-chat": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -143,7 +244,7 @@
         "samples": 0
       },
       "felo-web/felo-search": {
-        "calls": 2,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -153,7 +254,7 @@
         "samples": 0
       },
       "felo-search": {
-        "calls": 2,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -163,7 +264,7 @@
         "samples": 0
       },
       "felo-web/felo-scholar": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -173,7 +274,7 @@
         "samples": 0
       },
       "felo-scholar": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -183,7 +284,7 @@
         "samples": 0
       },
       "felo-web/felo-social": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -193,7 +294,7 @@
         "samples": 0
       },
       "felo-social": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -203,7 +304,7 @@
         "samples": 0
       },
       "felo-web/felo-document": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -213,7 +314,7 @@
         "samples": 0
       },
       "felo-document": {
-        "calls": 2,
+        "calls": 5,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -233,24 +334,84 @@
         "samples": 0
       },
       "opencode/hy3-free": {
-        "calls": 1,
-        "inputTokens": 20,
-        "outputTokens": 24,
-        "totalTokens": 44,
+        "calls": 11,
+        "inputTokens": 175,
+        "outputTokens": 289,
+        "totalTokens": 464,
         "provider": "opencode",
-        "outputTokensPerSec": 7.91,
-        "meanLatencyMs": 3034,
-        "samples": 1
+        "outputTokensPerSec": 10.24,
+        "meanLatencyMs": 2565,
+        "samples": 11
       },
       "hy3-free": {
-        "calls": 1,
-        "inputTokens": 20,
-        "outputTokens": 24,
-        "totalTokens": 44,
+        "calls": 11,
+        "inputTokens": 175,
+        "outputTokens": 289,
+        "totalTokens": 464,
         "provider": "opencode",
-        "outputTokensPerSec": 7.91,
-        "meanLatencyMs": 3034,
-        "samples": 1
+        "outputTokensPerSec": 10.24,
+        "meanLatencyMs": 2565,
+        "samples": 11
+      },
+      "auto/coding": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "auto",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "opencode/deepseek-v4-flash-free": {
+        "calls": 9,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "opencode",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "deepseek-v4-flash-free": {
+        "calls": 9,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "opencode",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "opencode/nemotron-3-ultra-free": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "opencode",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "nemotron-3-ultra-free": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "opencode",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "auto/smart": {
+        "calls": 1,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "auto",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
       }
     }
   },

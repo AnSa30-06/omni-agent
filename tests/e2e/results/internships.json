@@ -1,0 +1,102 @@
+[
+  {
+    "organization": "CERN openlab",
+    "role": "Summer Student – Computing / IT Projects",
+    "location": "Geneva, Switzerland (CERN)",
+    "deadline": "January 26, 2026, 23:59 CET",
+    "eligibility": "Bachelor's or Master's student (not PhD) in computer science, mathematics, engineering, or physics. Must have completed at least three years of full-time university studies by summer 2026. Strong computing profile required. All nationalities welcome.",
+    "source_url": "https://openlab.cern/call-for-applications-is-open-apply-now-to-the-2026-edition-of-the-cern-openlab-summer-student-programme/",
+    "description": "Nine-week paid summer programme (June–August 2026) working on advanced computing projects at CERN for the LHC community. Includes hands-on IT project work, lectures by CERN computing experts, accelerator and experimental area visits, and a 90 CHF/day subsistence allowance plus travel allowance. Applications are now closed as of the listed deadline.",
+    "verified": true
+  },
+  {
+    "organization": "Google",
+    "role": "Student Researcher, BS/MS – Fall 2026",
+    "location": "Multiple US locations (Mountain View, CA; Ann Arbor, MI; New York, NY; Seattle, WA; and 15+ others)",
+    "deadline": "November 27, 2026 (rolling review; may close earlier if projects are filled)",
+    "eligibility": "Currently enrolled in a Bachelor's or Master's degree in Computer Science, Linguistics, Statistics, Biostatistics, Applied Mathematics, Operations Research, Economics, Natural Sciences, or related technical field. Must be located in the US for the duration of the engagement. English proficiency required.",
+    "source_url": "https://www.google.com/about/careers/applications/jobs/results/132362676918461126-student-researcher-bsms-fall-2026",
+    "description": "Student Researcher Program placing students on research projects aligned with Google's scientific advancement priorities. Flexible in time commitment, length, and onsite/remote nature depending on the project. Start dates typically August through December. Non-conversion eligible. Applications reviewed on a rolling basis.",
+    "verified": true
+  },
+  {
+    "organization": "Microsoft Research",
+    "role": "Undergraduate Research Internship – Computing",
+    "location": "Redmond, WA; New York City, NY; Cambridge, MA (12-week summer program)",
+    "deadline": "Not stated on the page (Summer 2026 applications are closed; check for future cycles)",
+    "eligibility": "Rising junior or rising senior enrolled in a bachelor's degree in CS, computer engineering, software engineering, information science, or related major. At least two years of programming experience. Completed courses in Calculus, Probability and Statistics, and/or Machine Learning, or demonstrated training in at least one social science methodology. Especially encourages applications from underrepresented groups.",
+    "source_url": "https://www.microsoft.com/en-us/research/academic-program/undergraduate-research-internship-computing/",
+    "description": "12-week summer research internship at Microsoft Research Labs. Interns are paired with mentors and work alongside doctoral interns and world-class researchers. Research areas include AI, algorithms, computer vision, systems, NLP, and more. Program goal is to encourage participants to pursue advanced degrees in computing fields.",
+    "verified": true
+  },
+  {
+    "organization": "MIT Lincoln Laboratory",
+    "role": "Summer Research Program Intern",
+    "location": "Lexington, MA (near Boston), with housing at Northeastern University campus",
+    "deadline": "Not stated on the fetched page (check careers.ll.mit.edu for current cycle deadlines)",
+    "eligibility": "Must have completed at least sophomore year of college or be enrolled in a master's or doctoral program. Excellent academic record required. Must be a U.S. citizen.",
+    "source_url": "https://www.ll.mit.edu/careers/student-opportunities/summer-research-program",
+    "description": "Summer program (mid-May through mid-August) offering hands-on research experience at a leading-edge national defense research lab. Over 200 students hired each summer from top universities. Provides competitive weekly pay, travel assistance, discounted Northeastern University housing, and daily shuttle service. Projects span AI, cybersecurity, communications, satellite systems, and more.",
+    "verified": true
+  },
+  {
+    "organization": "Max Planck Institutes (Informatics, Software Systems, Security & Privacy)",
+    "role": "Research Intern – Computer Science",
+    "location": "Saarbrücken, Germany; Kaiserslautern, Germany; Bochum, Germany",
+    "deadline": "November 1 of the previous year (for summer start between May–August). For other start dates, apply at least 5 months in advance.",
+    "eligibility": "Exceptional Bachelor's, Master's, and Doctoral students worldwide with a basic background in CS (roughly first three years of a standard CS Bachelor's by start of internship). Industry applicants with similar background also welcome. English-speaking working environment.",
+    "source_url": "https://www.cis.mpg.de/internships/",
+    "description": "Fully funded research internships (typically 12–14 weeks) at world-renowned Max Planck research institutes across all areas of computer science. Each intern works directly with an assigned faculty mentor. Includes stipend, housing costs, and roundtrip travel. Internships can lead to coauthored publications at top CS conferences. Summer application deadline is November 1.",
+    "verified": true
+  },
+  {
+    "organization": "NVIDIA",
+    "role": "University Intern (BS/MS/PhD level)",
+    "location": "Silicon Valley and other NVIDIA offices globally",
+    "deadline": "Not stated on the page (year-round internships available, minimum 12-week commitment)",
+    "eligibility": "Currently enrolled BS, MS, or PhD students. Interns are paid employees with benefits. Specific requirements vary by role.",
+    "source_url": "https://www.nvidia.com/en-us/about-nvidia/careers/university-recruiting/",
+    "description": "Year-round paid internships working on real projects alongside NVIDIA engineers in AI, deep learning, graphics, autonomous machines, high-performance computing, and more. NVIDIA also offers the Ignite pre-internship program (12-week summer) for current freshmen and sophomores from diverse backgrounds. Interns are employees doing meaningful, hands-on work with cutting-edge technology.",
+    "verified": true
+  },
+  {
+    "organization": "Amazon",
+    "role": "Software Development Engineer Intern / University Internships",
+    "location": "Various global locations",
+    "deadline": "Not stated on the general program page (check individual role listings for deadlines)",
+    "eligibility": "Currently enrolled students (specific degree and year requirements vary by individual internship listing). See amazon.jobs for specific role eligibility.",
+    "source_url": "https://www.amazon.jobs/content/en/career-programs/university/internships-for-students",
+    "description": "Paid internship program offering real-world experience at Amazon. Interns own projects from start to finish, working with emerging technologies and business innovation. Each intern is paired with a mentor. Opportunities span software development, science, and other technical areas across Amazon's global operations.",
+    "verified": true
+  },
+  {
+    "organization": "Sandia National Laboratories",
+    "role": "Computer Science Research Intern (CSRI Program)",
+    "location": "Albuquerque, NM; Livermore, CA",
+    "deadline": "Not stated (year-round and summer positions posted on Sandia Careers portal)",
+    "eligibility": "Undergraduate (sophomore or higher) or graduate students. U.S. citizenship requirements may apply (Sandia is a national security laboratory – verify on individual job postings). Disciplines include AI, computer science, computer engineering, mathematics, statistics, and related fields.",
+    "source_url": "https://www.sandia.gov/careers/career-possibilities/students-and-postdocs/internships-co-ops/institute-programs/computer-science-research-institute/",
+    "description": "Multidisciplinary internship program at Sandia's Computer Science Research Institute. Interns work directly with staff mentors on research spanning machine learning, parallel computing, cybersecurity, computational science, discrete mathematics, quantum computing, and more. Includes a specialized summer seminar series and publication opportunities in the annual Summer Proceedings.",
+    "verified": true
+  },
+  {
+    "organization": "NASA",
+    "role": "OSTEM Internship Program",
+    "location": "Various NASA centers across the United States",
+    "deadline": "Spring 2027: September 14, 2026; Summer 2027: February 26, 2027; Fall 2027: May 21, 2027",
+    "eligibility": "College-level students (undergraduate or graduate) enrolled in accredited institutions. Must be U.S. citizens. Open to STEM and non-STEM majors.",
+    "source_url": "https://www.nasa.gov/learning-resources/internship-programs/",
+    "description": "NASA offers 2,000+ paid internship positions annually through the OSTEM program. Students work on real NASA projects under the guidance of agency mentors, building technical skills and career readiness. Three sessions per year (Spring, Summer, Fall). The Pathways program provides a structured pipeline from internship to full-time federal employment at NASA upon graduation.",
+    "verified": true
+  },
+  {
+    "organization": "Microsoft (Clipchamp Team)",
+    "role": "Applied Science PhD Intern – Computer Vision & Generative AI",
+    "location": "Brisbane, Sydney, or Melbourne, Australia (fully on-site)",
+    "deadline": "Early September 2026 (applications reviewed on a rolling basis; open for minimum 5 days)",
+    "eligibility": "Currently pursuing a Doctorate in CS, Applied Science, Statistics, or related field with a research focus in computer vision, machine learning, or multimodal AI. Must have at least 1 semester/term remaining after internship. Hands-on deep learning experience in Python (PyTorch, Hugging Face). Preferably graduating August 2027–July 2028 and available late November 2026–February 2027.",
+    "source_url": "https://apply.careers.microsoft.com/careers/job/1970393556978221",
+    "description": "12-week full-time PhD internship at Microsoft's Clipchamp team in Australia. Projects focus on multimodal models for video understanding, agentic AI systems, and generative AI. Interns design and evaluate models that see and reason over video, build agentic workflows, and fine-tune state-of-the-art foundation models. In-person role; remote arrangements not available.",
+    "verified": true
+  }
+]
