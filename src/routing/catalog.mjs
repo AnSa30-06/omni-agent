@@ -11,6 +11,7 @@ import { pkg } from "../util/paths.mjs";
 import { logger } from "../util/log.mjs";
 import { GatewayClient } from "../gateway/client.mjs";
 import { observedThroughput } from "../usage/telemetry.mjs";
+import * as gatewayTel from "../usage/gateway-telemetry.mjs";
 
 const log = logger("catalog");
 
@@ -86,7 +87,10 @@ export async function getCatalogue(opts = {}) {
   if (!opts.force && _cache.models && Date.now() - _cache.at < TTL_MS) return _cache.models;
   const client = opts.client ?? new GatewayClient();
   const raw = await client.listModels();
-  const throughput = observedThroughput();
+  // Gateway-recorded calls cover everything, including the agent's own model
+  // calls, which never pass through this client. Local telemetry is merged in
+  // underneath for anything the gateway did not serve.
+  const throughput = { ...observedThroughput(), ...(gatewayTel.available() ? gatewayTel.observedThroughput() : {}) };
 
   // Pricing is management-scoped. Absent a key it is genuinely unknown, and the
   // catalogue says so rather than defaulting to zero (which would make every
@@ -97,7 +101,7 @@ export async function getCatalogue(opts = {}) {
 
   const models = raw.map((m) => {
     const tiers = estimateTiers(m.id);
-    const obs = throughput[m.id] ?? null;
+    const obs = lookupThroughput(throughput, m.id);
     const price = findPrice(pricing, m.id);
     return {
       id: m.id,
@@ -124,6 +128,27 @@ export async function getCatalogue(opts = {}) {
   _cache = { at: Date.now(), models };
   log.info("catalogue refreshed", { count: models.length, pricing: pricing ? "available" : "unavailable" });
   return models;
+}
+
+/**
+ * Join measured throughput onto a catalogue entry.
+ *
+ * Falls back to the bare model name because the two sides use different
+ * provider aliases for the SAME model: the catalogue publishes the short alias
+ * (`oc/big-pickle`, `felo/felo-chat`) while the call log records the canonical
+ * name (`opencode/big-pickle`, `felo-web/felo-chat`). Upstream documents this
+ * alias/canonical duality explicitly.
+ *
+ * NOTE the deliberate asymmetry with findPrice(), which refuses exactly this
+ * fallback. Joining a bare name for THROUGHPUT relates two aliases of one model
+ * on one upstream. Joining a bare name for PRICE would relate two DIFFERENT
+ * upstreams that happen to serve a similarly-named model - stamping OpenAI's
+ * price on a free proxy. Same technique, one is correct and one is a lie.
+ */
+function lookupThroughput(throughput, id) {
+  if (throughput[id]) return throughput[id];
+  const bare = String(id).split("/").pop();
+  return throughput[bare] ?? null;
 }
 
 /**

@@ -15,6 +15,7 @@ import { logger } from "../util/log.mjs";
 import { GatewayClient } from "../gateway/client.mjs";
 import { queryProvider, configuredProviders, ADAPTERS } from "../providers/usage-adapters.mjs";
 import { sessionSummary, todaySummary, rangeSummary } from "./telemetry.mjs";
+import * as gatewayTel from "./gateway-telemetry.mjs";
 import { loadConfig } from "../config.mjs";
 
 const log = logger("dashboard");
@@ -158,13 +159,39 @@ export async function buildDashboard(opts = {}) {
     },
     providers,
     freeTier,
-    telemetry: {
-      // Explicitly local. Never presented as provider billing data.
-      source: "local-measurement",
-      session: sessionSummary(),
-      today: todaySummary(),
-      last30Days: rangeSummary(30),
-    },
+    telemetry: buildTelemetry(health?.system?.uptime),
+  };
+}
+
+/**
+ * Token usage.
+ *
+ * Prefers the GATEWAY's own call log, because the agent's model calls go
+ * OpenCode -> plugin -> gateway and never pass through this process. Reading
+ * only our own client's calls showed "0 tokens this session" while the agent
+ * was actively working.
+ *
+ * Falls back to local telemetry when the gateway's log is unavailable.
+ */
+function buildTelemetry(gatewayUptimeSec) {
+  if (gatewayTel.available()) {
+    const g = { session: gatewayTel.sessionSummary(gatewayUptimeSec), today: gatewayTel.todaySummary(), last30Days: gatewayTel.rangeSummary(30) };
+    if (g.last30Days.calls > 0) {
+      return {
+        // Local measurement of provider-reported counts. Not billing data.
+        source: "gateway-call-log",
+        note: "Every call routed through the gateway, including the agent's own.",
+        ...g,
+        directCalls: rangeSummary(30).calls,
+      };
+    }
+  }
+  return {
+    source: "local-measurement",
+    note: "Only calls made directly by this process; the gateway call log was unavailable.",
+    session: sessionSummary(),
+    today: todaySummary(),
+    last30Days: rangeSummary(30),
   };
 }
 
@@ -254,7 +281,8 @@ export function renderDashboard(d) {
 
   const t = d.telemetry;
   L.push("TOKEN USAGE (measured on this machine)");
-  L.push(`  This session: ${t.session.inputTokens} in / ${t.session.outputTokens} out / ${t.session.totalTokens} total  (${t.session.calls} calls)`);
+  L.push(`  Source: ${t.source}${t.note ? " - " + t.note : ""}`);
+  L.push(`  Since gateway start: ${t.session.inputTokens} in / ${t.session.outputTokens} out / ${t.session.totalTokens} total  (${t.session.calls} calls)`);
   L.push(`  Today:        ${t.today.inputTokens} in / ${t.today.outputTokens} out / ${t.today.totalTokens} total  (${t.today.calls} calls)`);
   L.push(`  Last 30 days: ${t.last30Days.totalTokens} total  (${t.last30Days.calls} calls, ${t.last30Days.errors} errors)`);
   L.push(
