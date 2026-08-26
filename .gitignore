@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+runtime/
+
+# Build output
+dist/
+staging/
+*.exe
+*.zip
+
+# Local scratch (never committed)
+.scratch/
+*.log
+
+# Secrets and per-machine state - these must never reach the repository
+.env
+.env.*
+!.env.example
+credentials.dat
+config.json
+auth.json
+*.pem
+*.key
+
+# Playwright browsers
+browsers/
+
+# OS noise
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Raw agent transcript from the e2e run - large and noisy. The report and the
+# structured results ARE committed, as evidence.
+tests/e2e/results/transcript.txt

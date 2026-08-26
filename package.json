@@ -1,0 +1,64 @@
+{
+  "name": "omni-agent",
+  "version": "1.0.0",
+  "private": false,
+  "description": "A downloadable, model-agnostic coding agent: OpenCode as the harness, OmniRoute as the model gateway, with browser automation, web research, scraping and document tools preconfigured.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "bin": {
+    "omni-agent": "bin/omni-agent.mjs"
+  },
+  "main": "src/index.mjs",
+  "files": [
+    "bin/",
+    "src/",
+    "plugin/",
+    "config/",
+    "skills/",
+    "scripts/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/omni-agent.mjs",
+    "setup": "node bin/omni-agent.mjs setup",
+    "doctor": "node bin/omni-agent.mjs doctor",
+    "usage": "node bin/omni-agent.mjs usage",
+    "test": "node --test tests/unit/*.test.mjs",
+    "test:unit": "node --test tests/unit/*.test.mjs",
+    "test:integration": "node --test tests/integration/*.test.mjs",
+    "test:browser": "node --test tests/integration/browser.test.mjs",
+    "test:e2e": "node tests/e2e/run-e2e.mjs",
+    "postinstall": "node scripts/postinstall.mjs",
+    "build:installer": "node scripts/build-installer.mjs",
+    "build:portable": "node scripts/build-portable.mjs",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "test:all": "node --test tests/unit/*.test.mjs tests/integration/*.test.mjs"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "exceljs": "^4.4.0",
+    "linkedom": "^0.18.12",
+    "mammoth": "^1.12.0",
+    "pdfjs-dist": "^4.10.38",
+    "playwright-core": "^1.58.0",
+    "turndown": "^7.2.4",
+    "@opencode-ai/plugin": "^1.18.23"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AnSa30-06/omni-agent.git"
+  },
+  "keywords": [
+    "ai-agent",
+    "opencode",
+    "omniroute",
+    "browser-automation",
+    "web-research",
+    "llm"
+  ]
+}
