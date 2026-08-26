@@ -1,0 +1,105 @@
+{
+  "ranAt": "2026-08-26T20:16:55.947Z",
+  "elapsedMs": 0,
+  "recordCount": 0,
+  "checks": {
+    "Research output": [
+      {
+        "name": "Results file written",
+        "pass": false,
+        "detail": "agent did not create C:\\Users\\Abc\\AppData\\Local\\OmniAgent\\e2e-workspace\\internships.json"
+      }
+    ],
+    "Tool usage": [
+      {
+        "name": "web_search was used",
+        "pass": false,
+        "detail": ""
+      },
+      {
+        "name": "web_fetch was used",
+        "pass": false,
+        "detail": ""
+      },
+      {
+        "name": "web_scrape was used",
+        "pass": false,
+        "detail": ""
+      },
+      {
+        "name": "browser was used",
+        "pass": false,
+        "detail": ""
+      },
+      {
+        "name": "document_write was used",
+        "pass": false,
+        "detail": ""
+      }
+    ],
+    "System": [
+      {
+        "name": "Token usage was recorded",
+        "pass": true,
+        "detail": "0 new call(s) recorded this run, 415 tokens total today"
+      },
+      {
+        "name": "Token counts are provider-reported",
+        "pass": true,
+        "detail": "every counted call reported usage"
+      },
+      {
+        "name": "Quota status is displayed",
+        "pass": true,
+        "detail": "dashboard rendered"
+      },
+      {
+        "name": "No unlabelled quota figures",
+        "pass": true,
+        "detail": "every figure is labelled Live / cached / unavailable"
+      },
+      {
+        "name": "Gateway routed the request",
+        "pass": true,
+        "detail": "gateway up at http://127.0.0.1:20129"
+      },
+      {
+        "name": "A real model served the work",
+        "pass": true,
+        "detail": "big-pickle, hy3-free"
+      }
+    ]
+  },
+  "resolution": [],
+  "telemetry": {
+    "calls": 2,
+    "errors": 0,
+    "inputTokens": 275,
+    "outputTokens": 140,
+    "totalTokens": 415,
+    "toolCalls": 0,
+    "allProviderReported": true,
+    "byModel": {
+      "big-pickle": {
+        "calls": 1,
+        "inputTokens": 255,
+        "outputTokens": 116,
+        "totalTokens": 371,
+        "outputTokensPerSec": 2.03,
+        "meanLatencyMs": 57007,
+        "samples": 1
+      },
+      "hy3-free": {
+        "calls": 1,
+        "inputTokens": 20,
+        "outputTokens": 24,
+        "totalTokens": 44,
+        "outputTokensPerSec": 4.15,
+        "meanLatencyMs": 5779,
+        "samples": 1
+      }
+    }
+  },
+  "failed": 6,
+  "passed": false
+}

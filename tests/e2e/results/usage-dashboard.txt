@@ -1,0 +1,24 @@
+MODEL GATEWAY
+  Running at http://127.0.0.1:20129 (OmniRoute 3.8.49, up 351s)
+  Routing mode: balanced
+
+PROVIDER QUOTA / BALANCE
+  No provider API keys configured.
+  The agent still works: the gateway serves free, no-credential models.
+GATEWAY FREE TIER
+  Steady monthly allowance: 1,526,225,000 tokens
+    including recurring credits: 1,527,225,000 tokens
+  First month (with signup bonuses): 2,152,725,000 tokens
+  Boost allowance: 24,000,000 tokens
+  Reported by the gateway. Depends on which upstream accounts you connect.
+  Live - fetched 0 seconds ago
+
+TOKEN USAGE (measured on this machine)
+  This session: 0 in / 0 out / 0 total  (0 calls)
+  Today:        275 in / 140 out / 415 total  (2 calls)
+  Last 30 days: 415 total  (2 calls, 0 errors)
+  Token counts are provider-reported.
+
+  Per model (30d):
+    big-pickle                         371 tok  1 calls  2.03 tok/s measured over 1 calls
+    hy3-free                            44 tok  1 calls  4.15 tok/s measured over 1 calls
