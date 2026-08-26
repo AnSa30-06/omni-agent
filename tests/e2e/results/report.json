@@ -1,6 +1,6 @@
 {
-  "ranAt": "2026-08-26T23:30:51.405Z",
-  "elapsedMs": 1130053,
+  "ranAt": "2026-08-26T23:45:51.935Z",
+  "elapsedMs": 0,
   "recordCount": 10,
   "checks": {
     "Research output": [
@@ -96,7 +96,7 @@
       {
         "name": "Token usage was recorded",
         "pass": true,
-        "detail": "53 new call(s) recorded this run, 6891616 tokens total today"
+        "detail": "0 new call(s) recorded this run, 6891708 tokens total today"
       },
       {
         "name": "Token counts are provider-reported",
@@ -179,17 +179,17 @@
   ],
   "telemetry": {
     "source": "gateway-call-log",
-    "calls": 301,
-    "errors": 62,
-    "inputTokens": 6795675,
-    "outputTokens": 95941,
-    "totalTokens": 6891616,
+    "calls": 313,
+    "errors": 73,
+    "inputTokens": 6795695,
+    "outputTokens": 96013,
+    "totalTokens": 6891708,
     "cachedInputTokens": 6226752,
-    "reasoningTokens": 257,
+    "reasoningTokens": 326,
     "allProviderReported": true,
     "byModel": {
       "opencode/big-pickle": {
-        "calls": 246,
+        "calls": 248,
         "inputTokens": 6795500,
         "outputTokens": 95652,
         "totalTokens": 6891152,
@@ -199,7 +199,7 @@
         "samples": 228
       },
       "big-pickle": {
-        "calls": 246,
+        "calls": 248,
         "inputTokens": 6795500,
         "outputTokens": 95652,
         "totalTokens": 6891152,
@@ -209,7 +209,7 @@
         "samples": 228
       },
       "opencode/north-mini-code-free": {
-        "calls": 3,
+        "calls": 4,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -219,7 +219,7 @@
         "samples": 0
       },
       "north-mini-code-free": {
-        "calls": 3,
+        "calls": 4,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -229,7 +229,7 @@
         "samples": 0
       },
       "felo-web/felo-chat": {
-        "calls": 5,
+        "calls": 7,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -239,7 +239,7 @@
         "samples": 0
       },
       "felo-chat": {
-        "calls": 5,
+        "calls": 7,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -249,7 +249,7 @@
         "samples": 0
       },
       "felo-web/felo-search": {
-        "calls": 6,
+        "calls": 8,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -259,7 +259,7 @@
         "samples": 0
       },
       "felo-search": {
-        "calls": 6,
+        "calls": 8,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -269,7 +269,7 @@
         "samples": 0
       },
       "felo-web/felo-scholar": {
-        "calls": 5,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -279,7 +279,7 @@
         "samples": 0
       },
       "felo-scholar": {
-        "calls": 5,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -289,7 +289,7 @@
         "samples": 0
       },
       "felo-web/felo-social": {
-        "calls": 5,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -299,7 +299,7 @@
         "samples": 0
       },
       "felo-social": {
-        "calls": 5,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -309,7 +309,7 @@
         "samples": 0
       },
       "felo-web/felo-document": {
-        "calls": 5,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -319,7 +319,7 @@
         "samples": 0
       },
       "felo-document": {
-        "calls": 5,
+        "calls": 6,
         "inputTokens": 0,
         "outputTokens": 0,
         "totalTokens": 0,
@@ -339,24 +339,24 @@
         "samples": 0
       },
       "opencode/hy3-free": {
-        "calls": 11,
-        "inputTokens": 175,
-        "outputTokens": 289,
-        "totalTokens": 464,
+        "calls": 12,
+        "inputTokens": 195,
+        "outputTokens": 361,
+        "totalTokens": 556,
         "provider": "opencode",
-        "outputTokensPerSec": 10.24,
-        "meanLatencyMs": 2565,
-        "samples": 11
+        "outputTokensPerSec": 11.36,
+        "meanLatencyMs": 2649,
+        "samples": 12
       },
       "hy3-free": {
-        "calls": 11,
-        "inputTokens": 175,
-        "outputTokens": 289,
-        "totalTokens": 464,
+        "calls": 12,
+        "inputTokens": 195,
+        "outputTokens": 361,
+        "totalTokens": 556,
         "provider": "opencode",
-        "outputTokensPerSec": 10.24,
-        "meanLatencyMs": 2565,
-        "samples": 11
+        "outputTokensPerSec": 11.36,
+        "meanLatencyMs": 2649,
+        "samples": 12
       },
       "auto/coding": {
         "calls": 2,
@@ -409,6 +409,16 @@
         "samples": 0
       },
       "auto/smart": {
+        "calls": 1,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "auto",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "auto/cheap": {
         "calls": 1,
         "inputTokens": 0,
         "outputTokens": 0,
