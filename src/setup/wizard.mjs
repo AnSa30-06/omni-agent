@@ -15,7 +15,7 @@ import { PATHS, ensureDirs, pkg } from "../util/paths.mjs";
 import { loadConfig, updateConfig } from "../config.mjs";
 import { setSecret, getSecret, listSecretNames } from "../util/secrets.mjs";
 import { ensureRunning, ensureGatewayEnv } from "../gateway/supervisor.mjs";
-import { writeOpenCodeConfig, writeOpenCodeAuth } from "./opencode-config.mjs";
+import { applyConfig } from "./apply-config.mjs";
 import { provisionGatewayToken } from "../gateway/provision.mjs";
 import { runDoctor, renderDoctor } from "./doctor.mjs";
 import { ADAPTERS } from "../providers/usage-adapters.mjs";
@@ -203,10 +203,10 @@ export async function runSetup(opts = {}) {
     }
 
     say("  Writing configuration...");
-    const wrote = writeOpenCodeConfig();
-    const auth = writeOpenCodeAuth(getSecret("omniroute.apiKey"));
+    const wrote = await applyConfig();
     say(`  Configuration written. ${wrote.skills} skills installed.`);
-    say(`  Model gateway wired into OpenCode: ${wrote.omnirouteWired && auth.written ? "yes" : "NO"}`);
+    say(`  Model gateway wired into OpenCode: ${wrote.omnirouteWired && wrote.authWritten ? "yes" : "NO"}`);
+    say(wrote.model ? `  The agent will run on: ${wrote.model}` : "  Agent model: OpenCode will choose (gateway was unreachable)");
 
     // --- 5. Verify ---------------------------------------------------------
     if (!opts.skipDoctor) {

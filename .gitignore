@@ -10,6 +10,8 @@ staging/
 
 # Local scratch (never committed)
 .scratch/
+.tmp/
+tmp/
 *.log
 
 # Secrets and per-machine state - these must never reach the repository

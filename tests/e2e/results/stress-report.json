@@ -1,0 +1,15 @@
+{
+  "ranAt": "2026-08-26T22:08:33.926Z",
+  "results": [
+    {
+      "name": "coding",
+      "label": "Coding - write a working program",
+      "pass": true,
+      "detail": "program runs and reports the correct totals",
+      "elapsedMs": 67570,
+      "exitCode": 0
+    }
+  ],
+  "passed": 1,
+  "total": 1
+}

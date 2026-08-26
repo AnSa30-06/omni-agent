@@ -32,6 +32,25 @@ const UA =
 const lastCallAt = new Map();
 const MIN_INTERVAL_MS = { duckduckgo: 2500, searxng: 1500, browser: 1500 };
 
+// Public SearXNG instances, tried in order.
+//
+// Any one of them can be down, rate-limited, or returning an empty page - so
+// the list has to be long enough that the whole rotation failing means the
+// machine really is throttled rather than that we picked two unlucky hosts.
+// Measured 2026-08-27 on a throttled IP: four of the original four returned
+// short empty pages while opnxng returned 33 results for the same query, which
+// is why the order below leads with the ones that answered.
+const SEARXNG_INSTANCES = [
+  "https://opnxng.com",
+  "https://searxng.site",
+  "https://baresearch.org",
+  "https://searx.be",
+  "https://priv.au",
+  "https://search.inetol.net",
+  "https://searx.tiekoetter.com",
+];
+
+
 async function throttle(providerId) {
   const min = MIN_INTERVAL_MS[providerId];
   if (!min) return;
@@ -197,7 +216,7 @@ const PROVIDERS = {
       const configured = process.env.SEARXNG_INSTANCE;
       const instances = configured
         ? [configured.replace(/\/$/, "")]
-        : ["https://searxng.site", "https://searx.be", "https://priv.au", "https://search.inetol.net"];
+        : SEARXNG_INSTANCES;
       const { parseHTML } = await import("linkedom");
       let lastErr = null;
 

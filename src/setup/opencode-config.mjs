@@ -74,6 +74,17 @@ function permissionProfile(name) {
       [glob(PATHS.workspace)]: "allow",
       [glob(PATHS.downloads)]: "allow",
       [glob(PATHS.home)]: "allow",
+      // Name-based safety net for redirected filesystems.
+      //
+      // Under a Windows packaged (MSIX) app, writes to LOCALAPPDATA are
+      // virtualised into the container's LocalCache. This process sees
+      // ...\Local\OmniAgent\... while OpenCode sees
+      // ...\Local\Packages\<pkg>\LocalCache\Local\OmniAgent\..., so the
+      // absolute patterns above simply do not match and every write is refused.
+      // Measured exactly that. These globs are still scoped to directories
+      // named after this application.
+      "**/OmniAgent/**": "allow",
+      "**/OmniAgent Workspace/**": "allow",
     };
   }
   return permission;
@@ -187,10 +198,21 @@ export function writeOpenCodeConfig(opts = {}) {
   // down. So it is only set when the wiring it depends on is actually present.
   const smallModelSafe = !!omniroutePlugin && !!opts.apiKey;
 
+  // The agent's own model.
+  //
+  // Left unset, OpenCode picks one itself - observed choosing `oc/big-pickle`,
+  // a specific free model - which means the routing preset the user selected
+  // governs nothing the agent actually does. Pointing it at the gateway combo
+  // for the configured mode is what makes "smart" and "cheap" mean something.
+  //
+  // Still not a hardcoded vendor model: it is a combo id, resolved from the live
+  // catalogue by the caller, and the gateway does the real routing behind it.
+  // OpenCode does not hot-reload config, so a mode change applies at next launch.
+  const defaultModel = opts.defaultModel ? `${providerPrefix}/${opts.defaultModel}` : null;
+
   const config = {
     $schema: "https://opencode.ai/config.json",
-    // No main `model` pinned here on purpose: routing is decided by our own
-    // layer and the gateway's auto/* combos, and a hardcoded id would go stale.
+    ...(defaultModel && smallModelSafe ? { model: defaultModel } : {}),
     ...(smallModelSafe ? { small_model: `${providerPrefix}/auto/cheap` } : {}),
     default_agent: "omni",
     autoupdate: false,

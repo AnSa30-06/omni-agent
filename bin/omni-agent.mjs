@@ -11,7 +11,8 @@ import { PATHS, ensureDirs } from "../src/util/paths.mjs";
 import { loadConfig, updateConfig, gatewayBaseUrl } from "../src/config.mjs";
 import { ensureRunning, stop as stopGateway, status as gatewayStatus } from "../src/gateway/supervisor.mjs";
 import { locateOpenCode } from "../src/gateway/locate.mjs";
-import { writeOpenCodeConfig, opencodeEnv, ocConfigDir } from "../src/setup/opencode-config.mjs";
+import { opencodeEnv, ocConfigDir } from "../src/setup/opencode-config.mjs";
+import { applyConfig } from "../src/setup/apply-config.mjs";
 import { runSetup, installBrowser } from "../src/setup/wizard.mjs";
 import { runDoctor, renderDoctor } from "../src/setup/doctor.mjs";
 import { buildDashboard, renderDashboard } from "../src/usage/dashboard.mjs";
@@ -57,11 +58,13 @@ Options
 async function ensureReady({ quiet = false } = {}) {
   ensureDirs();
   const cfg = loadConfig();
+  const gw = await ensureRunning({ onProgress: quiet ? () => {} : (m) => say(m) });
+  // After the gateway, not before: applyConfig resolves the model the current
+  // routing mode implies, and that needs a live catalogue.
   if (!fs.existsSync(path.join(ocConfigDir(), "opencode.json"))) {
     if (!quiet) say("First run: writing configuration...");
-    writeOpenCodeConfig();
+    await applyConfig();
   }
-  const gw = await ensureRunning({ onProgress: quiet ? () => {} : (m) => say(m) });
   return { cfg, gw };
 }
 
@@ -194,7 +197,13 @@ async function main() {
           return process.exit(1);
         }
         updateConfig({ routing: { ...loadConfig().routing, mode } });
-        return say(`Routing mode set to ${PRESETS[mode].label}.`);
+        say(`Routing mode set to ${PRESETS[mode].label}.`);
+        // The mode only means something once the agent's pinned model changes
+        // with it, and OpenCode reads its config at launch - it does not
+        // hot-reload. So rewrite it now, and say plainly when it takes effect.
+        const applied = await applyConfig();
+        say(applied.model ? `The agent will run on: ${applied.model}` : "Could not reach the gateway; the model will be resolved at next start.");
+        return say("Restart the agent for this to take effect.");
       }
       if (sub === "key") {
         const [provider, key] = [args[1], args[2]];

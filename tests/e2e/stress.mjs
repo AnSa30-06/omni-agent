@@ -21,7 +21,11 @@ import { request } from "../../src/util/http.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RESULTS = path.join(HERE, "results");
-const WS = path.join(PATHS.home, "stress-workspace");
+// Under the user profile, NOT LOCALAPPDATA. In a Windows packaged-app context
+// LOCALAPPDATA is virtualised into the container's LocalCache, so OpenCode sees
+// a different absolute path than this process does and refuses every write as
+// external. Observed: all four tasks failed in under 40s having read nothing.
+const WS = path.join(PATHS.workspace, "stress");
 
 const argv = process.argv.slice(2);
 const TIMEOUT_S = Number(argv[argv.indexOf("--timeout") + 1]) || 1200;
