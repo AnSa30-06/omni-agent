@@ -290,7 +290,18 @@ export function renderDashboard(d) {
       ? "  Token counts are provider-reported."
       : "  Some calls returned no usage block; totals below count only calls that did report usage."
   );
-  const models = Object.entries(t.last30Days.byModel).sort((a, b) => b[1].totalTokens - a[1].totalTokens).slice(0, 8);
+  // The gateway call log records every call under both the qualified id it
+  // routed to ("opencode/big-pickle") and the bare name it reported
+  // ("big-pickle"), so that a throughput lookup succeeds whichever one the
+  // caller has. That is right for lookups and wrong for a list: shown raw, one
+  // model's 246 calls read as two models with 246 calls each. Keep the
+  // qualified id and drop the bare duplicate.
+  const entries = Object.entries(t.last30Days.byModel);
+  const qualifiedTails = new Set(entries.map(([id]) => id).filter((id) => id.includes("/")).map((id) => id.split("/").pop()));
+  const models = entries
+    .filter(([id]) => id.includes("/") || !qualifiedTails.has(id))
+    .sort((a, b) => b[1].totalTokens - a[1].totalTokens)
+    .slice(0, 8);
   if (models.length) {
     L.push("");
     L.push("  Per model (30d):");
