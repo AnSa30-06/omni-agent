@@ -1,0 +1,60 @@
+{
+  "$comment": "Local capability estimates for model routing. READ THIS BEFORE EDITING.",
+  "version": 3,
+  "updated": "2026-08-27",
+  "disclaimer": "capability_tier is a LOCAL EDITORIAL ESTIMATE maintained in this file. It is NOT a benchmark score and this product must never present it as one. speed_tier is likewise editorial and is superseded at runtime by measured tokens/sec whenever this installation has observed enough calls (see src/usage/telemetry.mjs). Cost figures are never stored here - they come from the gateway's pricing API or are reported as unknown.",
+  "tiers": {
+    "capability": ["fast-basic", "medium", "strong", "very-strong", "elite"],
+    "speed": ["slow", "medium", "fast", "very-fast"]
+  },
+  "$patternNotes": "Matched case-insensitively against the model id, most specific first. Deliberately keyed on model FAMILY rather than exact version, so a new point release inherits sensible defaults instead of falling off the table.",
+  "patterns": [
+    { "match": "opus", "capability_tier": "elite", "speed_tier": "medium", "recommended_tasks": ["planning", "hard-reasoning", "synthesis", "coding"] },
+    { "match": "gpt-5|o[34]-pro|o[34]\\b", "capability_tier": "elite", "speed_tier": "medium", "recommended_tasks": ["planning", "hard-reasoning", "coding"] },
+    { "match": "sonnet", "capability_tier": "very-strong", "speed_tier": "fast", "recommended_tasks": ["coding", "agentic", "synthesis", "browser-planning"] },
+    { "match": "gemini.*pro", "capability_tier": "very-strong", "speed_tier": "fast", "recommended_tasks": ["long-context", "synthesis", "vision"] },
+    { "match": "deepseek.*(r1|reason)", "capability_tier": "very-strong", "speed_tier": "medium", "recommended_tasks": ["hard-reasoning", "maths"] },
+    { "match": "grok", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["chat", "reasoning"] },
+    { "match": "deepseek", "capability_tier": "strong", "speed_tier": "very-fast", "recommended_tasks": ["coding", "extraction", "cheap-bulk"] },
+    { "match": "kimi|moonshot", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["long-context", "coding", "agentic"] },
+    { "match": "qwen.*(max|plus|235|72b)", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["coding", "multilingual"] },
+    { "match": "glm|zai", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["coding", "agentic"] },
+    { "match": "mistral.*large|mixtral", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["chat", "extraction"] },
+    { "match": "llama.*(405|70)b", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["chat", "extraction"] },
+    { "match": "haiku", "capability_tier": "medium", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles", "simple-extraction"] },
+    { "match": "gemini.*flash|flash-lite", "capability_tier": "medium", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles", "simple-extraction", "bulk-summarise"] },
+    { "match": "gpt-.*(mini|nano)", "capability_tier": "medium", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles", "simple-extraction"] },
+    { "match": "minimax|mimo|gemma|phi|small|lite|tiny|8b|7b|4b|3b", "capability_tier": "fast-basic", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles"] }
+  ],
+  "$comboNotes": "OmniRoute's auto/* combos already perform routing, fallback and quota-awareness upstream. We treat them as first-class routing targets and prefer them over naming a vendor model, because the combo knows about credential state and rate limits that this client cannot see.",
+  "combos": {
+    "auto/best-coding": { "capability_tier": "elite", "speed_tier": "medium", "intent": "coding" },
+    "auto/best-reasoning": { "capability_tier": "elite", "speed_tier": "medium", "intent": "hard-reasoning" },
+    "auto/pro-coding": { "capability_tier": "very-strong", "speed_tier": "fast", "intent": "coding" },
+    "auto/pro-reasoning": { "capability_tier": "very-strong", "speed_tier": "medium", "intent": "hard-reasoning" },
+    "auto/smart": { "capability_tier": "very-strong", "speed_tier": "medium", "intent": "general" },
+    "auto/coding": { "capability_tier": "strong", "speed_tier": "fast", "intent": "coding" },
+    "auto/reasoning": { "capability_tier": "strong", "speed_tier": "medium", "intent": "reasoning" },
+    "auto/chat": { "capability_tier": "strong", "speed_tier": "fast", "intent": "chat" },
+    "auto/best-fast": { "capability_tier": "strong", "speed_tier": "very-fast", "intent": "fast" },
+    "auto/fast": { "capability_tier": "medium", "speed_tier": "very-fast", "intent": "fast" },
+    "auto/cheap": { "capability_tier": "medium", "speed_tier": "very-fast", "intent": "cheap" },
+    "auto/best-free": { "capability_tier": "medium", "speed_tier": "medium", "intent": "free" },
+    "auto/vision": { "capability_tier": "strong", "speed_tier": "fast", "intent": "vision" },
+    "auto/best-vision": { "capability_tier": "very-strong", "speed_tier": "medium", "intent": "vision" }
+  },
+  "$taskNotes": "Which routing intent each internal task should ask for. Cheap tasks must not reach an elite model - that is the single biggest waste of budget in an agent loop.",
+  "tasks": {
+    "classify": "cheap",
+    "title": "cheap",
+    "extract-simple": "cheap",
+    "summarise": "fast",
+    "dedupe": "cheap",
+    "plan": "smart",
+    "reason": "smart",
+    "code": "coding",
+    "browser-plan": "smart",
+    "synthesise": "smart",
+    "chat": "balanced"
+  }
+}
