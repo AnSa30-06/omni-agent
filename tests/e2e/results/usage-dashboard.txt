@@ -1,5 +1,5 @@
 MODEL GATEWAY
-  Running at http://127.0.0.1:20129 (OmniRoute 3.8.49, up 351s)
+  Running at http://127.0.0.1:20129 (OmniRoute 3.8.49, up 1352s)
   Routing mode: balanced
 
 PROVIDER QUOTA / BALANCE
@@ -14,11 +14,18 @@ GATEWAY FREE TIER
   Live - fetched 0 seconds ago
 
 TOKEN USAGE (measured on this machine)
-  This session: 0 in / 0 out / 0 total  (0 calls)
-  Today:        275 in / 140 out / 415 total  (2 calls)
-  Last 30 days: 415 total  (2 calls, 0 errors)
+  Source: gateway-call-log - Every call routed through the gateway, including the agent's own.
+  Since gateway start: 507741 in / 8390 out / 516131 total  (13 calls)
+  Today:        529968 in / 8715 out / 538683 total  (31 calls)
+  Last 30 days: 538683 total  (31 calls, 14 errors)
   Token counts are provider-reported.
 
   Per model (30d):
-    big-pickle                         371 tok  1 calls  2.03 tok/s measured over 1 calls
-    hy3-free                            44 tok  1 calls  4.15 tok/s measured over 1 calls
+    opencode/big-pickle             538639 tok  18 calls  47.93 tok/s measured over 16 calls
+    big-pickle                      538639 tok  18 calls  47.93 tok/s measured over 16 calls
+    opencode/hy3-free                   44 tok  1 calls  7.91 tok/s measured over 1 calls
+    hy3-free                            44 tok  1 calls  7.91 tok/s measured over 1 calls
+    opencode/north-mini-code-free         0 tok  1 calls  throughput not measured yet
+    north-mini-code-free                 0 tok  1 calls  throughput not measured yet
+    felo-web/felo-chat                   0 tok  2 calls  throughput not measured yet
+    felo-chat                            0 tok  2 calls  throughput not measured yet

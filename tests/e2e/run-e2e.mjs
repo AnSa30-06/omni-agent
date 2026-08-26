@@ -17,13 +17,17 @@ import { PATHS, ensureDirs } from "../../src/util/paths.mjs";
 import { opencodeEnv } from "../../src/setup/opencode-config.mjs";
 import { locateOpenCode } from "../../src/gateway/locate.mjs";
 import { ensureRunning } from "../../src/gateway/supervisor.mjs";
-import { rangeSummary } from "../../src/usage/telemetry.mjs";
+import * as gatewayTel from "../../src/usage/gateway-telemetry.mjs";
+import { rangeSummary as localRangeSummary } from "../../src/usage/telemetry.mjs";
 import { buildDashboard, renderDashboard } from "../../src/usage/dashboard.mjs";
 import { request } from "../../src/util/http.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = path.join(HERE, "results");
-const WORKSPACE = path.join(PATHS.home, "e2e-workspace");
+// Under the user profile, NOT LOCALAPPDATA: on Windows a packaged-app context
+// redirects LOCALAPPDATA into a LocalCache path, which OpenCode then treats as
+// outside the worktree and refuses to write to in a headless run.
+const WORKSPACE = path.join(PATHS.workspace, "e2e");
 const RESULTS_JSON = path.join(WORKSPACE, "internships.json");
 const EVIDENCE = path.join(WORKSPACE, "evidence.md");
 
@@ -33,6 +37,14 @@ const TIMEOUT_S = Number(args[args.indexOf("--timeout") + 1]) || 3600;
 
 const say = (s = "") => process.stdout.write(s + "\n");
 const rule = () => say("=".repeat(74));
+
+/**
+ * Usage for the run.
+ * Reads the gateway's call log where available - it is the only record that
+ * sees the agent's OWN model calls, which go OpenCode -> plugin -> gateway and
+ * never touch this process's client.
+ */
+const usageSummary = () => (gatewayTel.available() ? gatewayTel.rangeSummary(1) : localRangeSummary(1));
 
 const TASK = `Find 10 legitimate computer science internship or graduate job opportunities that are currently available on the public web. Prefer university, research lab and company sources over job aggregators.
 
@@ -187,7 +199,7 @@ async function verifySystem(before) {
   const checks = [];
   const add = (name, pass, detail) => checks.push({ name, pass, detail });
 
-  const after = rangeSummary(1);
+  const after = usageSummary();
   const newCalls = after.calls - before.calls;
   add("Token usage was recorded", newCalls > 0 || after.calls > 0,
     `${newCalls} new call(s) recorded this run, ${after.totalTokens} tokens total today`);
@@ -232,7 +244,7 @@ async function main() {
 
   let transcript = "";
   let elapsedMs = 0;
-  const before = rangeSummary(1);
+  const before = usageSummary();
 
   if (!VERIFY_ONLY) {
     say("");
@@ -291,7 +303,7 @@ async function main() {
     recordCount: resultChecks.records.length,
     checks: Object.fromEntries(all.map(([g, c]) => [g, c])),
     resolution: resultChecks.resolution ?? [],
-    telemetry: rangeSummary(1),
+    telemetry: usageSummary(),
     failed,
     passed: failed === 0,
   };

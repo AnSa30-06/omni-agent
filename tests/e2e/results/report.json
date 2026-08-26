@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-08-26T20:16:55.947Z",
+  "ranAt": "2026-08-26T20:33:36.152Z",
   "elapsedMs": 0,
   "recordCount": 0,
   "checks": {
@@ -7,28 +7,28 @@
       {
         "name": "Results file written",
         "pass": false,
-        "detail": "agent did not create C:\\Users\\Abc\\AppData\\Local\\OmniAgent\\e2e-workspace\\internships.json"
+        "detail": "agent did not create C:\\Users\\Abc\\OmniAgent Workspace\\e2e\\internships.json"
       }
     ],
     "Tool usage": [
       {
         "name": "web_search was used",
-        "pass": false,
+        "pass": true,
         "detail": ""
       },
       {
         "name": "web_fetch was used",
-        "pass": false,
+        "pass": true,
         "detail": ""
       },
       {
         "name": "web_scrape was used",
-        "pass": false,
+        "pass": true,
         "detail": ""
       },
       {
         "name": "browser was used",
-        "pass": false,
+        "pass": true,
         "detail": ""
       },
       {
@@ -41,7 +41,7 @@
       {
         "name": "Token usage was recorded",
         "pass": true,
-        "detail": "0 new call(s) recorded this run, 415 tokens total today"
+        "detail": "0 new call(s) recorded this run, 538683 tokens total today"
       },
       {
         "name": "Token counts are provider-reported",
@@ -66,27 +66,180 @@
       {
         "name": "A real model served the work",
         "pass": true,
-        "detail": "big-pickle, hy3-free"
+        "detail": "opencode/big-pickle, big-pickle, opencode/north-mini-code-free, north-mini-code-free, felo-web/felo-chat"
       }
     ]
   },
   "resolution": [],
   "telemetry": {
-    "calls": 2,
-    "errors": 0,
-    "inputTokens": 275,
-    "outputTokens": 140,
-    "totalTokens": 415,
-    "toolCalls": 0,
+    "source": "gateway-call-log",
+    "calls": 31,
+    "errors": 14,
+    "inputTokens": 529968,
+    "outputTokens": 8715,
+    "totalTokens": 538683,
+    "cachedInputTokens": 454720,
+    "reasoningTokens": 21,
     "allProviderReported": true,
     "byModel": {
+      "opencode/big-pickle": {
+        "calls": 18,
+        "inputTokens": 529948,
+        "outputTokens": 8691,
+        "totalTokens": 538639,
+        "provider": "opencode",
+        "outputTokensPerSec": 47.93,
+        "meanLatencyMs": 11334,
+        "samples": 16
+      },
       "big-pickle": {
+        "calls": 18,
+        "inputTokens": 529948,
+        "outputTokens": 8691,
+        "totalTokens": 538639,
+        "provider": "opencode",
+        "outputTokensPerSec": 47.93,
+        "meanLatencyMs": 11334,
+        "samples": 16
+      },
+      "opencode/north-mini-code-free": {
         "calls": 1,
-        "inputTokens": 255,
-        "outputTokens": 116,
-        "totalTokens": 371,
-        "outputTokensPerSec": 2.03,
-        "meanLatencyMs": 57007,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "opencode",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "north-mini-code-free": {
+        "calls": 1,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "opencode",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-web/felo-chat": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-chat": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-web/felo-search": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-search": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-web/felo-scholar": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-scholar": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-web/felo-social": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-social": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-web/felo-document": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "felo-document": {
+        "calls": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "felo-web",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "auto/fast": {
+        "calls": 1,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "provider": "auto",
+        "outputTokensPerSec": null,
+        "meanLatencyMs": null,
+        "samples": 0
+      },
+      "opencode/hy3-free": {
+        "calls": 1,
+        "inputTokens": 20,
+        "outputTokens": 24,
+        "totalTokens": 44,
+        "provider": "opencode",
+        "outputTokensPerSec": 7.91,
+        "meanLatencyMs": 3034,
         "samples": 1
       },
       "hy3-free": {
@@ -94,12 +247,13 @@
         "inputTokens": 20,
         "outputTokens": 24,
         "totalTokens": 44,
-        "outputTokensPerSec": 4.15,
-        "meanLatencyMs": 5779,
+        "provider": "opencode",
+        "outputTokensPerSec": 7.91,
+        "meanLatencyMs": 3034,
         "samples": 1
       }
     }
   },
-  "failed": 6,
+  "failed": 2,
   "passed": false
 }

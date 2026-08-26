@@ -54,7 +54,29 @@ export function opencodeEnv(extra = {}) {
 function permissionProfile(name) {
   const all = JSON.parse(fs.readFileSync(pkg("config", "permissions.json"), "utf8"));
   const profile = all.profiles[name] ?? all.profiles.standard;
-  return profile.permission;
+  const permission = structuredClone(profile.permission);
+
+  // Allow the app's own directories through the external-directory boundary.
+  //
+  // Without this the agent researches successfully and then cannot save the
+  // result: OpenCode classifies a write to its own workspace as "external"
+  // whenever the resolved path differs from the worktree it computed - which
+  // happens on Windows when LOCALAPPDATA is redirected into a packaged-app
+  // LocalCache. In a headless `opencode run`, "ask" auto-rejects, so an hour of
+  // work is discarded at the last step. Observed exactly that.
+  //
+  // Scoped to directories this product owns. The broad "*": "ask" stays first,
+  // and OpenCode evaluates the LAST matching rule, so these are the exceptions.
+  const glob = (p) => p.replace(/\\/g, "/").replace(/\/$/, "") + "/**";
+  if (permission.external_directory !== "allow") {
+    permission.external_directory = {
+      "*": typeof permission.external_directory === "string" ? permission.external_directory : "ask",
+      [glob(PATHS.workspace)]: "allow",
+      [glob(PATHS.downloads)]: "allow",
+      [glob(PATHS.home)]: "allow",
+    };
+  }
+  return permission;
 }
 
 /**

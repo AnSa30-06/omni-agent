@@ -106,7 +106,14 @@ const APP_INCLUDE = [
   "installer/assets",
 ];
 
-const EXCLUDE_DIRS = new Set([".git", ".scratch", "dist", "staging", "tests", "runtime", ".github"]);
+// Excluded only at the REPOSITORY ROOT.
+//
+// This used to be matched against every path segment, which silently stripped
+// `node_modules/htmlparser2/dist/` - so linkedom could not load, and web fetch
+// and web search both died on a fresh install with
+// "Cannot find module htmlparser2/dist/esm/index.js". Found by installing the
+// built EXE and running the health check, not by reading the code.
+const EXCLUDE_TOP_LEVEL = new Set([".git", ".scratch", "dist", "staging", "tests", "runtime", ".github"]);
 
 function copyApp(dest) {
   fs.mkdirSync(dest, { recursive: true });
@@ -121,15 +128,44 @@ function copyApp(dest) {
     fs.cpSync(src, target, {
       recursive: true,
       filter: (s) => {
+        const relPath = path.relative(APP_ROOT, s);
+        const segments = relPath.split(path.sep);
+        // Only the first segment is checked, so a dependency's own dist/ or
+        // tests/ directory survives.
+        if (segments.length === 1 && EXCLUDE_TOP_LEVEL.has(segments[0])) return false;
         const base = path.basename(s);
-        if (EXCLUDE_DIRS.has(base)) return false;
         // Never ship a credential or a local env file, whatever it is called.
         if (/^\.env($|\.)/.test(base)) return false;
-        if (base === "credentials.dat" || base === "config.json") return false;
+        if (segments.length === 1 && (base === "credentials.dat" || base === "config.json")) return false;
         return true;
       },
     });
   }
+}
+
+/** Fail the build if a dependency the app cannot start without is missing. */
+function verifyStagedApp(appStage) {
+  const required = [
+    ["node_modules/linkedom/esm/shared/parse-from-string.js", "HTML parsing"],
+    ["node_modules/htmlparser2/dist/esm/index.js", "HTML parsing (linkedom dependency)"],
+    ["node_modules/playwright-core/cli.js", "browser install"],
+    ["node_modules/@mozilla/readability/Readability.js", "article extraction"],
+    ["node_modules/turndown/lib/turndown.cjs.js", "markdown conversion"],
+    ["node_modules/exceljs/dist/exceljs.nodejs.js", "spreadsheets"],
+    ["node_modules/@opencode-ai/plugin/dist/tool.js", "the plugin contract"],
+    ["bin/omni-agent.mjs", "the launcher"],
+    ["plugin/index.mjs", "the tool layer"],
+    ["skills", "the skill library"],
+    ["config/models/metadata.json", "model metadata"],
+  ];
+  const missing = required.filter(([f]) => !fs.existsSync(path.join(appStage, f)));
+  if (missing.length) {
+    say("");
+    say("Staged application is incomplete:");
+    for (const [f, why] of missing) say(`  MISSING ${f}   (needed for ${why})`);
+    throw new Error(`${missing.length} required file(s) missing from the staged app`);
+  }
+  say(`  verified ${required.length} required paths are present.`);
 }
 
 function dirSizeMB(dir) {
@@ -172,6 +208,7 @@ async function main() {
   const appStage = path.join(STAGING, "app");
   const nodeStage = path.join(STAGING, "node");
   copyApp(appStage);
+  verifyStagedApp(appStage);
   fs.cpSync(nodeSrc, nodeStage, { recursive: true });
   say(`  app:  ${dirSizeMB(appStage)} MB`);
   say(`  node: ${dirSizeMB(nodeStage)} MB`);
