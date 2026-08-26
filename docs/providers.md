@@ -91,25 +91,55 @@ myprovider: {
 
 ## Search providers
 
-Tried in the configured order; the first with a usable credential wins.
+Tried in the configured order; the first with a usable credential wins, and the chain falls
+through on failure.
 
 | Provider | Credential | Notes |
 |---|---|---|
 | **Brave Search** | `BRAVE_SEARCH_API_KEY` | Free tier available. Good quality. |
 | **Tavily** | `TAVILY_API_KEY` | Built for agents; returns cleaner content. |
 | **Serper** | `SERPER_API_KEY` | Google results via API. |
-| **DuckDuckGo** | *none* | **The keyless default.** Always available. |
+| **DuckDuckGo** | *none* | First keyless option. HTML endpoint, sub-second. |
+| **SearXNG** | *none* | Second keyless option, **independent index**. Public instances, or your own via `SEARXNG_INSTANCE`. |
+| **Browser** | *none* | Last resort. Runs the query in the bundled Chromium. Slow but survives HTTP-level throttling. |
 
-DuckDuckGo is last in the order and needs no account, which is what makes the product work
-the moment it is installed. The parser drops paid placements (`result--ad`) and DuckDuckGo's
-own redirector links, so what comes back is organic results with real destination URLs.
+Three keyless providers, not one, and that is not belt-and-braces — it is the fix for a
+failure that actually happened.
+
+### Keyless search gets rate-limited, and the product now handles it
+
+Measured during a research run: DuckDuckGo began returning an **empty page** to every
+query from this machine part-way through. Empty is also how "nothing matched" looks, so the
+agent read it as "no results", reworded the query, and searched again — which made it
+worse.
+
+Three changes came out of that:
+
+1. **A politeness throttle.** Keyless providers are spaced 1.5–2.5 s apart. An agent fires
+   five queries in as many seconds while exploring; that burst is what triggers the block. A
+   couple of seconds per search is nothing next to a model turn.
+2. **Throttling is reported as throttling.** An empty page now raises a distinct error, so
+   the chain falls through to the next provider instead of the agent rewording forever. When
+   *every* keyless provider is throttled the message says exactly that, and says that a
+   search API key removes the limit.
+3. **An independent second option.** SearXNG reaches results by a different path, so it does
+   not fail at the same moment and for the same reason.
+
+If you do a lot of research, configure one keyed provider. It is the single biggest
+reliability improvement available, and Brave and Tavily both have free tiers.
+
+> Mojeek was evaluated as the independent option and dropped: its search page is a 5 KB
+> JavaScript shell over plain HTTP and carries no results without rendering.
 
 Change the order:
 
 ```jsonc
 // %LOCALAPPDATA%\OmniAgent\config.json
-{ "search": { "order": ["tavily", "brave", "duckduckgo"] } }
+{ "search": { "order": ["tavily", "brave", "duckduckgo", "searxng", "browser"] } }
 ```
+
+The DuckDuckGo parser drops paid placements (`result--ad`) and the engine's own redirector
+links, so what comes back is organic results with real destination URLs.
 
 Results are always labelled `kind: "search-snippets"`. The skills instruct the agent that a
 snippet is a lead, not evidence, and that it must fetch before quoting.

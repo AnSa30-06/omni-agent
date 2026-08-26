@@ -87,13 +87,31 @@ Re-downloads Chromium into `%LOCALAPPDATA%\OmniAgent\browsers`.
 - **A CAPTCHA or bot check** — the agent will not attempt to bypass one. Do that step
   yourself.
 
-## Web search returns nothing
+## "Every keyless search provider is currently throttling this machine"
 
-DuckDuckGo rate-limits aggressively when queried in bursts. Wait, or add a keyed provider:
+Real, common, and not a bug. The free search endpoints block an IP that queries them in
+bursts — which is exactly what an agent doing research looks like. They return an empty
+page rather than an error code.
 
-```bash
-omni-agent config key brave BSA...     # then set search.order in config.json
-```
+The product already: spaces requests 1.5–2.5 s apart, falls through DuckDuckGo → SearXNG →
+the bundled browser, and reports throttling as throttling rather than as "no results".
+
+When you see this message:
+
+- **Wait.** These limits decay, usually within the hour.
+- **Work from known URLs.** `web_fetch` on a specific page is unaffected — only *search* is
+  limited.
+- **Add a search key.** This removes the limit permanently. Brave and Tavily both have free
+  tiers:
+  ```bash
+  omni-agent config key brave BSA...
+  ```
+  Then put it first in `search.order` in `%LOCALAPPDATA%\OmniAgent\config.json`.
+- **Point at your own SearXNG.** `SEARXNG_INSTANCE=https://my-searxng.example.com` stops the
+  product depending on volunteer-run public instances.
+
+If search returns results but they are irrelevant or in the wrong language, it is a public
+SearXNG instance with odd defaults — pin your own, or add a keyed provider.
 
 ## "Quota unavailable from provider"
 

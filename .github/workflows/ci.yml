@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: Unit tests and secret scan
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --omit=dev --no-fund --no-audit
+
+      # Unit tests are hermetic: no network, no gateway, no browser. They use a
+      # synthetic model catalogue so routing is testable without a live gateway.
+      - name: Unit tests
+        run: npm test
+
+      - name: Secret scan
+        run: npm run scan:secrets
+
+  integration:
+    name: Live integration tests
+    # Hits the real internet and drives a real browser, so it is not run on
+    # every pull request from a fork.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --omit=dev --no-fund --no-audit
+
+      - name: Install Chromium
+        run: node node_modules/playwright-core/cli.js install chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.browsers
+
+      - name: Web integration tests
+        run: node --test --test-timeout=120000 tests/integration/web.test.mjs
+
+      - name: Browser integration tests
+        run: node --test --test-timeout=120000 tests/integration/browser.test.mjs
+        env:
+          OMNI_AGENT_HOME: ${{ github.workspace }}\.omni-agent-home
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.browsers
+
+  installer:
+    name: Build the installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --omit=dev --no-fund --no-audit
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer and portable zip
+        run: |
+          node scripts/build-installer.mjs
+          node scripts/build-portable.mjs
+        env:
+          ISCC_PATH: C:\Program Files (x86)\Inno Setup 6\ISCC.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omni-agent-dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
