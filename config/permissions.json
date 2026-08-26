@@ -1,0 +1,145 @@
+{
+  "$comment": "Permission profiles. The user is assumed to be non-technical, so the default profile answers the easy questions itself and saves the interruption budget for things that actually matter. Selected by config.permissions.profile.",
+  "version": 1,
+  "profiles": {
+    "standard": {
+      "label": "Standard",
+      "description": "Reading, searching, browsing and writing files happen without asking. Anything that changes the wider system, reaches outside the project, or has an external side effect asks first. Genuinely destructive commands are refused outright.",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "edit": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "todowrite": "allow",
+        "skill": "allow",
+        "task": "allow",
+        "lsp": "allow",
+        "question": "allow",
+        "external_directory": "ask",
+        "bash": {
+          "*": "ask",
+
+          "ls*": "allow",
+          "dir*": "allow",
+          "cat *": "allow",
+          "head *": "allow",
+          "tail *": "allow",
+          "wc *": "allow",
+          "find *": "allow",
+          "grep *": "allow",
+          "rg *": "allow",
+          "which *": "allow",
+          "echo *": "allow",
+          "pwd": "allow",
+          "type *": "allow",
+
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "git branch*": "allow",
+          "git remote*": "allow",
+          "git add*": "allow",
+          "git commit*": "allow",
+          "git checkout*": "allow",
+          "git switch*": "allow",
+          "git stash*": "allow",
+          "git init*": "allow",
+
+          "node *": "allow",
+          "npm run*": "allow",
+          "npm test*": "allow",
+          "npm ls*": "allow",
+          "npx *": "ask",
+          "python *": "allow",
+          "py *": "allow",
+          "pip list*": "allow",
+          "pytest*": "allow",
+
+          "git push --force*": "deny",
+          "git push -f*": "deny",
+          "git reset --hard*": "ask",
+          "git clean -fd*": "ask",
+
+          "rm -rf /*": "deny",
+          "rm -rf ~*": "deny",
+          "rm -rf C:*": "deny",
+          "del /f /s /q C:*": "deny",
+          "format *": "deny",
+          "diskpart*": "deny",
+          "mkfs*": "deny",
+          "shutdown*": "deny",
+          "reg delete*": "deny",
+          "net user*": "deny",
+          "netsh advfirewall*": "deny",
+          "Set-MpPreference*": "deny",
+          "Add-MpPreference*": "deny",
+          "bcdedit*": "deny",
+          "curl * | sh": "deny",
+          "curl * | bash": "deny",
+          "iwr * | iex": "deny",
+          "*Invoke-Expression*": "deny"
+        }
+      }
+    },
+
+    "cautious": {
+      "label": "Cautious",
+      "description": "Reading and searching are automatic; everything that writes, runs or reaches the network asks first. Slower, but nothing happens without you seeing it.",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "todowrite": "allow",
+        "question": "allow",
+        "lsp": "allow",
+        "skill": "allow",
+        "edit": "ask",
+        "task": "ask",
+        "webfetch": "ask",
+        "websearch": "allow",
+        "external_directory": "ask",
+        "bash": {
+          "*": "ask",
+          "ls*": "allow",
+          "cat *": "allow",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "rm -rf /*": "deny",
+          "rm -rf ~*": "deny",
+          "format *": "deny",
+          "diskpart*": "deny",
+          "shutdown*": "deny",
+          "reg delete*": "deny",
+          "Set-MpPreference*": "deny"
+        }
+      }
+    },
+
+    "open": {
+      "label": "Open",
+      "description": "For experienced users on a machine they do not mind changing. Only unambiguously destructive commands are refused. Do not pick this if you are not sure.",
+      "permission": {
+        "*": "allow",
+        "external_directory": "allow",
+        "bash": {
+          "*": "allow",
+          "rm -rf /*": "deny",
+          "rm -rf ~*": "deny",
+          "format *": "deny",
+          "diskpart*": "deny",
+          "mkfs*": "deny",
+          "shutdown*": "deny",
+          "Set-MpPreference*": "deny"
+        }
+      }
+    }
+  },
+
+  "$alwaysConfirm": "These are enforced in code, not by this file, and no profile can switch them off. See src/tools/browser.mjs (click) and docs/security.md: submitting a web form or activating any control that sends, publishes, purchases, applies, or deletes requires the user's explicit authorisation for that specific action in that turn."
+}
