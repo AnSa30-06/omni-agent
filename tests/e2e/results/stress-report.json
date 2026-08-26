@@ -1,12 +1,44 @@
 {
-  "ranAt": "2026-08-26T22:51:05.483Z",
+  "ranAt": "2026-08-26T22:57:27.013Z",
   "results": [
+    {
+      "name": "coding",
+      "label": "Coding - write a working program",
+      "pass": true,
+      "detail": "program runs and reports the correct totals",
+      "elapsedMs": 41622,
+      "exitCode": 0
+    },
+    {
+      "name": "research",
+      "label": "Web research - compare three tools with real citations",
+      "pass": true,
+      "detail": "3 tools, 6 distinct sources, 5 of 6 re-fetched OK",
+      "elapsedMs": 83553,
+      "exitCode": 0
+    },
     {
       "name": "browser",
       "label": "Browser - fill a real form from a local file, STOP before submitting",
       "pass": true,
       "detail": "name:true email:true size:true stopped-before-submit:true",
-      "elapsedMs": 91883,
+      "elapsedMs": 99634,
+      "exitCode": 0
+    },
+    {
+      "name": "data",
+      "label": "Data - analyse a CSV and answer a specific question",
+      "pass": true,
+      "detail": "identified Sprocket losing 600, which is correct",
+      "elapsedMs": 40867,
+      "exitCode": 0
+    },
+    {
+      "name": "documents",
+      "label": "Documents - extract a specific fact from a PDF",
+      "pass": true,
+      "detail": "invoice_number:true total_due:true (got INV-2026-0473 / 3840)",
+      "elapsedMs": 40653,
       "exitCode": 0
     },
     {
@@ -14,10 +46,10 @@
       "label": "General - a multi-step task unrelated to any of the above",
       "pass": true,
       "detail": "version-in-md:true nodejs.org-cited:true csv-well-formed:true",
-      "elapsedMs": 72422,
+      "elapsedMs": 48050,
       "exitCode": 0
     }
   ],
-  "passed": 2,
-  "total": 2
+  "passed": 6,
+  "total": 6
 }

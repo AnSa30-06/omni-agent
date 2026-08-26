@@ -86,6 +86,13 @@ Re-downloads Chromium into `%LOCALAPPDATA%\OmniAgent\browsers`.
   explicitly to submit, and it will ask you to confirm. See [security.md](security.md).
 - **A CAPTCHA or bot check** — the agent will not attempt to bypass one. Do that step
   yourself.
+- **"the browser needs a Node.js runtime and none was found"** — the browser runs in a
+  separate Node process (see [architecture.md](architecture.md#playwright-runs-in-its-own-process)).
+  Launch through `omni-agent`, which uses the bundled runtime, rather than starting
+  `opencode` yourself.
+- **"the browser host did not start within 30s"** — look for `browser-host` lines in
+  `%LOCALAPPDATA%\OmniAgent\logs\`. A stale handshake file is safe to delete:
+  `%LOCALAPPDATA%\OmniAgent\browser-host.json`.
 
 ## "Every keyless search provider is currently throttling this machine"
 

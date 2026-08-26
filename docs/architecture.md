@@ -119,6 +119,38 @@ to `ariaSnapshot()` and carries no refs. So `domSnapshot()` in
 Refs are invalidated by anything that changes the page. A stale ref fails with an
 instruction to re-snapshot rather than silently hitting a different element.
 
+### Playwright runs in its own process
+
+OpenCode plugins execute inside OpenCode's embedded Bun. Playwright cannot reach Chromium
+from there. Both of its transports fail at the same step, measured on Bun 1.3.14:
+
+| Transport | What happens |
+|---|---|
+| `--remote-debugging-pipe` (the default) | Chromium starts, logs normally, `launch` times out after 180 s |
+| `connectOverCDP(ws://…)` | Chromium starts and prints its DevTools URL; Playwright hangs at `<ws connecting>` |
+
+The second one localises the fault. Spawning works, stdio works, Chromium works — what
+fails is Playwright's WebSocket client completing an upgrade handshake in that runtime. The
+same code launches in 6 s under Node and 10 s under a standalone Bun 1.4.0.
+
+Plain HTTP from Bun has never been a problem — `web_fetch` and `web_search` run there — so
+Playwright stays on the Node side of a loopback HTTP boundary:
+
+```
+  plugin (Bun)  --HTTP 127.0.0.1--> browser-host.mjs (Node) --> Playwright --> Chromium
+```
+
+[`browser-host.mjs`](../src/tools/browser-host.mjs) owns the browser and answers on a
+random loopback port, with a per-process token and an explicit method allowlist — the
+method name arrives over the wire, so it is never used to look something up on the module.
+It shuts the browser down after fifteen idle minutes.
+[`browser-proxy.mjs`](../src/tools/browser-proxy.mjs) picks the in-process or the forwarded
+implementation from the runtime, so no caller has to know which side it is on.
+
+> This bug survived a full suite of passing browser tests because every one of them drove
+> `browser.mjs` directly, under Node — which is not how the product calls it.
+> `tests/integration/browser-host.test.mjs` drives the wire instead.
+
 ## Escalation
 
 Three strategies for getting a page, cheapest first:
