@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Omni Agent</title>
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" href="logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- ── sidebar ─────────────────────────────────────────────────── -->
+      <aside id="sidebar">
+        <div class="brand">
+          <img class="brand-mark" src="logo.svg" alt="" width="24" height="24" />
+          <span class="brand-name">Omni Agent</span>
+          <button class="icon-btn" id="toggle-side" title="Hide sidebar" aria-label="Hide sidebar">☰</button>
+        </div>
+        <div class="side-top">
+          <div class="seg" role="tablist" aria-label="Mode">
+            <button class="seg-btn active" data-surface="chat" role="tab" aria-selected="true">
+              <span class="seg-dot"></span> Chat
+            </button>
+            <button class="seg-btn" data-surface="code" role="tab" aria-selected="false">
+              <span class="seg-code">&lt;/&gt;</span> Code
+            </button>
+          </div>
+        </div>
+
+        <button id="new-session" class="new-btn">
+          <span class="plus">+</span> New
+        </button>
+
+        <nav class="nav" id="nav">
+          <button class="nav-item" data-page="routines"><span class="ico">◷</span> Routines</button>
+          <button class="nav-item" data-page="transcripts"><span class="ico">❏</span> Transcripts</button>
+          <button class="nav-item" data-page="tools"><span class="ico">⚙</span> Tools &amp; plugins</button>
+          <button class="nav-item" data-page="search"><span class="ico">⌕</span> Search tools</button>
+          <button class="nav-item" data-page="providers"><span class="ico">◈</span> Free capacity</button>
+          <button class="nav-item" data-page="saving"><span class="ico">▤</span> Token saving</button>
+          <button class="nav-item" data-page="usage"><span class="ico">◔</span> Usage</button>
+          <button class="nav-item" data-page="settings"><span class="ico">⋮</span> Settings</button>
+          <button class="nav-item" data-page="dashboard"><span class="ico">⊞</span> Advanced dashboard</button>
+        </nav>
+
+        <div class="side-scroll">
+          <div class="side-label" id="session-heading">Conversations</div>
+          <div id="session-list"></div>
+        </div>
+
+        <div class="side-foot">
+          <div class="who">
+            <img class="avatar" src="logo.svg" alt="" width="22" height="22" />
+            <span class="who-name">Omni Agent</span>
+          </div>
+          <span class="badge" id="foot-model">—</span>
+        </div>
+      </aside>
+
+      <!-- ── main ────────────────────────────────────────────────────── -->
+      <main id="main">
+        <header id="topbar">
+          <button class="icon-btn only-collapsed" id="show-side" title="Show sidebar">☰</button>
+          <h1 id="title">New conversation</h1>
+          <span class="chip" id="workspace-chip"></span>
+          <div class="grow"></div>
+          <div class="meter" id="context-meter" hidden>
+            <div class="meter-bar"><i id="context-fill"></i></div>
+            <span id="context-text"></span>
+          </div>
+          <button class="icon-btn" id="btn-stop" title="Stop the agent" hidden>■</button>
+        </header>
+
+        <!-- conversation -->
+        <section id="view-session" class="view active">
+          <div id="messages" class="messages">
+            <div class="empty" id="empty-state">
+              <img class="empty-mark" src="logo.svg" alt="Omni Agent" width="56" height="56" />
+              <h2 id="empty-title">What would you like to do?</h2>
+              <p id="empty-sub">Ask a question, or describe something you want built.</p>
+              <div class="starters" id="starters"></div>
+            </div>
+          </div>
+
+          <div id="permission-bar" class="permission-bar" hidden></div>
+
+          <div class="composer-wrap">
+            <form id="composer" class="composer">
+              <textarea
+                id="prompt"
+                rows="1"
+                placeholder="Ask anything, or describe what you want done"
+                autocomplete="off"
+              ></textarea>
+              <div class="composer-row">
+                <div class="composer-left">
+                  <button type="button" class="pill" id="mode-btn" title="How much it does on its own">
+                    <span id="mode-label">Auto</span> <span class="caret">▾</span>
+                  </button>
+                  <button type="button" class="icon-btn" id="attach-btn" title="Add a file">+</button>
+                </div>
+                <div class="composer-right">
+                  <button type="button" class="pill ghost" id="model-btn" title="Choose the model">
+                    <span id="model-label">Choosing…</span> <span class="caret">▾</span>
+                  </button>
+                  <span class="pill ghost usage" id="usage-pill" title="Free allowance used">—</span>
+                  <button type="submit" class="send" id="send" title="Send">↵</button>
+                </div>
+              </div>
+            </form>
+            <p class="fineprint" id="fineprint"></p>
+          </div>
+        </section>
+
+        <!-- every settings-ish page renders into here -->
+        <section id="view-page" class="view">
+          <div class="page" id="page-body"></div>
+        </section>
+      </main>
+    </div>
+
+    <!-- popovers -->
+    <div class="popover" id="pop-mode" hidden></div>
+    <div class="popover" id="pop-model" hidden></div>
+    <div class="modal-back" id="modal-back" hidden><div class="modal" id="modal"></div></div>
+    <div class="toasts" id="toasts"></div>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

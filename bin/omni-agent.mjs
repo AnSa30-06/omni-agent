@@ -36,7 +36,8 @@ function usage() {
   say(`
 Omni Agent ${VERSION}
 
-  omni-agent [folder]        Start the agent (default). Opens OpenCode.
+  omni-agent ui              Open the Omni Agent desktop app (recommended)
+  omni-agent [folder]        Start the agent in the terminal instead
   omni-agent setup           First-run setup wizard
   omni-agent doctor          Check that everything works
   omni-agent usage           Show model, quota and token usage
@@ -49,6 +50,8 @@ Omni Agent ${VERSION}
   omni-agent provider signin <id>
   omni-agent dashboard [page]  Open the gateway's own web dashboard
   omni-agent saving [tier]     Show or set how hard it compresses to save tokens
+  omni-agent routine list      Scheduled routines
+  omni-agent routine run <id>  Run one now
 
   omni-agent gateway start|stop|status
   omni-agent config mode <fast|balanced|smart|quality|cheap>
@@ -437,6 +440,54 @@ async function main() {
       say(`Diagnostics written to: ${r.path}`);
       say("Secrets are redacted. Check it before sharing.");
       return;
+    }
+
+    case "ui":
+    case "app": {
+      const { launchUI } = await import("../src/ui/launch.mjs");
+      // --no-window starts everything and prints the address instead of
+      // opening a window, for anyone who would rather use their own browser.
+      const r = await launchUI({ onProgress: say, open: !flags.has("--no-window") });
+      if (!r.ok) return process.exit(1);
+      say("");
+      say("Omni Agent is open. Close the window when you are done.");
+      say("Leave this running - closing it stops the agent.");
+      // Nothing else to do; the HTTP servers hold the process open.
+      return;
+    }
+
+    case "routine": {
+      const sub = args[0];
+      const routines = await import("../src/ui/routines.mjs");
+      if (sub === "list") {
+        for (const r of routines.list()) {
+          say(`${r.enabled ? "[on] " : "[   ]"} ${r.id}  ${r.name}`);
+          say(`        ${r.schedule.kind} ${r.schedule.at ?? ""} - next ${r.nextRun ? new Date(r.nextRun).toLocaleString() : "never"}`);
+        }
+        return;
+      }
+      if (sub === "run") {
+        const id = args[1];
+        if (!id) {
+          say("Usage: omni-agent routine run <id>");
+          return process.exit(1);
+        }
+        // Scheduled Tasks run this with no app open, so bring up what it needs.
+        const { ensureRunning } = await import("../src/gateway/supervisor.mjs");
+        await ensureRunning();
+        const { start: startAgent, stop: stopAgent } = await import("../src/ui/opencode-server.mjs");
+        const a = await startAgent();
+        if (!a.ok) {
+          say(`The agent server did not start: ${a.reason}`);
+          return process.exit(1);
+        }
+        const r = await routines.run(id);
+        say(r.ok ? `Started (session ${r.sessionID}).` : `Failed: ${r.reason}`);
+        stopAgent();
+        return process.exit(r.ok ? 0 : 1);
+      }
+      say("Usage: omni-agent routine [list|run <id>]");
+      return process.exit(1);
     }
 
     case "start":

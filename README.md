@@ -21,7 +21,9 @@ faster — but that is an upgrade, not a requirement.
 2. **Run it.** No administrator password needed.
 3. When it finishes, it opens a setup window that downloads the rest and checks everything
    works. This takes a while and needs about 4 GB — see [Disk and download](#disk-and-download).
-4. **Launch** *Omni Agent* from your Desktop or Start Menu.
+4. **Launch** *Omni Agent* from your Desktop or Start Menu. It opens as a window —
+   Chat on one side, Code on the other, with everything else a click away in the
+   sidebar. See [The desktop app](docs/desktop-app.md).
 
 That's it. Ask it something.
 
@@ -240,7 +242,11 @@ to waste a budget.
 ## Commands
 
 ```bash
-omni-agent                 # start the agent
+omni-agent ui              # open the desktop app (what the shortcut does)
+omni-agent ui --no-window  # ...and use your own browser instead
+omni-agent                 # start the agent in the terminal instead
+omni-agent routine list    # scheduled routines
+omni-agent routine run ID  # run one now
 omni-agent dashboard       # open the gateway's own web dashboard
 omni-agent dashboard search   # ...straight to the search-tools page
 omni-agent saving          # what each token-saving tier really saves
@@ -300,6 +306,7 @@ total.
 
 | | |
 |---|---|
+| [The desktop app](docs/desktop-app.md) | The window: Chat and Code, routines, transcripts, models |
 | [Installation](docs/installation.md) | Every install path, and what each one does |
 | [Architecture](docs/architecture.md) | How the pieces fit, and the decisions behind them |
 | [Providers](docs/providers.md) | Model, search and scraping providers; what each publishes |

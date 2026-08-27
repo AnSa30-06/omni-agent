@@ -23,7 +23,7 @@ function main() {
 
   // Copy the portable entry points into the staging root so the zip is usable
   // the moment it is extracted.
-  for (const f of ["start.bat", "setup.bat", "install.ps1", "install.bat"]) {
+  for (const f of ["app.bat", "start.bat", "setup.bat", "install.ps1", "install.bat"]) {
     const src = path.join(APP_ROOT, "installer", "portable", f);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(STAGING, f));
   }

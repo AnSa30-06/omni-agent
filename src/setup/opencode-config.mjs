@@ -177,9 +177,17 @@ export function writeOpenCodeConfig(opts = {}) {
         autoSyncIntervalMs: 300000,
         modelCacheTtl: 300000,
         features: {
-          // Only offer models with at least one healthy upstream connection, so
-          // the picker does not list things that will fail on first use.
-          usableOnly: true,
+          // Register EVERY model the gateway can serve, not just the ones it
+          // currently rates as healthy. `usableOnly: true` looks safer and is
+          // not: measured 2026-08-28 the gateway's own catalogue held 188
+          // models across 10 live providers while the filter registered 81, so
+          // more than a hundred free models were unreachable from the picker
+          // with no way for the user to ask for them.
+          //
+          // The tradeoff is real - an unhealthy model fails when it is chosen -
+          // so the model picker marks which ones the gateway currently rates as
+          // usable rather than hiding the rest.
+          usableOnly: false,
           diskCache: true,
         },
       },
