@@ -13,12 +13,13 @@ import { stdin, stdout } from "node:process";
 import { spawn } from "node:child_process";
 import { PATHS, ensureDirs, pkg } from "../util/paths.mjs";
 import { loadConfig, updateConfig } from "../config.mjs";
-import { setSecret, getSecret, listSecretNames } from "../util/secrets.mjs";
+import { listSecretNames } from "../util/secrets.mjs";
 import { ensureRunning, ensureGatewayEnv } from "../gateway/supervisor.mjs";
 import { applyConfig } from "./apply-config.mjs";
+import { catalogue as providerCatalogue, addModelProvider, addSearchKey } from "./providers.mjs";
+import { setSaving, TIERS } from "../routing/compression.mjs";
 import { provisionGatewayToken } from "../gateway/provision.mjs";
 import { runDoctor, renderDoctor } from "./doctor.mjs";
-import { ADAPTERS } from "../providers/usage-adapters.mjs";
 import { PRESETS } from "../routing/select.mjs";
 import { logger } from "../util/log.mjs";
 
@@ -26,9 +27,6 @@ const log = logger("wizard");
 
 const say = (s = "") => stdout.write(s + "\n");
 const rule = () => say("-".repeat(66));
-
-/** Providers offered in setup, in the order a user is likely to have them. */
-const OFFERED = ["anthropic", "openai", "google", "deepseek", "moonshot", "openrouter"];
 
 export async function installBrowser({ onProgress = say } = {}) {
   ensureDirs();
@@ -93,23 +91,52 @@ export async function runSetup(opts = {}) {
     if (interactive) {
       say();
       rule();
-      say("  STEP 1 of 5   Your AI models");
+      say("  STEP 1 of 6   Your AI models");
       rule();
       say();
-      say("  If you already pay for an AI service, entering the key here makes");
-      say("  the agent noticeably faster. Leave every one blank to use the free");
-      say("  models - the agent works either way.");
+      say("  The agent already works with no key at all. Everything below is an");
+      say("  upgrade: more models, more speed, higher limits - and every one of");
+      say("  these has a genuinely free tier that needs no card.");
       say();
-      for (const id of OFFERED) {
-        const a = ADAPTERS[id];
-        const key = await ask(`  ${a.label} API key (Enter to skip): `);
+      say("  Skip all of it now and run `omni-agent provider` whenever you like.");
+      say();
+      const freeCat = providerCatalogue();
+      // The three worth a non-technical person's time on first run. The full
+      // list of fifteen is one command away, and putting it all here would turn
+      // setup into a form.
+      for (const id of ["cerebras", "groq", "openrouter"]) {
+        const entry = freeCat.models.find((m) => m.id === id);
+        if (!entry) continue;
+        say(`  ${entry.label} - ${entry.gives}`);
+        if (entry.signup) say(`    Free key: ${entry.signup}`);
+        const key = await ask("    Paste the key (Enter to skip): ");
         if (key) {
-          setSecret(a.secretName, key);
-          enabled.push(id);
-          say(`    Saved. Stored encrypted for your Windows account only.`);
+          const r = await addModelProvider(id, key);
+          say(r.ok ? "    Connected." : `    Could not connect: ${r.reason}`);
+          if (r.ok) enabled.push(id);
         }
+        say();
       }
-      if (!enabled.length) say("\n  No keys entered. Using the free models.");
+
+      say("  Web search works without a key too, but the free endpoints throttle");
+      say("  a machine that searches a lot. A free search key removes that.");
+      say();
+      const brave = freeCat.search.find((x) => x.id === "brave");
+      if (brave) {
+        say(`  ${brave.label} - ${brave.gives}`);
+        say(`    Free key: ${brave.signup}`);
+        const key = await ask("    Paste the key (Enter to skip): ");
+        if (key) {
+          const r = addSearchKey("brave", key);
+          say(r.ok ? "    Saved, encrypted for this Windows account." : `    ${r.reason}`);
+        }
+        say();
+      }
+
+      say("  If you already PAY for Claude, ChatGPT, Copilot, Cursor or Gemini,");
+      say("  you can sign in and use that subscription instead - nothing is");
+      say("  charged twice. Run `omni-agent provider signin <name>` when ready.");
+      if (!enabled.length) say("\n  Nothing added. The free models will be used.");
     }
     updateConfig({ providers: { enabled } });
 
@@ -118,7 +145,7 @@ export async function runSetup(opts = {}) {
     if (interactive) {
       say();
       rule();
-      say("  STEP 2 of 5   How should the agent pick a model?");
+      say("  STEP 2 of 6   How should the agent pick a model?");
       rule();
       say();
       const keys = Object.keys(PRESETS);
@@ -137,7 +164,7 @@ export async function runSetup(opts = {}) {
       const all = JSON.parse(fs.readFileSync(pkg("config", "permissions.json"), "utf8"));
       say();
       rule();
-      say("  STEP 3 of 5   How much should it ask before acting?");
+      say("  STEP 3 of 6   How much should it ask before acting?");
       rule();
       say();
       const keys = Object.keys(all.profiles);
@@ -159,7 +186,7 @@ export async function runSetup(opts = {}) {
     // --- 4. Components -----------------------------------------------------
     say();
     rule();
-    say("  STEP 4 of 5   Installing components");
+    say("  STEP 4 of 6   Installing components");
     rule();
     say();
 
@@ -202,6 +229,36 @@ export async function runSetup(opts = {}) {
       say("  OpenCode will not see any models until this succeeds.");
     }
 
+    // --- 4. Token saving ---------------------------------------------------
+    //
+    // Deliberately AFTER the gateway is up and credentialed, because setting it
+    // is an authenticated call to the gateway. Asked late, applied immediately.
+    let savingTier = "tools";
+    if (interactive && prov.ok) {
+      say();
+      rule();
+      say("  STEP 5 of 6   Saving tokens");
+      rule();
+      say();
+      say("  Free models come with limits. The gateway can compress what gets");
+      say("  sent so the same work costs far fewer tokens. Code, links and");
+      say("  structured data are never touched, whichever you pick.");
+      say();
+      say("  1. Tool output only   Shrinks command, test and search output.");
+      say("                        Your conversation is untouched. Recommended.");
+      say("  2. Maximum            Compresses the conversation as well. Saves");
+      say("                        the most; replies get noticeably terse.");
+      say("  3. Off                Send everything exactly as written.");
+      say();
+      const pick = await ask("  Choose 1-3 [1]: ", "1");
+      savingTier = { "1": "tools", "2": "max", "3": "off" }[pick] ?? "tools";
+    }
+    if (prov.ok) {
+      const sv = await setSaving(savingTier);
+      const t = TIERS.find((x) => x.id === savingTier);
+      say(sv.ok ? `  Token saving: ${t?.label ?? savingTier}.` : `  Could not set token saving: ${sv.reason}`);
+    }
+
     say("  Writing configuration...");
     const wrote = await applyConfig();
     say(`  Configuration written. ${wrote.skills} skills installed.`);
@@ -212,7 +269,7 @@ export async function runSetup(opts = {}) {
     if (!opts.skipDoctor) {
       say();
       rule();
-      say("  STEP 5 of 5   Checking everything works");
+      say("  STEP 6 of 6   Checking everything works");
       rule();
       say("  (this runs a real model request and launches a real browser)");
       const result = await runDoctor({ deep: true });
