@@ -24,7 +24,7 @@ export const DEFAULTS = {
   },
   search: {
     /** Ordered. First provider that has its credential (or needs none) wins. */
-    order: ["brave", "tavily", "serper", "duckduckgo", "searxng", "browser"],
+    order: ["brave", "tavily", "serper", "duckduckgo", "bravehtml", "searxng", "browser"],
   },
   scrape: {
     order: ["builtin", "browser", "firecrawl"],

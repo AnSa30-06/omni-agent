@@ -30,7 +30,61 @@ const UA =
  * is nothing next to a model turn.
  */
 const lastCallAt = new Map();
-const MIN_INTERVAL_MS = { duckduckgo: 2500, searxng: 1500, browser: 1500 };
+/**
+ * Pull results out of a Brave results page.
+ *
+ * Exported so the unit test can drive THIS function rather than a copy of it.
+ * The other parsers in this file are tested against reimplementations in the
+ * test file, which means those tests can pass while the shipped parser is
+ * broken - not a mistake worth repeating.
+ *
+ * @param {string} html
+ * @param {number} count
+ */
+/**
+ * The readable title of a Brave result.
+ *
+ * The result anchor's own text is the site name, the domain and a breadcrumb
+ * before the actual title - observed: "Redis redis.io > home > comparing the
+ * best open source vector databases". Handing that to a model as the title
+ * wastes tokens and makes results look like near-duplicates of each other.
+ */
+function braveTitle(anchor, row) {
+  const node = row?.querySelector("div[class*='title'], .title, h3, h4");
+  const fromNode = (node?.textContent || "").trim();
+  if (fromNode) return fromNode.slice(0, 300);
+  const raw = (anchor.textContent || "").trim();
+  // Breadcrumbs are joined with a chevron; the real title is the last segment.
+  const parts = raw.split(/\s*[›❯>]\s*/).filter(Boolean);
+  return (parts.length > 1 ? parts[parts.length - 1] : raw).trim().slice(0, 300);
+}
+
+export async function parseBraveHtml(html, count = 10) {
+  const { parseHTML } = await import("linkedom");
+  const { document } = parseHTML(html);
+  const out = [];
+  // Result anchors carry a hashed Svelte class plus a stable `l1`. The
+  // enrichment cards - video carousels, and so on - do not, which is how they
+  // get excluded without matching on a hash that changes every deploy.
+  for (const a of document.querySelectorAll("a[class~='l1']")) {
+    const href = a.getAttribute("href") || "";
+    if (!/^https?:/i.test(href)) continue;
+    if (/^https?:\/\/(www\.)?(search\.)?brave\.com|bravesoftware/.test(href)) continue;
+    const row = a.closest("div[class*='snippet']") ?? a.parentElement?.parentElement ?? a.parentElement;
+    out.push({
+      title: braveTitle(a, row),
+      url: href,
+      snippet: (row?.querySelector("div[class*='snippet-description'], .snippet-description, p")?.textContent || "")
+        .trim()
+        .slice(0, 300),
+      published: null,
+    });
+    if (out.length >= count) break;
+  }
+  return out;
+}
+
+const MIN_INTERVAL_MS = { duckduckgo: 2500, searxng: 1500, bravehtml: 2000, browser: 1500 };
 
 // Public SearXNG instances, tried in order.
 //
@@ -254,6 +308,33 @@ const PROVIDERS = {
         }
       }
       throw lastErr ?? new RateLimited("searxng");
+    },
+  },
+
+  bravehtml: {
+    // Brave's own public results page, no key required.
+    //
+    // Worth having because it is an INDEPENDENT crawler - not a Google or Bing
+    // reseller - so it does not go down at the same moment, for the same
+    // reason, as DuckDuckGo. Measured 2026-08-27 on an IP that DuckDuckGo was
+    // already throttling: 276KB and 34 real result links.
+    //
+    // This is the ordinary public page fetched with an ordinary user agent. No
+    // CAPTCHA is solved and no bot check is defeated; if the page comes back
+    // empty that is treated as throttling and the chain moves on, exactly as
+    // with every other keyless provider here.
+    credential: () => "keyless",
+    async run(query, { count }) {
+      const res = await request(`https://search.brave.com/search?q=${encodeURIComponent(query)}`, {
+        method: "GET",
+        headers: { "user-agent": UA, accept: "text/html", "accept-language": "en-US,en;q=0.9" },
+        timeoutMs: 25_000,
+        retries: 0,
+      });
+      if (!res.ok) throw new Error(`brave-html ${res.status}`);
+      const out = await parseBraveHtml(await res.text(), count);
+      if (!out.length) throw new RateLimited("bravehtml");
+      return out;
     },
   },
 

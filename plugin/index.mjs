@@ -19,6 +19,7 @@ import { buildDashboard, renderDashboard } from "../src/usage/dashboard.mjs";
 import { selectModel, PRESETS } from "../src/routing/select.mjs";
 import { getCatalogue } from "../src/routing/catalog.mjs";
 import { loadConfig, updateConfig } from "../src/config.mjs";
+import { runGatewayAction, ACTIONS as GATEWAY_ACTIONS } from "../src/tools/gateway-tool.mjs";
 import { logger } from "../src/util/log.mjs";
 
 const z = tool.schema;
@@ -376,6 +377,52 @@ export const OmniAgentPlugin = async () => {
       }),
 
       // ---------------------------------------------------------------------
+      gateway: tool({
+        description:
+          "Inspect and adjust the model gateway this agent runs on: what is connected, what it costs, how hard it " +
+          "compresses to save tokens, and which free providers the user could add. Use it when the user asks to save " +
+          "tokens, asks why they are being rate-limited, asks what is connected, wants more free capacity, or asks " +
+          "for the dashboard.\n\n" +
+          "Actions:\n" +
+          Object.entries(GATEWAY_ACTIONS)
+            .map(([k, v]) => `  ${k} - ${v}`)
+            .join("\n") +
+          "\n\nprovider_add, provider_remove and saving_set change the user's setup. They are refused without " +
+          "confirm:true, and confirm:true means the user agreed to that specific change in this turn - not that you " +
+          "think it is a good idea.",
+        args: {
+          action: z.enum(Object.keys(GATEWAY_ACTIONS)).describe("Which operation to run."),
+          tier: z.string().optional().describe("saving_set: one of the tier ids from saving_list."),
+          provider: z.string().optional().describe("provider_add / provider_signin_url: the provider id."),
+          key: z.string().optional().describe("provider_add: the API key, if the user supplied one."),
+          connectionId: z.string().optional().describe("provider_remove: id from providers_list."),
+          page: z.string().optional().describe("dashboard_url: which dashboard page."),
+          confirm: z.boolean().optional().describe("Required for changes. Only true with the user's explicit say-so."),
+        },
+        async execute(args, ctx) {
+          // Route the confirmation through OpenCode's own permission prompt, so
+          // the user sees the change in the UI rather than it being settled
+          // inside the model's own reasoning.
+          if (args.confirm && typeof ctx?.ask === "function") {
+            await ctx.ask({
+              permission: "gateway_change",
+              patterns: [args.action],
+              always: [],
+              metadata: { action: args.action, provider: args.provider, tier: args.tier },
+            });
+          }
+          const r = await runGatewayAction(args.action, args, { confirm: !!args.confirm });
+          if (r.blocked) {
+            return { title: `gateway: ${args.action} needs confirmation`, output: r.message };
+          }
+          return {
+            title: `gateway ${args.action}`,
+            output: clip(j(r), 20000, "gateway response"),
+            metadata: { action: args.action, ok: r.ok },
+          };
+        },
+      }),
+
       agent_status: tool({
         description:
           "Report or change how this agent is configured: which model is in use, the routing mode, live provider " +

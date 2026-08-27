@@ -5,6 +5,7 @@
 // integration test can distinguish "the chain is broken" from "the internet is
 // saying no today". The parsing and fallback logic can be pinned regardless.
 import { test } from "node:test";
+import { parseBraveHtml } from "../../src/tools/search.mjs";
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
 
@@ -157,4 +158,77 @@ test("the default provider order ends at keyless providers", () => {
   // At least two keyless options, so one being rate-limited is not fatal.
   const keyless = order.filter((p) => ["duckduckgo", "searxng", "browser"].includes(p));
   assert.ok(keyless.length >= 2, `expected 2+ keyless providers, got ${keyless.join(",")}`);
+});
+
+// --- Brave ------------------------------------------------------------------
+//
+// NOTE: unlike the two parsers above, this drives the SHIPPED function. The
+// tests above reimplement their parser in this file, which means they can stay
+// green while the real one is broken. Worth fixing; not worth breaking today.
+//
+// Markup captured from search.brave.com on 2026-08-27. The result class is a
+// hashed Svelte name plus a stable `l1`; enrichment cards (video carousels)
+// carry different classes and must not be returned as results.
+const BRAVE_SAMPLE = `<html><body>
+<a href="/" class="brave-logo btn">Brave</a>
+<div id="results">
+  <div class="snippet svelte-1rq4ngz">
+    <div class="result-content svelte-1rq4ngz">
+      <a href="https://www.wayup.com/s/internships/computer-science/" class="svelte-14r20fy l1">Computer Science Internships</a>
+      <div class="snippet-description svelte-abc">Find internships in computer science.</div>
+    </div>
+  </div>
+  <div class="snippet svelte-1rq4ngz">
+    <div class="result-content svelte-1rq4ngz">
+      <a href="https://in.indeed.com/q-computer-science-summer-internship-2026-jobs.html" class="svelte-14r20fy l1">Summer 2026 jobs</a>
+      <div class="snippet-description svelte-abc">Indeed listings.</div>
+    </div>
+  </div>
+  <div class="video-cluster-grid svelte-1lzs4ju odd">
+    <a href="https://www.youtube.com/watch?v=J1hcsI9ANOE" class="enrichment-card-item svelte-kobgr0">A video</a>
+  </div>
+  <a href="https://search.brave.com/settings" class="svelte-14r20fy l1">Settings</a>
+</div></body></html>`;
+
+test("brave results are parsed with titles, absolute urls and snippets", async () => {
+  const r = await parseBraveHtml(BRAVE_SAMPLE);
+  assert.equal(r.length, 2, "two real results, and neither the video card nor the settings link");
+  assert.equal(r[0].url, "https://www.wayup.com/s/internships/computer-science/");
+  assert.match(r[0].title, /Computer Science Internships/);
+  assert.match(r[0].snippet, /Find internships/);
+});
+
+test("brave enrichment cards are not returned as search results", async () => {
+  const r = await parseBraveHtml(BRAVE_SAMPLE);
+  assert.ok(!r.some((x) => /youtube\.com/.test(x.url)), "a video carousel is not a web result");
+});
+
+test("no brave result points back at brave itself", async () => {
+  const r = await parseBraveHtml(BRAVE_SAMPLE);
+  assert.ok(!r.some((x) => /brave\.com/.test(x.url)));
+});
+
+test("an empty brave page yields nothing, which callers treat as throttling", async () => {
+  assert.equal((await parseBraveHtml("<html><body><p>nope</p></body></html>")).length, 0);
+});
+
+test("brave respects the requested result count", async () => {
+  assert.equal((await parseBraveHtml(BRAVE_SAMPLE, 1)).length, 1);
+});
+
+test("brave titles drop the site-name and breadcrumb prefix", async () => {
+  // Observed live: the anchor text is "Redis redis.io > home > <the real title>".
+  const html = `<html><body><div class="snippet s"><div class="result-content s">
+    <a href="https://redis.io/blog/best-open-source-vector-databases" class="s l1">Redis redis.io \u203a home \u203a Comparing the best open source vector databases</a>
+    </div></div></body></html>`;
+  const r = await parseBraveHtml(html);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].title, "Comparing the best open source vector databases");
+});
+
+test("a brave title with no breadcrumb is left alone", async () => {
+  const html = `<html><body><div class="snippet s"><div class="result-content s">
+    <a href="https://example.com/x" class="s l1">A plain title</a></div></div></body></html>`;
+  const r = await parseBraveHtml(html);
+  assert.equal(r[0].title, "A plain title");
 });
