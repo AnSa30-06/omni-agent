@@ -163,3 +163,33 @@ resolve time rather than falling back silently.
   reach the model.
 - Tool output is truncated with an explicit marker, so the model knows it has a prefix.
 - `compaction.auto` is on with a 15-turn tail.
+
+## Token saving is a separate axis
+
+Model choice decides *what* answers. Compression decides *how much you pay to
+ask*. They are configured separately, and the second one turned out to matter
+more on a free tier.
+
+The gateway ships twelve compression engines behind seven mode names. Three
+things about them are worth knowing, all measured on 2026-08-27:
+
+1. **Setting the mode does nothing on its own.** `PUT /api/settings/compression
+   {defaultMode:"stacked"}` is accepted and changes the field, and leaves the
+   twelve-engine map exactly as it was. Previewing "stacked" in that state saved
+   **0.2%**. A tier has to set the engines too.
+2. **RTK keeps its own config that the engine flag does not reach.** Default is
+   disabled, intensity "minimal", no filters — **0% on pure tool output**.
+   Configured properly the same payload goes **757 tokens to 37**. Tool output
+   is most of what an agent spends, so this is the largest single lever in the
+   product and it ships off.
+3. **The modes are not one dial.** On an agent-shaped payload `ultra` saves
+   **0.7%** and `rtk` saves **93.9%**, because one targets prose and the other
+   targets tool output. `omni-agent saving` therefore sorts by the measured
+   number and names the axis each mode works on, rather than presenting a
+   single intensity ladder that does not exist.
+
+Savings shown to the user are measured against their own recent requests through
+`POST /api/compression/preview`, locally. Where that is impossible the figure is
+labelled as a representative payload or as OmniRoute's own unverified claim —
+never as a measurement of this machine.
+

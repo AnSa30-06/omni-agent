@@ -103,6 +103,85 @@ scores and are never presented as such.
 
 ---
 
+## Spending fewer tokens
+
+Free tiers have limits, and most of what an agent spends is tool output — test
+runs, file reads, search results — not conversation.
+
+```bash
+omni-agent saving
+```
+
+That lists every tier with the saving **measured on your own recent requests**,
+locally, through the gateway's preview endpoint. Nothing here quotes a brochure
+figure as if it were a measurement.
+
+| Tier | Targets | Measured on an agent-shaped payload |
+|---|---|---|
+| `max` | tool output + conversation | 96.7% |
+| `tools` | tool output only | 93.9% |
+| `balanced` | conversation | 3.8% |
+| `safe` | everything, lightly | 3.8% |
+| `high` | conversation | 0.7% |
+| `off` | nothing | 0% |
+
+**`tools` is the default**: nearly all of the saving, and your conversation is
+sent exactly as written. Code, URLs and structured data are never compressed at
+any tier.
+
+```bash
+omni-agent saving max
+```
+
+> The seven underlying modes are not one dial — some target prose and some
+> target tool output, which is why `high` saves less than `tools` here. The list
+> is ordered by what it actually measured rather than by an invented intensity
+> scale.
+
+---
+
+## More free capacity
+
+```bash
+omni-agent provider
+```
+
+Fifteen providers with a genuine free tier, what each one gives you, and where
+to get the key. Add one and it is tested immediately with a real call:
+
+```bash
+omni-agent provider add cerebras csk-...
+```
+
+Already paying for Claude, ChatGPT, Copilot, Cursor or Gemini? Sign in and the
+agent uses that subscription — nothing is charged twice:
+
+```bash
+omni-agent provider signin claude
+```
+
+Free web-search keys live in the same place. They remove the throttling that
+keyless search hits.
+
+---
+
+## The dashboard
+
+The bundled gateway is a full web application running on your own machine —
+providers, compression, analytics, search tools, settings.
+
+```bash
+omni-agent dashboard          # overview
+omni-agent dashboard search   # search and scraping providers
+omni-agent dashboard free     # every provider with a free allowance
+```
+
+It asks for a password, which setup generated for you. The command prints it and
+copies it to your clipboard. The dashboard is not reachable from any other
+computer.
+
+---
+
 ## Choosing a model
 
 The agent routes automatically. Five modes:
@@ -136,6 +215,10 @@ to waste a budget.
 
 ```bash
 omni-agent                 # start the agent
+omni-agent dashboard       # open the gateway's own web dashboard
+omni-agent dashboard search   # ...straight to the search-tools page
+omni-agent saving          # what each token-saving tier really saves
+omni-agent provider        # free providers you can add, and what each gives
 omni-agent doctor          # check everything works, with real probes
 omni-agent usage           # model, quota and token usage
 omni-agent models          # what the gateway currently serves

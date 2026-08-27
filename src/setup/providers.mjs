@@ -205,7 +205,11 @@ export function render(all) {
     if (p.note) L.push(`         ${p.note}`);
   }
   L.push("");
-  L.push('  "gives" is each provider\'s own advertised allowance, not a measurement.');
+  // No numbers here, on purpose. Two allowances copied from a third-party list
+  // were already wrong when checked against the providers' own pages, and a
+  // stale figure shown to a non-technical user is worse than no figure.
+  L.push("  What each gives is described in kind, not in numbers - allowances change,");
+  L.push("  and the signup page is the authority.");
   L.push("");
   L.push("  Add one with:   omni-agent provider add <id> <key>");
   L.push("  Sign in with:   omni-agent provider signin <id>");

@@ -182,3 +182,46 @@ capability and speed tiers. Two things about it:
 `capability_tier` is a **local editorial estimate**, and the file says so in a `disclaimer`
 field. It is not a benchmark score and this product never presents it as one. An unfamiliar
 model gets `tierSource: "unknown"` rather than being guessed into a tier.
+
+## Adding free capacity
+
+`omni-agent provider` lists providers with a genuine free tier. Every id in
+`config/providers/free.json` is verified to exist in the gateway's own provider
+manifest (`GET /api/v1/provider-plugin-manifest`, 222 providers), and base URLs
+and auth mechanics are read from that manifest rather than hardcoded — so the
+catalogue cannot drift from what the gateway actually supports.
+
+Signup links are checked, not trusted:
+
+```bash
+node scripts/check-provider-links.mjs
+```
+
+It caught one on the first run: `console.mistral.ai` did not resolve, so Mistral
+was dropped rather than shipped as a dead link.
+
+**Three different routes in, and they are not the same thing.**
+
+| Route | What it creates | Where the credential lives |
+|---|---|---|
+| Paste a free API key | a gateway provider connection | the gateway |
+| Sign in (OAuth, 22 providers) | a gateway provider connection | the gateway |
+| Web-search key | nothing in the gateway | this product's encrypted local store |
+
+A connection test distinguishes "your credential is wrong" from "their server is
+down" using the gateway's own diagnosis, because the remedy is completely
+different. Telling someone to check a key they never entered is worse than
+saying nothing.
+
+OAuth returns a URL for the user to open. This program does not click through a
+consent screen on anyone's behalf.
+
+## What the gateway does NOT provide
+
+**Web search.** OmniRoute has no search API — its "search tools" are
+search-grounded *model* providers. On a keyless install all four
+(`felo/felo-search`, `pol/perplexity-fast`, `tllm/sonar-pro`,
+`pol/gemini-search`) returned 400/401/403, so routing search through the gateway
+is not available unless you connect a search-capable provider yourself. This
+product's own search stack is what actually runs.
+
