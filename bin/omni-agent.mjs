@@ -21,6 +21,8 @@ import { selectModel, PRESETS } from "../src/routing/select.mjs";
 import { setSecret, listSecretNames } from "../src/util/secrets.mjs";
 import { ADAPTERS } from "../src/providers/usage-adapters.mjs";
 import { exportDiagnostics } from "../src/util/diagnostics.mjs";
+import { PAGES, dashboardUrl, openInBrowser, copyToClipboard, password as dashPassword } from "../src/gateway/dashboard.mjs";
+import { TIERS, getSaving, setSaving, measure, renderTiers, tier as findTier } from "../src/routing/compression.mjs";
 
 const VERSION = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const say = (s = "") => process.stdout.write(s + "\n");
@@ -39,6 +41,9 @@ Omni Agent ${VERSION}
   omni-agent usage           Show model, quota and token usage
   omni-agent models          List the models available right now
   omni-agent route           Show which model would be chosen and why
+
+  omni-agent dashboard [page]  Open the gateway's own web dashboard
+  omni-agent saving [tier]     Show or set how hard it compresses to save tokens
 
   omni-agent gateway start|stop|status
   omni-agent config mode <fast|balanced|smart|quality|cheap>
@@ -236,6 +241,80 @@ async function main() {
       }
       say("Usage: omni-agent config <mode|key|management-key|show> ...");
       return process.exit(1);
+    }
+
+    case "dashboard": {
+      const page = args[0] ?? "home";
+      const url = dashboardUrl(page);
+      if (!url) {
+        say(`Unknown page "${page}". Choose one of:`);
+        for (const [k, v] of Object.entries(PAGES)) say(`  ${k.padEnd(12)} ${v.label}`);
+        return process.exit(1);
+      }
+      const { gw } = await ensureReady({ quiet: true });
+      if (gw.ok === false) {
+        say(`The gateway is not running (${gw.reason}), so the dashboard has nothing to serve.`);
+        say("Try `omni-agent gateway start`.");
+        return process.exit(1);
+      }
+      const pw = dashPassword();
+      say("");
+      say(`Opening ${PAGES[page].label}`);
+      say(`  ${url}`);
+      say("");
+      if (pw) {
+        const copied = await copyToClipboard(pw);
+        say("  It will ask for a password. This one was generated for you at setup:");
+        say("");
+        say(`      ${pw}`);
+        say("");
+        say(copied ? "  (copied to your clipboard)" : "  (select and copy it from above)");
+        say("");
+        say("  It is stored on this machine only, and the dashboard is not reachable");
+        say("  from any other computer.");
+      } else {
+        say("  No dashboard password was found. Run `omni-agent setup --non-interactive` first.");
+      }
+      say("");
+      const opened = openInBrowser(url);
+      if (!opened.ok) say(`Could not open a browser automatically (${opened.reason}). Paste the URL above.`);
+      return;
+    }
+
+    case "saving": {
+      const wanted = args[0];
+      if (wanted) {
+        if (!findTier(wanted)) {
+          say(`Unknown tier "${wanted}". Choose one of: ${TIERS.map((t) => t.id).join(", ")}`);
+          return process.exit(1);
+        }
+        await ensureReady({ quiet: true });
+        const r = await setSaving(wanted);
+        if (!r.ok) {
+          say(`Could not change the saving tier: ${r.reason}`);
+          if (r.remedy) say(r.remedy);
+          return process.exit(1);
+        }
+        say(`Token saving set to ${r.tier.label} (${r.tier.id}).`);
+        say(`  ${r.tier.summary}`);
+        say(`  ${r.tier.costs}`);
+        say("");
+        say("This applies to every request from now on, including the agent's own.");
+        return;
+      }
+      await ensureReady({ quiet: true });
+      const cur = await getSaving();
+      if (!cur.ok) {
+        say(`Could not read the current saving tier: ${cur.reason}`);
+        if (cur.remedy) say(cur.remedy);
+        return process.exit(1);
+      }
+      const measured = flags.has("--quick") ? null : await measure();
+      say("");
+      say(renderTiers({ current: cur.tier, measured }));
+      say("");
+      say("  Change it with:  omni-agent saving <tier>");
+      return;
     }
 
     case "diagnostics": {

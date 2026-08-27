@@ -104,7 +104,15 @@ begin
   if CurUninstallStep = usPostUninstall then
   begin
     DataDir := ExpandConstant('{localappdata}\OmniAgent');
-    if DirExists(DataDir) then
+    // Only ever on an explicit Yes from a human.
+    //
+    // /SUPPRESSMSGBOXES makes MsgBox return the DEFAULT button without showing
+    // anything, and the default for MB_YESNO is IDYES - so a silent uninstall
+    // was answering "yes, delete my settings, saved API keys and downloaded
+    // browser" on the user's behalf. Measured: it did exactly that, twice.
+    // A prompt nobody saw is not consent, so a silent uninstall now keeps the
+    // data and the user can delete the directory themselves.
+    if DirExists(DataDir) and (not UninstallSilent) then
     begin
       if MsgBox('Also delete your Omni Agent settings, saved API keys, logs and downloaded browser?' + #13#10#13#10 +
                 DataDir + #13#10#13#10 +
