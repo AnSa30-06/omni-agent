@@ -174,35 +174,96 @@
     {
       "id": "brave",
       "label": "Brave Search",
-      "secret": "brave.apiKey",
-      "gives": "Free monthly credits on an independent web index",
+      "secret": "search.brave",
+      "gives": "Free credits every month on an independent web index",
       "signup": "https://brave.com/search/api/",
-      "note": "Independent index. The best free search key to add. Verified 2026-08-27."
+      "note": "Independent index - it does not fail when Google or Bing do. Verified 2026-08-27.",
+      "env": "BRAVE_SEARCH_API_KEY",
+      "setup": [
+        "Open https://brave.com/search/api/ and pick the 'Search' plan, then 'Get started'.",
+        "Create a Brave account, or sign in if you have one.",
+        "The Search plan is billed at $5 per 1,000 requests and includes $5 of free credit EVERY MONTH, applied automatically - so roughly a thousand free searches a month, renewing. (Read from their pricing page on 2026-08-27; check it yourself, prices move.)",
+        "In the developer dashboard, create a subscription token. That token is your API key.",
+        "Run:  omni-agent provider add brave YOUR-KEY"
+      ],
+      "verify": "omni-agent doctor"
     },
     {
       "id": "tavily",
       "label": "Tavily",
-      "secret": "tavily.apiKey",
+      "secret": "search.tavily",
       "gives": "A free monthly allowance, built for agents",
       "signup": "https://app.tavily.com/",
-      "note": "Built for agents; returns cleaned content, not just links."
+      "note": "Returns cleaned page content rather than just links, which suits research work.",
+      "env": "TAVILY_API_KEY",
+      "setup": [
+        "Open https://app.tavily.com/ and sign up (Google or GitHub sign-in works).",
+        "The API key is shown on the dashboard as soon as the account exists. It usually begins 'tvly-'.",
+        "Run:  omni-agent provider add tavily YOUR-KEY"
+      ],
+      "verify": "omni-agent doctor"
     },
     {
       "id": "serper",
       "label": "Serper",
-      "secret": "serper.apiKey",
+      "secret": "search.serper",
       "gives": "A one-time free grant of Google results",
       "signup": "https://serper.dev/",
-      "note": "Google results. The free grant does not renew."
+      "note": "Google's results. The free grant does NOT renew, so keep it for work that needs Google specifically.",
+      "env": "SERPER_API_KEY",
+      "setup": [
+        "Open https://serper.dev/ and sign up.",
+        "A free credit grant is added to the account automatically. It is one-time, not monthly.",
+        "Copy the API key from the dashboard.",
+        "Run:  omni-agent provider add serper YOUR-KEY"
+      ],
+      "verify": "omni-agent doctor"
     },
     {
       "id": "firecrawl",
       "label": "Firecrawl",
-      "secret": "firecrawl.apiKey",
+      "secret": "scrape.firecrawl",
       "gives": "A free allowance of page scrapes",
       "signup": "https://firecrawl.dev/",
-      "note": "Scraping, not search. Used as the last escalation for hard pages."
+      "note": "Scraping, not search. Only used as the last escalation when a page defeats both a plain fetch and the bundled browser.",
+      "env": "FIRECRAWL_API_KEY",
+      "setup": [
+        "Open https://firecrawl.dev/ and sign up.",
+        "Copy the API key from the dashboard. It usually begins 'fc-'.",
+        "Run:  omni-agent provider add firecrawl YOUR-KEY",
+        "This one changes scraping, not search, so `omni-agent doctor` will not show it in the Web search row."
+      ],
+      "verify": "omni-agent provider list"
     }
   ],
-  "$commentGives": "`gives` is deliberately QUALITATIVE. It used to carry specific allowances copied from OmniRoute's README and they did not survive checking on 2026-08-27: Cerebras was listed as '1M tokens/day' and its own pricing page says $5 in free credits; Brave was listed as '2,000 searches a month' and its own page says $5 in free monthly credits. Allowances change and a stale number shown to a non-technical user is worse than no number, so the signup page is the authority and this field only says what KIND of thing you get."
+  "$commentGives": "`gives` is deliberately QUALITATIVE. It used to carry specific allowances copied from OmniRoute's README and they did not survive checking on 2026-08-27: Cerebras was listed as '1M tokens/day' and its own pricing page says $5 in free credits; Brave was listed as '2,000 searches a month' and its own page says $5 in free monthly credits. Allowances change and a stale number shown to a non-technical user is worse than no number, so the signup page is the authority and this field only says what KIND of thing you get.",
+  "$commentKeyless": "Search works with no key at all. These need no setup and are listed so the CLI can say so rather than leaving a user wondering what they are missing.",
+  "keyless": [
+    {
+      "id": "duckduckgo",
+      "label": "DuckDuckGo",
+      "note": "Default. Throttles a machine that searches in bursts, which is why a key helps."
+    },
+    {
+      "id": "bravehtml",
+      "label": "Brave (public page)",
+      "note": "Brave's own index without a key. Independent of DuckDuckGo, so it does not fail at the same moment."
+    },
+    {
+      "id": "searxng",
+      "label": "SearXNG",
+      "note": "Public volunteer instances, tried in rotation.",
+      "setup": [
+        "Nothing is required - a rotation of public instances is used automatically.",
+        "To stop depending on volunteers, point it at your own instance:",
+        "  setx SEARXNG_INSTANCE https://my-searxng.example.com",
+        "Then restart the agent. One instance you control removes almost all search throttling."
+      ]
+    },
+    {
+      "id": "browser",
+      "label": "Bundled browser",
+      "note": "Last resort. Runs the search in the real Chromium this product already ships. Slower, but survives plain-HTTP endpoints being throttled."
+    }
+  ]
 }

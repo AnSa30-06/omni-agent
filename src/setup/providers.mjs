@@ -173,6 +173,104 @@ export function hasSearchKey(id) {
   return entry ? !!getSecret(entry.secret) : false;
 }
 
+/**
+ * Step-by-step setup for one provider, as lines ready to print.
+ *
+ * Every search provider that needs a credential carries real steps in the
+ * catalogue. They name the page, say what the free tier actually is, and end
+ * with the exact command - because "get an API key" is not an instruction to
+ * someone who has never done it.
+ */
+export function setupSteps(id) {
+  const cat = catalogue();
+  const search = cat.search.find((s) => s.id === id);
+  const keyless = (cat.keyless ?? []).find((s) => s.id === id);
+  const model = cat.models.find((m) => m.id === id);
+  const signIn = cat.signIn.find((m) => m.id === id);
+
+  if (search) {
+    return {
+      ok: true,
+      label: search.label,
+      kind: "search",
+      gives: search.gives,
+      note: search.note,
+      steps: search.setup ?? [],
+      verify: search.verify ?? null,
+    };
+  }
+  if (keyless) {
+    return {
+      ok: true,
+      label: keyless.label,
+      kind: "keyless",
+      gives: "Works with no key at all",
+      note: keyless.note,
+      steps: keyless.setup ?? ["Nothing to set up. This one is already in use."],
+      verify: "omni-agent doctor",
+    };
+  }
+  if (model) {
+    return {
+      ok: true,
+      label: model.label,
+      kind: model.auth === "oauth" ? "signin" : model.auth === "none" ? "keyless" : "model",
+      gives: model.gives,
+      note: model.note,
+      steps:
+        model.auth === "none"
+          ? [`Run:  omni-agent provider add ${id}`, "No account and no key are needed."]
+          : model.auth === "oauth"
+            ? [`Run:  omni-agent provider signin ${id}`, "Approve the sign-in in the browser it opens."]
+            : [
+                model.signup ? `Open ${model.signup} and create a free account.` : "Create a free account with the provider.",
+                "Copy the API key from their dashboard.",
+                `Run:  omni-agent provider add ${id} YOUR-KEY`,
+              ],
+      verify: "omni-agent models",
+    };
+  }
+  if (signIn) {
+    return {
+      ok: true,
+      label: signIn.label,
+      kind: "signin",
+      gives: signIn.gives,
+      note: signIn.note,
+      steps: [
+        `Run:  omni-agent provider signin ${id}`,
+        "Approve the sign-in in the browser it opens. Nothing is charged twice.",
+      ],
+      verify: "omni-agent provider list",
+    };
+  }
+  return { ok: false, reason: `nothing called "${id}" in the catalogue` };
+}
+
+export function renderSetup(s) {
+  const L = [];
+  L.push(`${s.label} - ${s.gives}`);
+  if (s.note) L.push(`  ${s.note}`);
+  L.push("");
+  // Continuation lines (already indented in the catalogue) must not consume a
+  // step number, or the list reads 1, 2, 4.
+  let n = 0;
+  for (const step of s.steps) {
+    if (step.startsWith("  ")) L.push(`     ${step.trim()}`);
+    else L.push(`  ${++n}. ${step}`);
+  }
+  if (s.verify) {
+    L.push("");
+    L.push(`  Check it worked:  ${s.verify}`);
+  }
+  if (s.kind === "search") {
+    L.push("");
+    L.push("  Once the key is stored it is used FIRST automatically. You do not");
+    L.push("  need to edit any configuration.");
+  }
+  return L.join("\n");
+}
+
 /** Render the whole picture for a terminal. */
 export function render(all) {
   const L = [];
@@ -199,6 +297,10 @@ export function render(all) {
 
   L.push("  Web search - removes the throttling that keyless search hits");
   L.push("");
+  L.push("  Search already works with NO key: DuckDuckGo, then Brave's public");
+  L.push("  page, then public SearXNG instances, then the bundled browser.");
+  L.push("  A key below removes the throttling those hit when you search a lot.");
+  L.push("");
   for (const p of all.search) {
     L.push(`  ${mark(p.connected)}${p.id.padEnd(15)} ${p.label} - ${p.gives}`);
     L.push(`         sign up: ${p.signup}`);
@@ -211,6 +313,7 @@ export function render(all) {
   L.push("  What each gives is described in kind, not in numbers - allowances change,");
   L.push("  and the signup page is the authority.");
   L.push("");
+  L.push("  Step-by-step:   omni-agent provider setup <id>");
   L.push("  Add one with:   omni-agent provider add <id> <key>");
   L.push("  Sign in with:   omni-agent provider signin <id>");
   return L.join("\n");

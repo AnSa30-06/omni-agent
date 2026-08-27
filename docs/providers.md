@@ -225,3 +225,45 @@ search-grounded *model* providers. On a keyless install all four
 is not available unless you connect a search-capable provider yourself. This
 product's own search stack is what actually runs.
 
+## Setting up a search provider
+
+Search works with **no key at all** — DuckDuckGo, then Brave's public results
+page, then public SearXNG instances, then the bundled browser. Those free
+endpoints throttle a machine that searches in bursts, which is what an agent
+doing research looks like. A key removes that.
+
+Every provider carries step-by-step instructions:
+
+```bash
+omni-agent provider setup brave
+```
+
+Once a key is stored it is used **first**, automatically — there is no
+configuration to edit. Verified: `availableProviders()` filters the default
+order by which credentials exist, and the keyed providers sit ahead of the
+keyless ones.
+
+| Provider | Where | What the free tier is |
+|---|---|---|
+| **Brave** | <https://brave.com/search/api/> | $5 of credit every month, auto-applied, at $5 per 1,000 requests — so roughly 1,000 searches/month, renewing *(their pricing page, read 2026-08-27)* |
+| **Tavily** | <https://app.tavily.com/> | A free monthly allowance; returns cleaned page content rather than links |
+| **Serper** | <https://serper.dev/> | A **one-time** free grant of Google results — it does not renew |
+| **Firecrawl** | <https://firecrawl.dev/> | A free allowance of page **scrapes**, not searches |
+
+Brave is the one to add first: it is an independent index, so it does not fail
+at the same moment and for the same reason as DuckDuckGo.
+
+**Self-hosting SearXNG** removes almost all throttling without any account:
+
+```powershell
+setx SEARXNG_INSTANCE https://my-searxng.example.com
+```
+
+Then restart the agent.
+
+Secrets are stored under the names the code actually reads — `search.brave`,
+`search.tavily`, `search.serper`, `scrape.firecrawl` — or the matching
+environment variables (`BRAVE_SEARCH_API_KEY` and so on). An earlier version of
+the catalogue stored them under different names, which meant the key was saved
+somewhere nothing looked.
+

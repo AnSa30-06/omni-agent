@@ -160,8 +160,34 @@ agent uses that subscription — nothing is charged twice:
 omni-agent provider signin claude
 ```
 
-Free web-search keys live in the same place. They remove the throttling that
-keyless search hits.
+### Search keys
+
+Search works with **no key at all** — DuckDuckGo, then Brave's public results
+page, then public SearXNG instances, then the bundled browser. Those free
+endpoints throttle a machine that searches in bursts, which is exactly what
+research looks like. A key removes that.
+
+Every provider comes with step-by-step instructions:
+
+```bash
+omni-agent provider setup brave
+```
+
+```
+Brave Search - Free credits every month on an independent web index
+
+  1. Open https://brave.com/search/api/ and pick the 'Search' plan.
+  2. Create a Brave account, or sign in.
+  3. $5 of free credit every month, applied automatically.
+  4. In the developer dashboard, create a subscription token.
+  5. Run:  omni-agent provider add brave YOUR-KEY
+
+  Check it worked:  omni-agent doctor
+```
+
+Once a key is stored it is used **first**, automatically — nothing to
+configure. Brave is the one to add first: an independent index, so it does not
+fail at the same moment as DuckDuckGo.
 
 ---
 

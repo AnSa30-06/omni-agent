@@ -44,6 +44,7 @@ Omni Agent ${VERSION}
   omni-agent route           Show which model would be chosen and why
 
   omni-agent provider [list]   Free providers you can add, and what each gives you
+  omni-agent provider setup <id>    Step-by-step instructions for one provider
   omni-agent provider add <id> <key>
   omni-agent provider signin <id>
   omni-agent dashboard [page]  Open the gateway's own web dashboard
@@ -276,7 +277,11 @@ async function main() {
             return process.exit(1);
           }
           say(`Stored the ${id} search key, encrypted for this Windows account.`);
-          say("Put it first in `search.order` in your config to prefer it. It is used automatically as a fallback either way.");
+          // Verified: availableProviders() filters the default order by which
+          // credentials exist, and the keyed providers sit ahead of the keyless
+          // ones - so storing the key is the whole job.
+          say("It is now used FIRST for searches. No configuration to edit.");
+          say("Check it with:  omni-agent doctor");
           return;
         }
         const r = await providers.addModelProvider(id, key);
@@ -296,6 +301,32 @@ async function main() {
           }
         }
         say("Run `omni-agent models` to see what it added.");
+        return;
+      }
+
+      if (sub === "setup") {
+        const id = args[1];
+        if (!id) {
+          const cat = providers.catalogue();
+          say("");
+          say("Setup instructions are available for:");
+          say("");
+          say("  Web search:  " + cat.search.map((x) => x.id).join(", "));
+          say("  No key:      " + (cat.keyless ?? []).map((x) => x.id).join(", "));
+          say("  Models:      " + cat.models.map((x) => x.id).join(", "));
+          say("  Sign-in:     " + cat.signIn.map((x) => x.id).join(", "));
+          say("");
+          say("  omni-agent provider setup <id>");
+          return;
+        }
+        const st = providers.setupSteps(id);
+        if (!st.ok) {
+          say(st.reason);
+          return process.exit(1);
+        }
+        say("");
+        say(providers.renderSetup(st));
+        say("");
         return;
       }
 
@@ -323,7 +354,7 @@ async function main() {
         return;
       }
 
-      say("Usage: omni-agent provider <list|add|signin> ...");
+      say("Usage: omni-agent provider <list|setup|add|signin> ...");
       return process.exit(1);
     }
 

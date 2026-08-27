@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { PATHS, ensureDirs } from "./util/paths.mjs";
 
 export const DEFAULTS = {
-  version: 1,
+  version: 2,
   /** Set true by the setup wizard once it completes successfully. */
   configured: false,
   gateway: {
@@ -67,7 +67,46 @@ export function loadConfig() {
   try {
     onDisk = JSON.parse(fs.readFileSync(PATHS.config, "utf8"));
   } catch {}
-  return deepMerge(DEFAULTS, onDisk);
+  const merged = deepMerge(DEFAULTS, onDisk);
+  return migrate(merged, onDisk);
+}
+
+/**
+ * Carry a saved config forward when the defaults gain something new.
+ *
+ * deepMerge cannot help here: an ARRAY on disk replaces the default array
+ * wholesale, so a provider added to DEFAULTS in a new version is invisible to
+ * everyone who already has a config file - which is every existing install.
+ * Measured: `bravehtml` was added to the default search order and the effective
+ * order on this machine stayed exactly as it was.
+ *
+ * So provider lists are reconciled ONCE, stamped with the version, and left
+ * alone afterwards. That way a new keyless provider reaches existing users, and
+ * a user who later removes one on purpose does not have it put back every run.
+ */
+function migrate(cfg, onDisk) {
+  if (!onDisk || Object.keys(onDisk).length === 0) return cfg;
+  if ((onDisk.version ?? 1) >= DEFAULTS.version) return cfg;
+
+  for (const group of ["search", "scrape"]) {
+    const defaults = DEFAULTS[group]?.order ?? [];
+    const current = cfg[group]?.order ?? [];
+    const missing = defaults.filter((id) => !current.includes(id));
+    if (!missing.length) continue;
+    // Rebuild in DEFAULTS order for the ids both know about, then append
+    // anything the user added that defaults do not carry.
+    const known = defaults.filter((id) => current.includes(id) || missing.includes(id));
+    const extra = current.filter((id) => !defaults.includes(id));
+    cfg[group].order = [...known, ...extra];
+  }
+
+  cfg.version = DEFAULTS.version;
+  try {
+    fs.writeFileSync(PATHS.config, JSON.stringify(cfg, null, 2));
+  } catch {
+    /* a read-only config is not worth crashing a launch over */
+  }
+  return cfg;
 }
 
 export function saveConfig(cfg) {
