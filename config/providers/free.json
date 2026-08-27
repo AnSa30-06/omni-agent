@@ -1,0 +1,163 @@
+{
+  "$commentDropped": "Mistral was in this list and was removed 2026-08-27: console.mistral.ai did not resolve from the checker, and an unverifiable signup link is worse than a missing provider. Re-add it if the console URL can be confirmed.",
+  "$comment": "Providers with a genuine free tier, curated. Every `id` is a real id in the gateway's own provider manifest (GET /api/v1/provider-plugin-manifest, 222 providers), so `omni-agent provider add <id>` resolves the base URL and auth mechanics from the gateway rather than from anything hardcoded here. `signup` is where a person goes to get the credential; those URLs are checked by scripts/check-provider-links.mjs and must not be shipped dead. `gives` is what the provider itself advertises - it is their claim, not a measurement, and the UI says so.",
+  "version": 1,
+  "models": [
+    {
+      "id": "pollinations",
+      "label": "Pollinations",
+      "auth": "none",
+      "gives": "GPT, Llama and Claude-class models with no account at all",
+      "signup": null,
+      "note": "Nothing to sign up for. Add it and it works."
+    },
+    {
+      "id": "cerebras",
+      "label": "Cerebras",
+      "auth": "apikey",
+      "gives": "1M tokens/day free, and the fastest inference of anything on this list",
+      "signup": "https://cloud.cerebras.ai/",
+      "note": "Free tier needs no card. Best single addition for speed."
+    },
+    {
+      "id": "groq",
+      "label": "Groq",
+      "auth": "apikey",
+      "gives": "A generous free tier on Llama, Qwen and GPT-OSS models",
+      "signup": "https://console.groq.com/keys",
+      "note": "Very fast. Rate-limited per minute rather than per month."
+    },
+    {
+      "id": "opencode-zen",
+      "label": "OpenCode Zen",
+      "auth": "apikey",
+      "gives": "DeepSeek and Nemotron with no token cap",
+      "signup": "https://opencode.ai/auth",
+      "note": "Free forever. This is the pool the agent already uses by default."
+    },
+    {
+      "id": "kilocode",
+      "label": "Kilo Code",
+      "auth": "oauth",
+      "gives": "An auto-router plus Tencent Hy3, free forever",
+      "signup": null,
+      "note": "Sign in with your account instead of pasting a key."
+    },
+    {
+      "id": "requesty",
+      "label": "Requesty",
+      "auth": "apikey",
+      "gives": "GPT-OSS 120B and Nemotron, free forever",
+      "signup": "https://app.requesty.ai/",
+      "note": null
+    },
+    {
+      "id": "siliconflow",
+      "label": "SiliconFlow",
+      "auth": "apikey",
+      "gives": "DeepSeek V3.2 and R1 on a free tier",
+      "signup": "https://cloud.siliconflow.com/",
+      "note": null
+    },
+    {
+      "id": "zai",
+      "label": "Z.AI GLM",
+      "auth": "apikey",
+      "gives": "GLM-4.7 and GLM-4.5-Flash, free forever",
+      "signup": "https://z.ai/",
+      "note": null
+    },
+    {
+      "id": "qoder",
+      "label": "Qoder AI",
+      "auth": "apikey",
+      "gives": "Qwen3-Max and Kimi-K2",
+      "signup": "https://qoder.com/",
+      "note": null
+    },
+    {
+      "id": "cloudflare-ai",
+      "label": "Cloudflare Workers AI",
+      "auth": "apikey",
+      "gives": "50+ models on 10,000 free neurons a day",
+      "signup": "https://dash.cloudflare.com/",
+      "note": "Needs a Cloudflare account ID as well as a token."
+    },
+    {
+      "id": "nvidia",
+      "label": "NVIDIA NIM",
+      "auth": "apikey",
+      "gives": "GLM and MiniMax at roughly 40 requests/minute free",
+      "signup": "https://build.nvidia.com/",
+      "note": null
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter",
+      "auth": "apikey",
+      "gives": "Every model tagged :free, and a much higher rate limit if you ever top up",
+      "signup": "https://openrouter.ai/keys",
+      "note": "The widest single catalogue. Free models are rate-limited, not metered."
+    },
+    {
+      "id": "gemini",
+      "label": "Google Gemini",
+      "auth": "apikey",
+      "gives": "A free tier on Gemini Flash models",
+      "signup": "https://aistudio.google.com/apikey",
+      "note": "Google publishes no quota API, so usage will read as unavailable."
+    },
+    {
+      "id": "chutes",
+      "label": "Chutes",
+      "auth": "apikey",
+      "gives": "Open-weight models on a free allowance",
+      "signup": "https://chutes.ai/",
+      "note": null
+    }
+  ],
+  "$commentSignIn": "Providers you do not pay extra for because you ALREADY pay for them. Signing in routes the agent through a subscription the user is holding anyway. These are OAuth in the gateway's manifest.",
+  "signIn": [
+    { "id": "claude", "label": "Claude (Anthropic)", "gives": "Your Claude subscription", "note": "Pro or Max." },
+    { "id": "codex", "label": "ChatGPT / Codex", "gives": "Your ChatGPT subscription", "note": "Plus or Pro." },
+    { "id": "gemini", "label": "Gemini", "gives": "Your Google AI subscription", "note": null },
+    { "id": "github", "label": "GitHub Copilot", "gives": "Your Copilot seat", "note": "Individual or via an org." },
+    { "id": "cursor", "label": "Cursor", "gives": "Your Cursor subscription", "note": null },
+    { "id": "grok-cli", "label": "Grok", "gives": "Your X/Grok subscription", "note": null }
+  ],
+  "$commentSearch": "Web search keys. These are NOT gateway providers - they are used by this product's own search tool, and are stored in the local encrypted credential store. Free tiers here remove the throttling that keyless search hits.",
+  "search": [
+    {
+      "id": "brave",
+      "label": "Brave Search",
+      "secret": "brave.apiKey",
+      "gives": "2,000 searches a month free",
+      "signup": "https://brave.com/search/api/",
+      "note": "Independent index. The best free search key to add."
+    },
+    {
+      "id": "tavily",
+      "label": "Tavily",
+      "secret": "tavily.apiKey",
+      "gives": "1,000 searches a month free",
+      "signup": "https://app.tavily.com/",
+      "note": "Built for agents; returns cleaned content, not just links."
+    },
+    {
+      "id": "serper",
+      "label": "Serper",
+      "secret": "serper.apiKey",
+      "gives": "2,500 free searches, one time",
+      "signup": "https://serper.dev/",
+      "note": "Google results. The free grant does not renew."
+    },
+    {
+      "id": "firecrawl",
+      "label": "Firecrawl",
+      "secret": "firecrawl.apiKey",
+      "gives": "500 free page scrapes",
+      "signup": "https://firecrawl.dev/",
+      "note": "Scraping, not search. Used as the last escalation for hard pages."
+    }
+  ]
+}

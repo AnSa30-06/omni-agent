@@ -23,6 +23,7 @@ import { ADAPTERS } from "../src/providers/usage-adapters.mjs";
 import { exportDiagnostics } from "../src/util/diagnostics.mjs";
 import { PAGES, dashboardUrl, openInBrowser, copyToClipboard, password as dashPassword } from "../src/gateway/dashboard.mjs";
 import { TIERS, getSaving, setSaving, measure, renderTiers, tier as findTier } from "../src/routing/compression.mjs";
+import * as providers from "../src/setup/providers.mjs";
 
 const VERSION = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const say = (s = "") => process.stdout.write(s + "\n");
@@ -42,6 +43,9 @@ Omni Agent ${VERSION}
   omni-agent models          List the models available right now
   omni-agent route           Show which model would be chosen and why
 
+  omni-agent provider [list]   Free providers you can add, and what each gives you
+  omni-agent provider add <id> <key>
+  omni-agent provider signin <id>
   omni-agent dashboard [page]  Open the gateway's own web dashboard
   omni-agent saving [tier]     Show or set how hard it compresses to save tokens
 
@@ -240,6 +244,86 @@ async function main() {
         return;
       }
       say("Usage: omni-agent config <mode|key|management-key|show> ...");
+      return process.exit(1);
+    }
+
+    case "provider": {
+      const sub = args[0] ?? "list";
+      await ensureReady({ quiet: true });
+
+      if (sub === "list") {
+        const all = await providers.listAll();
+        if (!all.gatewayReachable) {
+          say(`The gateway is not reachable (${all.reason}), so what is already connected cannot be shown.`);
+          say("");
+        }
+        say("");
+        say(providers.render(all));
+        return;
+      }
+
+      if (sub === "add") {
+        const [id, key] = [args[1], args[2]];
+        if (!id) {
+          say("Usage: omni-agent provider add <id> <key>");
+          return process.exit(1);
+        }
+        // A search key is a local secret, not a gateway connection.
+        if (providers.catalogue().search.some((sp) => sp.id === id)) {
+          const r = providers.addSearchKey(id, key);
+          if (!r.ok) {
+            say(`Could not store that key: ${r.reason}`);
+            return process.exit(1);
+          }
+          say(`Stored the ${id} search key, encrypted for this Windows account.`);
+          say("Put it first in `search.order` in your config to prefer it. It is used automatically as a fallback either way.");
+          return;
+        }
+        const r = await providers.addModelProvider(id, key);
+        if (!r.ok) {
+          say(`Could not add ${id}: ${r.reason}`);
+          return process.exit(1);
+        }
+        say(`Added ${id}.`);
+        if (r.connectionId) {
+          say("Testing it with a real call...");
+          const t = await providers.testConnection(r.connectionId);
+          if (t.ok) {
+            say("  It works.");
+          } else {
+            say(`  The gateway could not use it: ${t.error ?? t.reason ?? "no reason given"}`);
+            if (t.remedy) say(`  ${t.remedy}`);
+          }
+        }
+        say("Run `omni-agent models` to see what it added.");
+        return;
+      }
+
+      if (sub === "signin") {
+        const id = args[1];
+        if (!id) {
+          say("Usage: omni-agent provider signin <id>");
+          return process.exit(1);
+        }
+        const u = await providers.signInUrl(id);
+        if (!u.ok) {
+          say(u.reason);
+          return process.exit(1);
+        }
+        say("");
+        say(`Sign in to ${id} in your browser:`);
+        say(`  ${u.url}`);
+        say("");
+        say("  This uses a subscription you already pay for. Nothing is charged twice.");
+        say("  Approve it yourself - this program will not click through a consent screen for you.");
+        say("");
+        const opened = openInBrowser(u.url);
+        if (!opened.ok) say(`Could not open a browser automatically (${opened.reason}). Paste the URL above.`);
+        say("When it is done, check with:  omni-agent provider list");
+        return;
+      }
+
+      say("Usage: omni-agent provider <list|add|signin> ...");
       return process.exit(1);
     }
 
