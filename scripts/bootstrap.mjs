@@ -80,24 +80,52 @@ async function main() {
     fs.writeFileSync(marker, JSON.stringify({ name: "omni-agent-runtime", private: true, version: "1.0.0" }, null, 2));
   }
 
-  let failures = 0;
+  const missing = COMPONENTS.filter((c) => !isInstalled(c.name));
   for (const c of COMPONENTS) {
-    if (isInstalled(c.name)) {
-      say(`  ${c.label} (${c.name}): already installed, skipping.`);
-      continue;
-    }
-    say(`  Downloading the ${c.label} (${c.spec}, about ${c.approxMB} MB)...`);
-    const r = await run(["install", c.spec, "--omit=dev", "--no-fund", "--no-audit", "--loglevel=error"], RUNTIME);
-    if (r.ok && isInstalled(c.name)) {
-      say(`  ${c.label}: installed.`);
-    } else {
-      failures++;
+    if (!missing.includes(c)) say(`  ${c.label} (${c.name}): already installed, skipping.`);
+  }
+
+  // 🔴 ONE npm install for everything that is missing, never one per component.
+  //
+  // `npm install <pkg>` reifies the WHOLE tree and prunes anything the prefix's
+  // package.json does not list. A component that fails is therefore not just a
+  // failure of its own: it is unsaved, so the NEXT component's install deletes
+  // whatever it managed to lay down. Measured 2026-08-28 on a clean install -
+  // omniroute failed, and installing opencode-ai then reported
+  // "added 3 packages, and removed 1192 packages", leaving a machine with
+  // neither a gateway nor a recoverable half of one.
+  let failures = 0;
+  if (missing.length) {
+    const total = missing.reduce((n, c) => n + c.approxMB, 0);
+    say(`  Downloading ${missing.map((c) => c.label).join(" and ")} (about ${total} MB)...`);
+    const r = await run(
+      ["install", ...missing.map((c) => c.spec), "--omit=dev", "--no-fund", "--no-audit", "--loglevel=error"],
+      RUNTIME,
+    );
+    const stillMissing = missing.filter((c) => !isInstalled(c.name));
+    for (const c of missing) if (!stillMissing.includes(c)) say(`  ${c.label}: installed.`);
+    failures = stillMissing.length;
+    if (failures) {
+      const tail = String(r.tail);
       say("");
-      say(`  FAILED to install the ${c.label}.`);
-      say(`  ${String(r.tail).split("\n").slice(-6).join("\n  ")}`);
+      say(`  FAILED to install: ${stillMissing.map((c) => c.label).join(", ")}.`);
+      say(`  ${tail.split("\n").slice(-6).join("\n  ")}`);
       say("");
-      say("  This is almost always a network problem, a proxy, or no disk space.");
-      say("  Fix that and run 'Set up Omni Agent' from the Start Menu again.");
+      // Name the cause the message can actually tell apart, rather than
+      // blaming the network for everything. ENOTEMPTY is a Windows lock -
+      // antivirus, an open Explorer window, or a still-running Omni Agent -
+      // and telling someone to check their connection sends them the wrong way.
+      if (/ENOTEMPTY|EPERM|EBUSY|EACCES/.test(tail)) {
+        say("  Windows would not let npm replace a folder that is still in use.");
+        say("  Close Omni Agent and any Explorer window inside its folder, then");
+        say("  run 'Set up Omni Agent' again. If it keeps happening, your");
+        say("  antivirus is holding the files while they are being written.");
+      } else if (/ENOSPC/.test(tail)) {
+        say("  The drive is full. Free up space and run 'Set up Omni Agent' again.");
+      } else {
+        say("  This is usually a network problem or a proxy.");
+        say("  Fix that and run 'Set up Omni Agent' from the Start Menu again.");
+      }
     }
   }
 

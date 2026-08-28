@@ -302,7 +302,11 @@ function renderMessages(list) {
       } else if (part.type === "text" && part.text) {
         body.append(renderMarkdownish(part.text));
       } else if (part.type === "reasoning" && part.text) {
-        const d = el("details", "tool");
+        // Hidden unless asked for. A reasoning block is longer than the answer
+        // it precedes, so leaving it in the transcript buries the thing the
+        // reader came for. Ctrl+O brings it back - see toggleReasoning.
+        if (!state.showReasoning) continue;
+        const d = el("details", "tool reasoning");
         d.append(el("summary", null, "Thinking"));
         d.append(Object.assign(el("pre"), { textContent: part.text }));
         body.append(d);
@@ -993,6 +997,25 @@ function paintModel() {
   $("foot-model").textContent = modelName();
 }
 
+/* -- reasoning ----------------------------------------------------------- */
+
+/**
+ * Show or hide the model's thinking. Ctrl+O.
+ *
+ * Off by default and remembered. Reasoning is usually several times longer than
+ * the answer, so shown by default it pushes the answer off the screen - and it
+ * is the answer, not the deliberation, that the reader asked for. Ctrl+O
+ * because Ctrl+R reloads the page and Ctrl+T opens a tab.
+ */
+function toggleReasoning() {
+  state.showReasoning = !state.showReasoning;
+  savePrefs({ showReasoning: state.showReasoning });
+  toast(state.showReasoning ? "Showing the model's thinking. Ctrl+O hides it." : "Thinking hidden. Ctrl+O shows it.");
+  // Re-render from what the server stored: hidden reasoning is dropped at
+  // render time, so the only way back is to render again.
+  refreshMessages();
+}
+
 /* -- files given to the agent -------------------------------------------- */
 
 /**
@@ -1276,9 +1299,25 @@ function openModelPicker(e) {
     if (state.sessionID) await setSessionModel(state.sessionID, state.model);
   };
 
+  // Three views of the same list, because "every model" and "the models my key
+  // paid for" are different questions and the second one had no answer at all:
+  // the gateway serves everything under one provider id, so a key's models were
+  // simply mixed into the same 115 rows with nothing to distinguish them.
+  let lens = "all";
+  const lensRow = el("div", "pop-lens");
+  const lensBtn = (id, label) => {
+    const b = el("button", "pop-tab" + (lens === id ? " on" : ""), label);
+    b.onclick = () => {
+      lens = id;
+      paint();
+    };
+    return b;
+  };
+
   const paint = () => {
     const q = search.value.trim().toLowerCase();
     results.replaceChildren();
+    lensRow.replaceChildren(lensBtn("all", "All"), lensBtn("free", "Free"), lensBtn("keys", "From your keys"));
     if (!state.models.length) {
       // Almost always the gateway still warming up rather than a machine with
       // no models, and saying "none" invites the reader to go looking for a
@@ -1289,9 +1328,20 @@ function openModelPicker(e) {
     }
     let shown = 0;
     for (const p of state.models) {
-      const hits = p.models.filter(
-        (m) => !q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
-      );
+      const hits = p.models.filter((m) => {
+        if (lens === "free" && !m.free) return false;
+        // "From your keys" is the complement of free, and it is honest about
+        // what it knows: a model that costs money is one the gateway can only
+        // serve because a key pays for it.
+        if (lens === "keys" && m.free) return false;
+        if (!q) return true;
+        return (
+          m.name.toLowerCase().includes(q) ||
+          m.id.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          (m.vendor ?? "").toLowerCase().includes(q)
+        );
+      });
       if (!hits.length) continue;
       results.append(el("div", "pop-head", `${p.name}${p.preferred ? " · included free" : ""} (${hits.length})`));
       // No practical cap: the whole point is that every model is pickable, and
@@ -1306,6 +1356,8 @@ function openModelPicker(e) {
         if (bad) bits.push("failed here before");
         if (m.id.startsWith("auto/")) bits.push("picks for you");
         if (m.free) bits.push("free");
+        else if (m.vendor) bits.push(`from your ${m.vendor} key`);
+        if (m.vendor && m.free) bits.push(m.vendor);
         if (m.context) bits.push(fmtNum(m.context) + " context");
         if (bits.length) b.append(el("small", null, bits.join(" · ")));
         if (bad) b.classList.add("unhealthy");
@@ -1314,9 +1366,23 @@ function openModelPicker(e) {
         shown++;
       }
     }
-    if (!shown) results.append(el("div", "pop-head", "Nothing matches that"));
+    if (!shown) {
+      results.append(el("div", "pop-head", "Nothing matches that"));
+      if (lens === "keys") {
+        results.append(
+          el("div", "pop-note", "Paid models appear here once you add a provider key in Providers."),
+        );
+      } else if (q) {
+        // Naming the route rather than leaving a dead end: a model that is not
+        // in the catalogue is not broken, it is unpaid for.
+        results.append(
+          el("div", "pop-note", `No model called "${search.value.trim()}" is available yet. Adding the provider's key in Providers puts its models in this list.`),
+        );
+      }
+    }
   };
 
+  box.insertBefore(lensRow, results);
   search.addEventListener("input", paint);
   paint();
   popover(e.currentTarget, box);
@@ -1826,18 +1892,17 @@ pages.tools = async () => {
   const mcpRaw = r.mcp ?? {};
   const mcp = Array.isArray(mcpRaw) ? mcpRaw : Object.entries(mcpRaw).map(([name, v]) => ({ name, ...(v ?? {}) }));
 
+  const toolIds = tools.map((t) => (typeof t === "string" ? t : (t.id ?? t.name))).filter(Boolean);
+  // A connection's tools are namespaced by its name, so they can be attributed
+  // back to it. The separator is not guaranteed to be an underscore, hence the
+  // character class rather than a hard-coded "_".
+  const toolsOf = (name) => toolIds.filter((id) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^a-z0-9]`, "i").test(id));
+  const mcpToolIds = new Set(mcp.flatMap((sv) => toolsOf(sv.name)));
+  const builtIn = toolIds.filter((id) => !mcpToolIds.has(id));
+
   const c1 = el("div", "card");
-  c1.append(el("h3", null, `Built-in tools (${tools.length})`));
-  c1.append(
-    el(
-      "p",
-      "muted",
-      tools
-        .map((t) => (typeof t === "string" ? t : (t.id ?? t.name)))
-        .slice(0, 40)
-        .join(" · ") || "None reported.",
-    ),
-  );
+  c1.append(el("h3", null, `Built-in tools (${builtIn.length})`));
+  c1.append(el("p", "muted", builtIn.join(" · ") || "None reported."));
   inner.append(c1);
 
   const c2 = el("div", "card");
@@ -1865,6 +1930,24 @@ pages.tools = async () => {
     };
     line.append(rm);
     c3.append(line);
+    // What this connection gave the agent - when it can be known.
+    //
+    // ⚠️ It usually cannot, and the honest wording matters here. OpenCode's
+    // tool inventory (/experimental/tool/ids) does NOT enumerate MCP tools:
+    // measured 2026-08-28, adding a server took the list from 24 entries to 24
+    // while the agent itself, asked to name its tools, listed thirteen
+    // `everything_*` ones it had just been given. Printing "no tools" from that
+    // endpoint would say a working connection is broken.
+    const mine = toolsOf(s.name);
+    c3.append(
+      el(
+        "p",
+        "muted",
+        mine.length
+          ? `${mine.length} tool${mine.length === 1 ? "" : "s"}: ${mine.join(" · ")}`
+          : "Its tools go to the agent directly - ask it what tools it has to see them. They are not in the built-in list above, which does not cover connections.",
+      ),
+    );
   }
   const addRow = el("div", "row");
   addRow.style.marginTop = "10px";
@@ -2020,6 +2103,17 @@ function wire() {
   };
   $("attach-btn").onclick = openFilePicker;
 
+  document.addEventListener("keydown", (e) => {
+    // Ctrl+O / Cmd+O, and only when the reader is not typing into something -
+    // a shortcut that fires mid-sentence is a shortcut that gets turned off.
+    if (e.key !== "o" && e.key !== "O") return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+    const t = e.target;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable) return;
+    e.preventDefault();
+    toggleReasoning();
+  });
+
   const t = $("prompt");
   t.addEventListener("input", autosize);
   t.addEventListener("keydown", (e) => {
@@ -2051,6 +2145,7 @@ async function boot() {
   state.model = prefs.model ?? null;
   state.unhealthy = prefs.unhealthy ?? {};
   state.verifiedModel = prefs.verifiedModel ?? null;
+  state.showReasoning = prefs.showReasoning === true;
   setSurface(prefs.surface === "code" ? "code" : "chat");
   $("mode-label").textContent = MODES[state.mode].label;
   const st = await api("status");

@@ -31,7 +31,11 @@ DefaultDirName={localappdata}\Programs\OmniAgent
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+; `commandline` is load-bearing, not decoration. With `dialog` alone, Inno
+; IGNORES /CURRENTUSER and /ALLUSERS and shows "Select install mode" anyway -
+; which /VERYSILENT then renders invisible, so an unattended install looks
+; exactly like a hang. Measured 2026-08-28 against 1.1.3.
+PrivilegesRequiredOverridesAllowed=dialog commandline
 OutputDir=..\dist
 OutputBaseFilename=OmniAgentSetup-{#AppVersion}
 Compression=lzma2/max

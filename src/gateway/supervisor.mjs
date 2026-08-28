@@ -156,6 +156,11 @@ export async function ensureRunning({ onProgress = () => {} } = {}) {
       cwd: PATHS.gatewayData,
       env: {
         ...process.env,
+        // 🔴 OUR gateway's own secrets, set explicitly, BEFORE anything else
+        // gets a chance to supply them. See ownEnv() for why this is the
+        // difference between a working gateway and one that answers 500 to
+        // every request it receives.
+        ...ownEnv(),
         DATA_DIR: PATHS.gatewayData,
         PORT: String(cfg.gateway.port),
         OMNIROUTE_BASE_URL: baseUrl,
@@ -202,16 +207,88 @@ export async function ensureRunning({ onProgress = () => {} } = {}) {
   return { started: false, baseUrl, ok: false, reason: "start-timeout" };
 }
 
+/**
+ * The gateway that is actually running, whatever the pid file claims.
+ *
+ * 🔴 The pid file lies, and it lies in the direction that does damage. A
+ * gateway started by a different launch writes its own pid; when THAT process
+ * is replaced, or the file is left behind by a crash, `readPid()` names a dead
+ * process and every caller concludes nothing is running. Measured 2026-08-28:
+ * `gateway stop` answered `{"stopped": false, "reason": "not-running"}` while
+ * omniroute was serving on port 20129 - and the in-place upgrade that ran next
+ * deadlocked on the files that live gateway was holding.
+ *
+ * So the pid file is a hint, and the process table is the authority.
+ */
+function livePid(cfg = loadConfig()) {
+  const fromFile = readPid();
+  if (alive(fromFile)) return fromFile;
+  const found = gatewayPid(cfg.gateway.port);
+  return alive(found) ? found : null;
+}
+
+/**
+ * The gateway's own .env, read and handed to the child directly.
+ *
+ * ⚠️ HARDENING, not a fix for any observed failure - and the difference matters,
+ * because the first version of this comment claimed it cured a gateway that
+ * answered HTTP 500 to everything. It did not. That was a corrupt
+ * `storage.sqlite`, and this change made no difference to it.
+ *
+ * What IS measured (2026-08-28): OmniRoute loads `~/.omniroute/.env` at
+ * startup - the config directory of a SEPARATE, pre-existing OmniRoute install
+ * that this product deliberately keeps out of - and on this machine that file's
+ * `STORAGE_ENCRYPTION_KEY` differs from the one in our own gateway directory.
+ * dotenv does not overwrite a variable that is already set, so which key wins
+ * depends on load order.
+ *
+ * Putting our values in the CHILD's environment makes them the ones already
+ * set, so nothing loaded from a file can replace them. It is the one place the
+ * isolation promise in PATHS is actually enforced rather than just stated.
+ */
+function ownEnv() {
+  const out = {};
+  let text = "";
+  try {
+    text = fs.readFileSync(ENV_FILE(), "utf8");
+  } catch {
+    return out;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const i = t.indexOf("=");
+    if (i <= 0) continue;
+    const key = t.slice(0, i).trim();
+    let value = t.slice(i + 1).trim();
+    // Quoted values are common in generated .env files.
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (key) out[key] = value;
+  }
+  return out;
+}
+
 /** Stop a gateway this process (or a previous run) started. */
 export async function stop() {
-  const pid = readPid();
-  if (!alive(pid)) return { stopped: false, reason: "not-running" };
+  const pid = livePid();
+  if (!pid) return { stopped: false, reason: "not-running" };
   try {
     process.kill(pid);
   } catch (err) {
     return { stopped: false, reason: err.message };
   }
   for (let i = 0; i < 20 && alive(pid); i++) await sleep(250);
+  // The launcher restarts its worker within seconds, so a stop that killed the
+  // launcher has to check the port again rather than trust one kill.
+  const survivor = livePid();
+  if (survivor && survivor !== pid) {
+    try {
+      process.kill(survivor);
+    } catch {}
+    for (let i = 0; i < 20 && alive(survivor); i++) await sleep(250);
+  }
   try {
     fs.unlinkSync(PID_FILE());
   } catch {}
@@ -219,6 +296,6 @@ export async function stop() {
 }
 
 export function status() {
-  const pid = readPid();
-  return { pid, running: alive(pid), dataDir: PATHS.gatewayData, envFile: ENV_FILE() };
+  const pid = livePid();
+  return { pid, running: pid !== null, dataDir: PATHS.gatewayData, envFile: ENV_FILE() };
 }

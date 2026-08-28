@@ -468,3 +468,42 @@ test("the model list is retried while the gateway is still warming up", () => {
   assert.match(fn, /if \(!state\.models\.length && retries > 0\)/);
   assert.match(fn, /setTimeout\(\(\) => loadModels\(retries - 1\), \d+\)/);
 });
+
+test("reasoning is hidden until it is asked for, and Ctrl+O is what asks", () => {
+  // A reasoning block is routinely longer than the answer it precedes, so
+  // shown by default it buries the thing the reader wanted. Ctrl+O because
+  // Ctrl+R reloads the page and Ctrl+T opens a tab.
+  const app = ui("public", "app.js");
+  assert.match(app, /if \(!state\.showReasoning\) continue;/, "reasoning must be dropped at render time");
+  assert.match(app, /state\.showReasoning = prefs\.showReasoning === true;/, "off unless the reader turned it on");
+  assert.match(app, /savePrefs\(\{ showReasoning: state\.showReasoning \}\)/, "the choice has to survive a restart");
+  // The binding must not fire while the reader is typing, or it becomes a
+  // shortcut they turn off.
+  const key = app.slice(app.indexOf('if (e.key !== "o"'), app.indexOf("toggleReasoning();\n  });"));
+  assert.match(key, /HTMLInputElement \|\| t instanceof HTMLTextAreaElement/);
+  assert.match(key, /ctrlKey \|\| e\.metaKey/);
+});
+
+test("a model says which upstream it comes from, and the picker can filter on it", () => {
+  // Every model the gateway serves arrives under ONE provider id, so a key's
+  // models were mixed into the same list with nothing to tell them apart -
+  // which is exactly the question "which models did my OpenRouter key give me?"
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  assert.match(api, /vendor: id\.includes\("\/"\) \? id\.slice\(0, id\.indexOf\("\/"\)\) : null,/);
+  const app = ui("public", "app.js");
+  assert.match(app, /lensBtn\("keys", "From your keys"\)/);
+  assert.match(app, /if \(lens === "free" && !m\.free\) return false;/);
+  assert.match(app, /from your \$\{m\.vendor\} key/);
+  // A search that finds nothing must name the route out, not dead-end.
+  assert.match(app, /Adding the provider's key in Providers puts its models in this list/);
+});
+
+test("adding a provider key reports what it unlocked, not just that it was stored", () => {
+  // "Key added" does not answer the question the reader is asking, which is
+  // "so what can I use now?"
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  const fn = api.slice(api.indexOf("  async providerAdd("), api.indexOf("  async providerSignin("));
+  assert.match(fn, /const before = await modelIds\(\);/);
+  assert.match(fn, /const after = await modelIds\(\);/);
+  assert.match(fn, /newModels: fresh\.length/);
+});

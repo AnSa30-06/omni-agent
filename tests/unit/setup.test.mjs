@@ -80,3 +80,53 @@ test("setup records the model that answered, resolved to a concrete id", () => {
   const wiz = fs.readFileSync(pkg("src", "setup", "wizard.mjs"), "utf8");
   assert.match(wiz, /rememberVerifiedModel\(result\.servedModel\)/);
 });
+
+
+test("every missing component is installed in ONE npm run", () => {
+  // 🔴 `npm install <pkg>` reifies the whole tree and prunes anything the
+  // prefix's package.json does not list. A component that FAILS is never
+  // saved, so the next component's install deletes whatever it managed to lay
+  // down. Measured 2026-08-28 on a clean install: omniroute failed, then
+  // installing opencode-ai reported "added 3 packages, and removed 1192
+  // packages" and the machine was left with neither.
+  const src = fs.readFileSync(pkg("scripts", "bootstrap.mjs"), "utf8");
+  assert.match(src, /const missing = COMPONENTS\.filter/);
+  assert.match(src, /\["install", \.\.\.missing\.map\(\(c\) => c\.spec\)/, "one install for all of them");
+  assert.ok(
+    !/for \(const c of COMPONENTS\) \{[\s\S]{0,400}await run\(\["install", c\.spec/.test(src),
+    "components must not be installed one at a time",
+  );
+});
+
+test("a locked file is not reported as a network problem", () => {
+  // ENOTEMPTY on Windows is antivirus, an open Explorer window, or a running
+  // Omni Agent - telling someone to check their connection sends them the
+  // wrong way entirely.
+  const src = fs.readFileSync(pkg("scripts", "bootstrap.mjs"), "utf8");
+  assert.match(src, /ENOTEMPTY\|EPERM\|EBUSY\|EACCES/);
+  assert.match(src, /Windows would not let npm replace a folder that is still in use/);
+  assert.match(src, /ENOSPC/, "a full drive is its own diagnosis");
+});
+
+test("the installer allows the command line to choose the install mode", () => {
+  // With `dialog` alone, Inno IGNORES /CURRENTUSER and shows "Select install
+  // mode" anyway - which /VERYSILENT then renders invisible, so an unattended
+  // install looks exactly like a hang. Measured 2026-08-28 against 1.1.3.
+  const iss = fs.readFileSync(pkg("installer", "omni-agent.iss"), "utf8");
+  assert.match(iss, /PrivilegesRequiredOverridesAllowed=dialog commandline/);
+});
+
+test("stopping the gateway does not trust a stale pid file", () => {
+  // Measured 2026-08-28: `gateway stop` answered "not-running" while omniroute
+  // was serving on its port, because the pid file named a process from an
+  // earlier launch - and the in-place upgrade that ran next deadlocked on the
+  // files that live gateway was holding.
+  const src = fs.readFileSync(pkg("src", "gateway", "supervisor.mjs"), "utf8");
+  assert.match(src, /function livePid\(/);
+  assert.match(src, /const found = gatewayPid\(cfg\.gateway\.port\);/);
+  const stop = src.slice(src.indexOf("export async function stop()"), src.indexOf("export function status()"));
+  assert.match(stop, /const pid = livePid\(\);/);
+  assert.ok(!/const pid = readPid\(\);/.test(stop), "stop must not read the pid file directly");
+  // The launcher restarts its worker, so one kill is not a stop.
+  assert.match(stop, /const survivor = livePid\(\);/);
+});

@@ -91,6 +91,19 @@ const FILE_DIALOG = [
   "$owner.Dispose()",
 ].join("; ");
 
+// Every model id the agent can currently see, as `providerID/modelID`. Used
+// to report what a newly added key actually unlocked.
+async function modelIds() {
+  const r = await oc("GET", "/config/providers");
+  if (!r.ok) return new Set();
+  const all = r.data?.providers ?? r.data?.all ?? r.data?.data ?? [];
+  const out = new Set();
+  for (const p of Array.isArray(all) ? all : []) {
+    for (const id of Object.keys(p.models ?? {})) out.add(`${p.id}/${id}`);
+  }
+  return out;
+}
+
 /** One dialog at a time, across every kind. See the note above. */
 let dialogOpen = false;
 
@@ -237,6 +250,13 @@ export const routes = {
         .map(([id, m]) => ({
           id,
           name: m.name ?? id,
+          // The upstream the gateway is routing to, taken from the model id's
+          // first segment (`oc/hy3-free` -> `oc`, `openrouter/mistral-large` ->
+          // `openrouter`). Every model the gateway serves arrives under ONE
+          // provider id, so without this there is no way to tell a free model
+          // from one that only exists because the reader added a key - which is
+          // exactly the question "which models did my OpenRouter key give me?"
+          vendor: id.includes("/") ? id.slice(0, id.indexOf("/")) : null,
           context: m.limit?.context ?? null,
           output: m.limit?.output ?? null,
           free: (m.cost?.input ?? 0) === 0 && (m.cost?.output ?? 0) === 0,
@@ -386,12 +406,53 @@ export const routes = {
     if (!body.id) return bad("which provider?");
     if (providers.catalogue().search.some((s) => s.id === body.id)) {
       const r = providers.addSearchKey(body.id, body.key);
-      return r.ok ? ok({ added: body.id, kind: "search" }) : bad(r.reason);
+      if (!r.ok) return bad(r.reason);
+      // 🔴 "Stored" is not "works", and the difference is the whole complaint.
+      // A key written to disk that the search stack never actually calls looks
+      // identical, from the app, to no key at all - the reader adds one, the
+      // agent still says the provider is unavailable, and nothing anywhere says
+      // why. So: run a REAL search through this provider before reporting
+      // success, and say plainly if it did not answer.
+      let works = null;
+      let problem = null;
+      try {
+        const { webSearch } = await import("../tools/search.mjs");
+        const t = await webSearch("omni agent connectivity check", { provider: body.id, count: 1 });
+        works = t.results.length > 0;
+        if (!works) problem = "the provider accepted the key but returned no results";
+      } catch (err) {
+        works = false;
+        problem = String(err?.message ?? err);
+      }
+      // The key is kept either way: a provider that is down right now is not a
+      // wrong key, and throwing it away would make the reader type it again.
+      const active = availableProviders(loadConfig());
+      return ok({
+        added: body.id,
+        kind: "search",
+        works,
+        problem,
+        usedFor: active[0] === body.id ? "the next web search" : `after ${active.slice(0, active.indexOf(body.id)).join(", ")}`,
+        order: active,
+      });
     }
+    // Counted before and after, because "key added" is not the answer to the
+    // question the reader is actually asking, which is "so what can I use now?"
+    const before = await modelIds();
     const r = await providers.addModelProvider(body.id, body.key);
     if (!r.ok) return bad(r.reason);
     const t = r.connectionId ? await providers.testConnection(r.connectionId) : null;
-    return ok({ added: r.id, connectionId: r.connectionId, works: t ? t.ok : null, problem: t && !t.ok ? t.error : null, remedy: t?.remedy ?? null });
+    const after = await modelIds();
+    const fresh = [...after].filter((id) => !before.has(id));
+    return ok({
+      added: r.id,
+      connectionId: r.connectionId,
+      works: t ? t.ok : null,
+      problem: t && !t.ok ? t.error : null,
+      remedy: t?.remedy ?? null,
+      newModels: fresh.length,
+      examples: fresh.slice(0, 5),
+    });
   },
 
   async providerSignin({ query }) {
