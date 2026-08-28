@@ -60,6 +60,47 @@ export async function installBrowser({ onProgress = say } = {}) {
   });
 }
 
+/** Returned by the race below when stdin ended instead of answering. */
+const CLOSED = Symbol("stdin-closed");
+
+/**
+ * A prompt that survives a stdin which is already at end-of-file.
+ *
+ * 🔴 THE BUG THIS EXISTS FOR, and it is not the obvious one. `rl.question()`
+ * against a stdin that is already at EOF does not throw and does not resolve -
+ * the interface emits 'close' and the promise is simply left PENDING FOREVER.
+ * With nothing else keeping the loop alive, Node then exits normally, with
+ * status 0. Measured 2026-08-28 on the shipped 1.1.0 build: `omni-agent setup`
+ * printed its welcome banner, stopped at "Press Enter to continue...", and
+ * exited 0 having installed nothing and having reported no error anywhere.
+ *
+ * A silent success for work that was never done is the worst failure this
+ * product can produce, so the question is raced against the interface closing
+ * and a dead stdin simply yields the default.
+ *
+ * ⚠️ One shared close-promise, created once. Attaching a listener per call
+ * leaks them and trips the max-listeners warning on a wizard that asks a
+ * dozen questions.
+ *
+ * @param {import("node:readline/promises").Interface|null} rl
+ * @returns {(q: string, dflt?: string) => Promise<string>}
+ */
+export function makeAsk(rl) {
+  if (!rl) return async (_q, dflt = "") => dflt;
+  let closed = false;
+  const onClosed = new Promise((resolve) => {
+    rl.once("close", () => {
+      closed = true;
+      resolve(CLOSED);
+    });
+  });
+  return async (q, dflt = "") => {
+    if (closed) return dflt;
+    const a = await Promise.race([rl.question(q), onClosed]);
+    return a === CLOSED ? dflt : String(a).trim() || dflt;
+  };
+}
+
 /**
  * @param {{interactive?:boolean, skipBrowser?:boolean, skipDoctor?:boolean}} [opts]
  */
@@ -67,11 +108,7 @@ export async function runSetup(opts = {}) {
   const interactive = opts.interactive ?? stdin.isTTY === true;
   ensureDirs();
   const rl = interactive ? readline.createInterface({ input: stdin, output: stdout }) : null;
-  const ask = async (q, dflt = "") => {
-    if (!rl) return dflt;
-    const a = (await rl.question(q)).trim();
-    return a || dflt;
-  };
+  const ask = makeAsk(rl);
 
   try {
     say();
@@ -85,7 +122,16 @@ export async function runSetup(opts = {}) {
     say("  It works straight away with free models, so you do not need an");
     say("  API key. You can add one later for more speed.");
     say();
-    if (interactive) await ask("  Press Enter to continue... ");
+    if (interactive) {
+      await ask("  Press Enter to continue... ");
+      // stdin.isTTY is true under Git Bash on Windows even when stdin delivers
+      // EOF immediately, so "interactive" can be wrong. Say so rather than
+      // silently answering every question on the user's behalf.
+      if (rl?.closed) {
+        say();
+        say("  (no keyboard input available - continuing with the defaults)");
+      }
+    }
 
     // --- 1. Providers ------------------------------------------------------
     const enabled = [];
