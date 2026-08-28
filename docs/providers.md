@@ -300,20 +300,30 @@ advertises it. **Being in the manifest is not evidence that a provider works.**
 GitHub *Copilot* is a different product and is still live — it is the `github`
 OAuth entry, `omni-agent provider signin github`, and it needs a paid seat.
 
-## About that "1.6 billion tokens a day"
+## About that "1.6 billion tokens a month"
 
-The gateway dashboard has a **Free tiers** page listing around forty providers
-with a free allowance, each labelled with the allowance that provider
-advertises. Adding those up is where a headline figure like *1.6 B tokens/day*
-comes from. Three things are true about it, and the third is the one that
-matters:
+**Where to sign up, in what order, and what each one is worth is its own
+document: [free-tiers.md](free-tiers.md).** What follows is what the number
+means.
+
+It is **per month, not per day** — an earlier version of this page said "a day"
+and that was wrong. The gateway's own **Free-token budget** widget reports
+**1,526,225,000 steady per month**, and **2,152,725,000 in the first month**
+with one-time signup credits included.
 
 **It is a sum over ~40 separate accounts you would have to open yourself.** It
 is not a pool, and nothing hands you any part of it. Each row is one signup, one
-key, one `omni-agent provider add`. That page is a **signup directory** — there
-is no API behind it (`/api/free-tiers`, `/api/providers/free-tiers` and
-`/api/provider-limits` all return 404 on 3.8.49), which is why this product
-cannot mirror it and does not try.
+key, one `omni-agent provider add`. **Two thirds of it is Mistral alone**, and
+six signups reach 93% of it.
+
+The figures come from `GET /api/free-tier/summary` — **there is an API, contrary
+to what this page said before**; the guesses that 404'd (`/api/free-tiers`,
+`/api/providers/free-tiers`, `/api/provider-limits`) were simply the wrong
+paths. Its method is honest: summing its per-model rows naively gives 6.86 B,
+and deduplicating by `poolKey` reproduces the published 1,526,225,000 exactly.
+
+⚠️ **The catalogue behind it is dated 2026-07-22 and has already rotted** — it
+still counts 18 M/month of GitHub Models, retired on 2026-07-30.
 
 **The per-provider numbers are the providers' own claims.** Two were already
 stale when checked on 2026-08-27: Cerebras was listed at "1M tokens/day" and its
@@ -348,6 +358,8 @@ do with the token count.** Your own credential moves you off the shared pool
 onto your own authenticated rate limit, which is why the 418s and 403s stop.
 Four or five keys is where the returns flatten — enough that a failure has
 somewhere to fall back to. Forty is a chore that buys very little over five.
+
+**Which five, and where to get them: [free-tiers.md](free-tiers.md).**
 
 ## What the gateway does NOT provide
 

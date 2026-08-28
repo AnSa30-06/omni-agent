@@ -218,10 +218,14 @@ omni-agent provider setup mistral      # the steps
 omni-agent provider add mistral YOUR-KEY
 ```
 
-Its models then appear in the picker under **From your keys**. Full worked
-example, the full id list, and what to make of the dashboard's "1.6 B free
-tokens a day" — it is a sum over ~40 accounts you would open yourself, not a
-pool — are in [docs/providers.md](docs/providers.md#adding-one-of-the-free-providers-yourself).
+Its models then appear in the picker under **From your keys**. A full worked
+example and the id list are in
+[docs/providers.md](docs/providers.md#adding-one-of-the-free-providers-yourself).
+
+**Chasing the dashboard's "1.6 billion free tokens"?** It is 1,526,225,000 **a
+month**, it is a sum over ~40 accounts you would open yourself, and **two thirds
+of it is Mistral alone** — six signups reach 93%. Which six, where to sign up,
+and what each is worth: **[docs/free-tiers.md](docs/free-tiers.md)**.
 
 ⚠️ **Being in the gateway's manifest is not evidence that a provider works.**
 GitHub Models is still listed there and was retired on 2026-07-30; its endpoint
@@ -375,6 +379,7 @@ total.
 | [Installation](docs/installation.md) | Every install path, and what each one does |
 | [Architecture](docs/architecture.md) | How the pieces fit, and the decisions behind them |
 | [Providers](docs/providers.md) | Model, search and scraping providers; what each publishes |
+| [Free tiers](docs/free-tiers.md) | What to sign up to for free capacity, in what order, and what it is really worth |
 | [Model routing](docs/routing.md) | How a model gets chosen |
 | [Security](docs/security.md) | The confirmation boundary, credential storage, permissions |
 | [Troubleshooting](docs/troubleshooting.md) | When something breaks |
