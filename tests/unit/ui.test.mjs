@@ -281,3 +281,100 @@ test("the view follows a live answer instead of measuring how far away it is", (
     "the per-render near-bottom measurement is the broken version",
   );
 });
+
+test("a model that refuses is retried on a different model, not left as a dead end", () => {
+  // Measured 2026-08-28 on a genuinely clean keyless install: the very first
+  // message failed with
+  //   [401]: Model north-mini-code-free is not supported ... invalid_api_key
+  // because the default auto/ combo resolved to a model needing a key. The CLI
+  // already survives this - doctor reports "answered after falling back from
+  // auto/cheap" - and only the app path had no fallback at all.
+  const app = ui("public", "app.js");
+  assert.match(app, /function isModelFailure/);
+  assert.match(app, /function retryOnAnotherModel/);
+  assert.match(app, /if \(retryOnAnotherModel\(\)\) return;/, "the end of a turn must attempt the retry");
+  // Bounded: silently working through a hundred models spends the user's time.
+  assert.match(app, /inFlight\.tries >= 2/);
+});
+
+test("the retry never picks an auto/ combo, and never a paid model", () => {
+  // An auto combo resolves to some other model at request time, so recording
+  // ITS id as unhealthy blames the wrong thing - and blacklists a router that
+  // may work next time. It is also what failed in the first place.
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("function nextModel("), app.indexOf("/** What is in flight"));
+  assert.match(fn, /m\.id\.startsWith\("auto\/"\)/, "auto/ combos must be skipped");
+  assert.match(fn, /!m\.free/, "a keyless install must not be sent to a paid model");
+  assert.match(fn, /Object\.keys\(state\.unhealthy\)/, "models that already failed here must be skipped");
+});
+
+test("a fallback is announced and remembered, never silent", () => {
+  // Honesty rule: the product may not quietly substitute a different model and
+  // present the answer as though nothing happened.
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("function retryOnAnotherModel("), app.indexOf("async function send("));
+  assert.match(fn, /toast\(`\$\{was\} would not answer\. Retrying with \$\{next\.name\}\.`\)/);
+  assert.match(fn, /savePrefs\(\{ model: state\.model \}\)/, "the working model becomes the default");
+  assert.match(fn, /inFlight\.id !== state\.sessionID/, "must not resurrect a prompt from a left conversation");
+});
+
+test("the turn's bookkeeping survives the error/idle pair", () => {
+  // endTurn runs for BOTH session.error and session.idle. Clearing inFlight in
+  // it means the idle right after a failure wipes the retry that the error just
+  // started, and the retry's own failure then has nowhere to record itself.
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("function endTurn("), app.indexOf("let refreshTimer"));
+  assert.ok(!/^\s*inFlight = null;/m.test(fn), "endTurn must not clear inFlight");
+});
+
+test("any errored turn that produced no text is treated as a model that did not answer", () => {
+  // This began as a list of status codes and the list kept growing: three
+  // consecutive attempts on a clean keyless install failed three different ways
+  //   [401] Model north-mini-code-free is not supported ... invalid_api_key
+  //   [502] fetch failed
+  //   [418] DuckDuckGo anti-abuse challenge failed: ERR_BN_LIMIT
+  // Enumerating the taxonomy of a free model pool is a losing game, so the rule
+  // is the reader's question instead: did an answer arrive?
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("function isModelFailure("), app.indexOf("function nextModel("));
+  assert.ok(!/statusCode\s*===/.test(fn), "must not enumerate status codes");
+  assert.match(fn, /if \(gotText\) return false/, "a partial answer is an answer");
+  assert.match(fn, /abort\|cancell\?ed/, "a reader who pressed stop must not trigger a retry");
+  assert.match(fn, /return true;\s*\}/, "anything else counts as a failure");
+  // And the caller has to supply whether text arrived, or the guard is dead.
+  assert.match(app, /isModelFailure\(inFlight\.error, gotText\)/);
+  assert.match(app, /const gotText = .*stream-text/);
+});
+
+test("the retry moves to a different vendor, not another model from the one that just failed", () => {
+  // Measured: a rate-limited DuckDuckGo returned the identical
+  //   [418] anti-abuse challenge failed: ERR_BN_LIMIT
+  // for two different models in a row, so the second retry was spent before it
+  // was made. The gateway serves every vendor under one provider id, so the
+  // vendor is the first segment of the MODEL id, not the provider id.
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("function nextModel("), app.indexOf("/** What is in flight"));
+  assert.match(fn, /const vendor = /);
+  assert.match(fn, /for \(const strict of \[true, false\]\)/, "a vendor preference that can be relaxed, not a hard filter");
+  assert.match(fn, /strict && spent\.has\(vendor\(m\.id\)\)/);
+});
+
+test("a fresh install starts on the model setup measured, not the one it was told about", () => {
+  // The other half of the 401 fix. The retry ladder rescues a bad first
+  // message; this stops there being one. Order is load-bearing: the user's own
+  // choice still wins, so re-running setup can never move them off a model they
+  // picked - it only fills the slot when nothing has been chosen.
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("async function loadModels("), app.indexOf("function paintModel("));
+  assert.match(fn, /state\.verifiedModel/, "the measured model must be consulted");
+  assert.ok(
+    fn.indexOf("if (known(saved)) state.model = saved;") < fn.indexOf("else if (verified)"),
+    "a model the user chose must outrank the one setup measured",
+  );
+  assert.ok(
+    fn.indexOf("else if (verified)") < fn.indexOf("else if (r.configured)"),
+    "a measured model must outrank the gateway's published default, which is the auto/ combo that 401'd",
+  );
+  // And it has to survive a restart, or the fix only holds for one session.
+  assert.match(app, /state\.verifiedModel = prefs\.verifiedModel \?\? null;/);
+});

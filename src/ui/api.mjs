@@ -19,6 +19,7 @@ import { listSecretNames } from "../util/secrets.mjs";
 import { oc, credentials } from "./opencode-server.mjs";
 import * as transcripts from "./transcripts.mjs";
 import * as routines from "./routines.mjs";
+import { readPrefs, writePrefs } from "./prefs.mjs";
 import { PATHS } from "../util/paths.mjs";
 import { pkg } from "../util/paths.mjs";
 import fs from "node:fs";
@@ -27,19 +28,6 @@ import path from "node:path";
 const ok = (d = {}) => ({ ok: true, ...d });
 const bad = (reason, extra = {}) => ({ ok: false, error: reason, ...extra });
 
-const prefsFile = () => path.join(PATHS.home, "ui-prefs.json");
-function readPrefs() {
-  try {
-    return JSON.parse(fs.readFileSync(prefsFile(), "utf8"));
-  } catch {
-    return { kinds: {} };
-  }
-}
-function writePrefs(p) {
-  try {
-    fs.writeFileSync(prefsFile(), JSON.stringify(p, null, 2));
-  } catch {}
-}
 
 /** Read a number out of whichever field a provider happened to use. */
 function firstNumber(obj, keys) {

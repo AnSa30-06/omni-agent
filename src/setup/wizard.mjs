@@ -20,6 +20,7 @@ import { catalogue as providerCatalogue, addModelProvider, addSearchKey } from "
 import { setSaving, TIERS } from "../routing/compression.mjs";
 import { provisionGatewayToken } from "../gateway/provision.mjs";
 import { runDoctor, renderDoctor } from "./doctor.mjs";
+import { rememberVerifiedModel } from "../ui/prefs.mjs";
 import { PRESETS } from "../routing/select.mjs";
 import { logger } from "../util/log.mjs";
 import { nodeExe } from "../util/node-exe.mjs";
@@ -322,6 +323,14 @@ export async function runSetup(opts = {}) {
       const result = await runDoctor({ deep: true });
       say(renderDoctor(result));
       updateConfig({ configured: result.ok });
+      // The check above sent a real request and fell back until something
+      // answered. That answer is a measured fact about THIS machine, so the
+      // desktop app starts there instead of on the gateway's published default
+      // - which on a keyless install can be an `auto/` combo that resolves to a
+      // model needing a key, and 401s on the user's very first message.
+      if (result.servedModel && rememberVerifiedModel(result.servedModel)) {
+        say(`  The app will start on ${result.servedModel}, which answered just now.`);
+      }
       if (!result.ok) {
         say("  Setup finished with failures. Fix the items above, then run:");
         say("    omni-agent doctor");

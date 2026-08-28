@@ -527,6 +527,25 @@ function liveToolPart(messageID, part) {
 function endTurn() {
   live.turn?.classList.remove("writing");
   setBusy(false);
+
+  // A model that refused is worth one more try on a different model, because on
+  // a keyless install the offered catalogue includes models that need a key and
+  // nothing publishes which. The failed model is already recorded by the
+  // renderer, so each attempt narrows the field rather than guessing again.
+  // Partial text means the model DID answer and merely stopped; swapping models
+  // and re-asking would throw away what the reader already has.
+  const gotText = !!live.body?.querySelector(".stream-text")?.textContent?.trim();
+  if (inFlight?.error && isModelFailure(inFlight.error, gotText)) {
+    const err = inFlight.error;
+    inFlight.error = null;
+    if (retryOnAnotherModel()) return;
+    toast(`No model would answer: ${String(err?.data?.message ?? err?.message ?? err).slice(0, 120)}`, "bad");
+  }
+  // `inFlight` is deliberately NOT cleared here. endTurn runs for BOTH
+  // session.error and session.idle, so the idle that follows a failure would
+  // otherwise wipe the retry's own bookkeeping the moment it started - and the
+  // retry's failure would then have nowhere to record itself. It is replaced
+  // wholesale by the next send, and its `error` is consumed above.
   // One authoritative re-render: the streamed text is deliberately literal, and
   // this is what turns it into rendered markdown - the same trade creator-os
   // makes. It also flattens the hundreds of per-fragment spans, which make
@@ -596,7 +615,14 @@ function subscribe(sessionID) {
       return;
     }
 
-    if (t === "session.idle" || t === "session.error") {
+    if (t === "session.error") {
+      // Kept, not acted on here: the turn is not over until session.idle, and
+      // deciding to retry before then would race the transcript.
+      if (inFlight) inFlight.error = q.error ?? q;
+      endTurn();
+      return;
+    }
+    if (t === "session.idle") {
       endTurn();
       return;
     }
@@ -701,31 +727,81 @@ function isPlaceholderTitle(t) {
   return !t || /^New session\b/i.test(t) || /^Untitled$/i.test(t);
 }
 
-async function send(text) {
-  if (!text.trim()) return;
-  const fresh = !state.sessionID;
-  if (!state.sessionID) await newSession();
-  const id = state.sessionID;
-  const current = state.sessions.find((s) => s.id === id);
-  if (fresh || isPlaceholderTitle(current?.title)) {
-    const name = nameFromPrompt(text);
-    if (name) {
-      await ocall("PATCH", `/session/${id}`, { title: name });
-      $("title").textContent = name;
+/**
+ * Did the turn fail in a way another model might survive?
+ *
+ * ⭐ ANY error, unless the reader caused it. This started as a list of status
+ * codes and that was the wrong shape: three consecutive attempts on a clean
+ * keyless install produced three DIFFERENT failures -
+ *   [401] Model north-mini-code-free is not supported ... invalid_api_key
+ *   [502] fetch failed                     (gateway could not reach it)
+ *   [418] DuckDuckGo anti-abuse challenge failed: ERR_BN_LIMIT
+ * - and each time the enumeration had to grow. Predicting the taxonomy of a
+ * free model pool is a losing game.
+ *
+ * The reader's question is not "which code was it" but "did I get an answer".
+ * So: an errored turn that produced no text is a model that did not answer,
+ * whatever it called itself. The exclusions are the cases where trying a
+ * different model would be wrong or rude - the reader pressed stop, or the
+ * model did answer and merely stopped early.
+ */
+function isModelFailure(err, gotText = false) {
+  if (!err) return false;
+  if (gotText) return false;
+  const msg = String(err?.data?.message ?? err?.message ?? err?.name ?? err ?? "");
+  if (/abort|cancell?ed|stopped by (the )?user/i.test(msg)) return false;
+  return true;
+}
+
+/**
+ * The next model worth trying after one has refused.
+ *
+ * ⚠️ Concrete models only, never an `auto/` combo. A combo resolves to some
+ * other model at request time, so when it fails we cannot tell WHICH model
+ * refused - recording the combo as unhealthy blames the wrong thing and would
+ * blacklist a router that works perfectly well next time. It is also how this
+ * bug presented: the default `auto/coding` resolved to a gated model and the
+ * first message of every fresh keyless install died on it.
+ */
+function nextModel(exclude = []) {
+  const bad = new Set([...Object.keys(state.unhealthy), ...exclude]);
+  // The vendor is the first segment of the model id - `ddgw/gpt-5.4-nano`,
+  // `oc/north-mini-code-free` - because the gateway serves every vendor under
+  // one provider id of its own.
+  const vendor = (id) => (id.includes("/") ? id.slice(0, id.indexOf("/")) : id);
+  const spent = new Set([...bad].map((k) => vendor(k.slice(k.indexOf("/") + 1))));
+
+  // Two passes. The first refuses to try a vendor that has already failed this
+  // turn, because the interesting failures are per-VENDOR, not per-model:
+  // measured, a rate-limited DuckDuckGo returned the identical
+  // "[418] anti-abuse challenge failed: ERR_BN_LIMIT" for two different models
+  // in a row, so the second attempt was spent before it was made. The second
+  // pass drops that preference rather than giving up entirely.
+  for (const strict of [true, false]) {
+    for (const p of state.models) {
+      for (const m of p.models) {
+        if (m.id.startsWith("auto/") || !m.free) continue;
+        if (bad.has(`${p.id}/${m.id}`)) continue;
+        if (strict && spent.has(vendor(m.id))) continue;
+        return { providerID: p.id, id: m.id, name: m.name };
+      }
     }
   }
+  return null;
+}
+
+/** What is in flight, so a model refusal can be retried with another model. */
+let inFlight = null;
+
+/** POST the message. Split out of send() so a retry does not re-create anything. */
+function postMessage(id, text) {
+  const body = { agent: agentFor(), parts: [{ type: "text", text }] };
+  if (state.model) body.model = { providerID: state.model.providerID, modelID: state.model.id };
   setBusy("sending");
-  // Paint the question immediately rather than waiting for the round trip.
-  scheduleRefresh();
   // Sending is an explicit "show me the answer": follow it wherever the view
   // happened to be, and keep following until the reader scrolls away.
   stickToBottom = true;
-
-  const body = {
-    agent: agentFor(),
-    parts: [{ type: "text", text }],
-  };
-  if (state.model) body.model = { providerID: state.model.providerID, modelID: state.model.id };
+  scheduleRefresh();
 
   // Deliberately not awaited for rendering: this route only returns once the
   // whole reply is finished, and the transcript should fill in as it arrives.
@@ -740,6 +816,51 @@ async function send(text) {
       setBusy(false);
       toast(e.message, "bad");
     });
+}
+
+/**
+ * Try the same question again on a different model.
+ *
+ * Bounded at two retries: past that the free pool is refusing generally rather
+ * than this one model being gated, and silently working through a hundred
+ * models would spend the user's time without telling them anything.
+ */
+function retryOnAnotherModel() {
+  if (!inFlight || inFlight.tries >= 2) return false;
+  // Never resurrect a prompt from a conversation the reader has since left.
+  if (inFlight.id !== state.sessionID) return false;
+  const failed = state.model ? `${state.model.providerID}/${state.model.id}` : null;
+  const next = nextModel(failed ? [failed, ...inFlight.tried] : inFlight.tried);
+  if (!next) return false;
+
+  const was = modelName();
+  inFlight.tries += 1;
+  if (failed) inFlight.tried.push(failed);
+  state.model = { providerID: next.providerID, id: next.id };
+  // Remembered, so the next conversation starts on something that answers
+  // instead of repeating this on every fresh session.
+  savePrefs({ model: state.model });
+  paintModel();
+  toast(`${was} would not answer. Retrying with ${next.name}.`);
+  setSessionModel(inFlight.id, state.model).finally(() => postMessage(inFlight.id, inFlight.text));
+  return true;
+}
+
+async function send(text) {
+  if (!text.trim()) return;
+  const fresh = !state.sessionID;
+  if (!state.sessionID) await newSession();
+  const id = state.sessionID;
+  const current = state.sessions.find((s) => s.id === id);
+  if (fresh || isPlaceholderTitle(current?.title)) {
+    const name = nameFromPrompt(text);
+    if (name) {
+      await ocall("PATCH", `/session/${id}`, { title: name });
+      $("title").textContent = name;
+    }
+  }
+  inFlight = { id, text, tries: 0, tried: [], error: null };
+  postMessage(id, text);
 
   // The title is generated after the first exchange, so pick it up shortly.
   setTimeout(loadSessions, 6000);
@@ -794,7 +915,16 @@ async function loadModels() {
   // Order matters: what the user chose, then what setup configured, then the
   // provider's own default, then anything. The provider default is third
   // because it is not chosen with chat in mind.
+  // A model the setup wizard actually got an answer from on this machine beats
+  // anything published, and it is the reason a fresh install's first message no
+  // longer fails. Only consulted when the user has not chosen for themselves.
+  const verified = state.verifiedModel
+    ? state.models
+        .flatMap((p) => p.models.map((m) => ({ providerID: p.id, id: m.id })))
+        .find((m) => m.id === state.verifiedModel)
+    : null;
   if (known(saved)) state.model = saved;
+  else if (verified) state.model = verified;
   else if (r.configured) state.model = r.configured;
   else if (pref?.default) state.model = { providerID: pref.id, id: pref.default };
   else if (pref?.models?.length) state.model = { providerID: pref.id, id: pref.models[0].id };
@@ -1738,6 +1868,7 @@ async function boot() {
   state.mode = MODES[prefs.mode] ? prefs.mode : "auto";
   state.model = prefs.model ?? null;
   state.unhealthy = prefs.unhealthy ?? {};
+  state.verifiedModel = prefs.verifiedModel ?? null;
   setSurface(prefs.surface === "code" ? "code" : "chat");
   $("mode-label").textContent = MODES[state.mode].label;
   const st = await api("status");

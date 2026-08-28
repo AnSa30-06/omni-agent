@@ -92,6 +92,7 @@ export async function runDoctor(opts = {}) {
   // Goes through the real execution path, fallback chain included, so this row
   // reflects what the agent will actually experience rather than what a single
   // hand-picked model does.
+  let servedModel = null;
   if (deep && catalogue.length) {
     try {
       const { complete } = await import("../routing/execute.mjs");
@@ -102,6 +103,22 @@ export async function runDoctor(opts = {}) {
         timeoutMs: 180000,
         client,
       });
+      // Which model to remember, and it is worth being precise about.
+      //
+      // The REQUESTED id is often an `auto/` combo, and seeding the app with a
+      // combo reinstates the very brittleness this is meant to remove: a combo
+      // resolves somewhere new on every call and can land on a model that needs
+      // a key. `r.servedBy` names the model that actually produced the tokens
+      // ("hy3-free"), but in the gateway's own naming rather than the
+      // catalogue's ("oc/hy3-free"), so it is resolved against the catalogue
+      // instead of trusted as an id. If it cannot be resolved, the requested id
+      // is still better than nothing.
+      const requested = r.attempts?.find((a) => a.ok)?.model ?? null;
+      const concrete = r.servedBy
+        ? (catalogue.find((m) => m.id === r.servedBy) ??
+            catalogue.find((m) => m.id.endsWith(`/${r.servedBy}`)))?.id
+        : null;
+      servedModel = concrete ?? requested;
       const said = (r.content || "").toLowerCase();
       const fellBack = r.fellBackFrom ? ` after falling back from ${r.fellBackFrom.join(", ")}` : "";
       if (said.includes("ready")) {
@@ -236,7 +253,7 @@ export async function runDoctor(opts = {}) {
 
   const failed = rows.filter((r) => r.status === FAIL).length;
   const warned = rows.filter((r) => r.status === WARN).length;
-  return { rows, failed, warned, ok: failed === 0 };
+  return { rows, failed, warned, ok: failed === 0, servedModel };
 }
 
 export function renderDoctor(result) {

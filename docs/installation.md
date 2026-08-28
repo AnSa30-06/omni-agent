@@ -116,7 +116,7 @@ Credentials can also come from environment variables — see
 The installer itself supports Inno Setup's standard switches:
 
 ```
-OmniAgentSetup-1.1.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Apps\OmniAgent"
+OmniAgentSetup-1.1.2.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Apps\OmniAgent"
 ```
 
 ---
@@ -126,7 +126,7 @@ OmniAgentSetup-1.1.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Apps\
 Each release publishes a SHA-256 for both artefacts.
 
 ```powershell
-Get-FileHash .\OmniAgentSetup-1.1.1.exe -Algorithm SHA256
+Get-FileHash .\OmniAgentSetup-1.1.2.exe -Algorithm SHA256
 ```
 
 The installer is **not code-signed** — Windows SmartScreen will warn on first run. Choose
