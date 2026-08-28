@@ -58,6 +58,12 @@ body {
 }
 button { font: inherit; color: inherit; cursor: pointer; }
 h1, h2, h3 { margin: 0; font-weight: 600; }
+h1 { line-height: 1.2; }
+h2 { line-height: 1.3; }
+h3 { line-height: 1.35; }
+
+/* The default selection against this palette was almost invisible. */
+::selection { background: var(--accent-soft); color: var(--ink); }
 
 #app { display: flex; height: 100vh; }
 
@@ -215,6 +221,56 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 .spin { display: inline-block; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* A tool call still running gets the same quiet pulse as the caret. */
+.tool.running summary { color: var(--ink); }
+.tool.running .tool-name::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 7px;
+  border-radius: 50%; background: var(--accent); vertical-align: middle;
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes dot-pulse { 50% { opacity: .25; } }
+
+/*
+ * ── the streamed-token fade ──────────────────────────────────────────────
+ *
+ * Each fragment the model produces arrives as its own span and fades from
+ * transparent, because text that simply appears reads as a page load while
+ * text that fades in per fragment reads as something being written. The spans
+ * are flattened back into plain text when the turn settles - a long answer is
+ * hundreds of them, and leaving that in the DOM makes selection and scrolling
+ * gritty for no benefit once the animation is over.
+ *
+ * ⚠️ Fail-safe on purpose: the fade runs FROM transparent rather than setting
+ * the element transparent and animating it back. Those look identical while
+ * animations run and are not remotely equivalent when they do not - with
+ * `opacity: 0` in the base rule, anything that stops the animation (a
+ * throttled background tab, a compositor that is not running) leaves the
+ * answer PERMANENTLY INVISIBLE.
+ *
+ * ⚠️ `forwards`, never `both`: `both` implies `backwards`, which pins the
+ * element to the transparent from-frame whenever the animation has not
+ * started - the same invisible-text failure, reintroduced by a keyword.
+ */
+.stream-text { white-space: pre-wrap; }
+.tok { animation: tok-in .42s ease forwards; }
+@keyframes tok-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* The caret that says "still writing". Goes with the .writing class. */
+.msg.writing .body::after {
+  content: ""; display: inline-block;
+  width: 7px; height: 1.05em; margin-left: 2px;
+  vertical-align: text-bottom; background: var(--accent); border-radius: 1px;
+  animation: caret 1.05s steps(2, start) infinite;
+}
+@keyframes caret { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tok { animation: none; }
+  .msg.writing .body::after { animation: none; }
+  .tool.running .tool-name::before { animation: none; }
+  .spin { animation: none; }
+}
+
 .empty { max-width: 620px; margin: 8vh auto 0; text-align: center; padding: 0 26px; }
 .empty-mark { width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 16px; display: block; }
 .empty h2 { font-size: 21px; margin-bottom: 6px; }
@@ -293,7 +349,15 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
   border: 1px solid var(--line); background: var(--bg-sink); border-radius: 8px;
   padding: 6px 12px; font-size: 12.5px; color: var(--ink); white-space: nowrap;
 }
+.btn { transition: border-color .12s ease, background-color .12s ease; }
 .btn:hover { border-color: var(--ink-faint); }
+.btn:active { transform: translateY(1px); }
+.pill:active, .icon-btn:active, .send:active, .starter:active { transform: translateY(1px); }
+.s-item, .pop-item, .nav-item, .starter { transition: background-color .12s ease, color .12s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .btn, .s-item, .pop-item, .nav-item, .starter { transition: none; }
+  .btn:active, .pill:active, .icon-btn:active, .send:active, .starter:active { transform: none; }
+}
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { filter: brightness(1.06); }
 .btn.danger { color: var(--bad); }
@@ -369,6 +433,7 @@ ol.steps code { font-family: var(--mono); font-size: 12px; background: var(--lin
 .toast.bad { border-left-color: var(--bad); }
 .toast.good { border-left-color: var(--good); }
 
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 3px solid var(--bg); }
 ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }

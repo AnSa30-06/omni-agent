@@ -18,6 +18,7 @@ and it exposes the parts of the system the terminal never showed.
 | **Auto / Plan / Ask first** | How much the agent does before checking with you. Code only. |
 | **Model picker** | Every model the gateway can serve — 160-odd on a keyless install — with a search box. |
 | **Usage** | How full the conversation's context is, and any free allowance the provider actually publishes. |
+| **Live output** | Text and tool calls stream in as they are produced, fading in fragment by fragment. |
 | **Working folder** | Which folder the agent reads and writes in. Chosen with the Windows folder picker, fixed when a conversation starts. |
 | **Routines** | Saved prompts on a schedule. |
 | **Transcripts** | A copy of every conversation, kept outside the agent, so deleting one is recoverable. |
@@ -84,6 +85,12 @@ message, returns 200, and never runs it — it is not used.
 and answers `200` with HTML, so a delete through it silently does nothing. The
 real one is `DELETE /session/{id}`.
 
+**`GET /api/session/{id}/event` never sends response headers.** The request
+hangs until it is aborted — no status line, no `content-type`, nothing. The app
+subscribed to it for its live updates, so no event ever arrived and answers
+appeared in one lump when the send request returned. The stream that works is
+the **global `/event`**, filtered by session id.
+
 **`POST /api/session?directory=X` accepts the directory and ignores it.** It
 answers 200 and hands back a session rooted in the default workspace. The
 legacy `POST /session?directory=X` honours it. This is the same v2/legacy split
@@ -125,6 +132,41 @@ key you have not added yet, and will answer `401`. So:
 Nothing about a model's health is guessed. The gateway publishes no per-model
 health — `theoldllm` reports `active: true` and answers `403` — so the only
 signal shown is what has already happened on this machine.
+
+## Streaming
+
+Answers are written into the page as they arrive, tool calls included. Three
+things about how, because each replaced something that was quietly broken:
+
+**Rendering is surgical, not wholesale.** The transcript used to be re-read and
+re-rendered from scratch on every event. A full re-render per token restarts
+every fade animation on every frame and makes the text strobe, so the assistant
+turn is built once and streamed into. One authoritative re-render happens when
+the turn settles — that is also what turns the literal streamed text into
+rendered markdown, and what flattens the hundreds of per-fragment spans that
+would otherwise make selection and scrolling gritty.
+
+**Each fragment fades in.** `message.part.delta` carries incremental text (not
+cumulative), and each one becomes a `<span class="tok">` that fades from
+transparent. Text that simply appears reads as a page load; text that fades in
+per fragment reads as something being written. A blinking caret marks the turn
+still being written, and a running tool call gets a pulsing dot. All three are
+switched off under `prefers-reduced-motion`.
+
+⚠️ **The fade runs *from* transparent, and that is a correctness safeguard, not
+a style.** Parking the element at `opacity: 0` and animating it back looks
+identical while animations run and leaves the entire answer **permanently
+invisible** when they do not — a throttled background tab, a compositor that is
+not running. For the same reason the animation is `forwards` and never `both`:
+`both` implies `backwards`, which pins the element to the transparent frame
+before the animation starts.
+
+**The view follows the answer with a sticky flag, not a distance measurement.**
+Asking "is the reader near the bottom?" each time content arrives is always
+answered "no" in a conversation with any history, so the view never follows what
+is being written. Instead following starts on, and only a deliberate scroll *up*
+turns it off. The scroll is `auto`, never smooth — a smooth scroll re-triggered
+on every token restarts before it arrives.
 
 ## The working folder
 

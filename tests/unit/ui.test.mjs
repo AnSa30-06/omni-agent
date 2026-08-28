@@ -230,3 +230,54 @@ test("the folder picker does not block the server while the dialog is open", () 
   assert.match(pick, /spawn\("powershell\.exe"/);
   assert.match(pick, /-STA/, "FolderBrowserDialog needs a single-threaded apartment");
 });
+
+test("live updates come from the global event stream, not the route that never answers", () => {
+  // Measured 2026-08-28: GET /api/session/{id}/event never sends response
+  // headers at all - the request hangs until it is aborted. The page had an
+  // EventSource pointed at it, so no event ever arrived and the transcript
+  // only updated when the send request finally returned. That is why answers
+  // landed in one lump instead of streaming.
+  const app = ui("public", "app.js");
+  assert.match(app, /new EventSource\(`\/oc\/event\?/, "the stream must be the global /event");
+  assert.ok(
+    !/EventSource\(`\/oc\/api\/session\//.test(app),
+    "/api/session/{id}/event never sends headers; it must not be subscribed to",
+  );
+  // A global stream carries other conversations, so it has to be filtered.
+  assert.match(app, /q\.sessionID !== state\.sessionID/);
+});
+
+test("streamed text fades from transparent and can never be left invisible", () => {
+  // The fade must run FROM transparent rather than parking the element at
+  // opacity 0 and animating it back: those look identical while animations
+  // run, and the second leaves the whole answer permanently invisible in a
+  // throttled tab or on a compositor that is not running.
+  const css = ui("public", "app.css");
+  const rule = /\.tok\s*\{([^}]*)\}/.exec(css);
+  assert.ok(rule, ".tok must exist");
+  assert.ok(!/opacity\s*:\s*0/.test(rule[1]), ".tok must not set opacity: 0 as its resting state");
+  assert.match(rule[1], /animation:[^;]*forwards/, "the fade must use forwards");
+  assert.ok(!/animation:[^;]*\bboth\b/.test(rule[1]), "`both` implies backwards, which pins it invisible");
+  assert.match(css, /@keyframes tok-in\s*\{\s*from\s*\{\s*opacity:\s*0/);
+  assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]{0,400}\.tok\s*\{\s*animation:\s*none/);
+});
+
+test("a streaming turn is written into, never re-rendered", () => {
+  // Re-rendering the transcript on every event restarts every fade animation
+  // on every frame and makes the text strobe.
+  const app = ui("public", "app.js");
+  assert.match(app, /if \(t\.startsWith\("session\."\) && !live\.turn\) scheduleRefresh\(\)/);
+  assert.match(app, /live\.parts\.set\(/, "parts are keyed so a tool updates in place instead of stacking");
+});
+
+test("the view follows a live answer instead of measuring how far away it is", () => {
+  // Measuring "am I near the bottom?" per token is always false in a
+  // conversation with history, so the view never follows the answer.
+  const app = ui("public", "app.js");
+  assert.match(app, /let stickToBottom = true/);
+  assert.match(app, /behavior: "auto"/, "a re-triggered smooth scroll never arrives");
+  assert.ok(
+    !/const atBottom = box\.scrollHeight/.test(app),
+    "the per-render near-bottom measurement is the broken version",
+  );
+});

@@ -273,7 +273,7 @@ function renderMarkdownish(text) {
 
 function renderMessages(list) {
   const box = $("messages");
-  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
+  liveReset();
   box.replaceChildren();
   if (!list.length) {
     box.append(emptyState());
@@ -344,9 +344,8 @@ function renderMessages(list) {
     wrap.append(body);
     box.append(wrap);
   }
-  // Only chase the bottom if the reader was already there, so scrolling back
-  // through a long answer is not yanked away every time a token arrives.
-  if (atBottom) box.scrollTop = box.scrollHeight;
+  watchThreadScroll();
+  scrollToEnd();
 }
 
 function emptyState() {
@@ -406,21 +405,162 @@ async function refreshMessages() {
   renderMessages(ordered);
 }
 
+/* ── following the bottom ──────────────────────────────────────────────── */
+
+/**
+ * Whether new content should pull the view down with it.
+ *
+ * Starts true and is only turned off when the reader deliberately scrolls UP.
+ *
+ * ⚠️ The obvious alternative - measuring "am I near the bottom?" each time
+ * something arrives - is subtly broken, and this app had it. A conversation
+ * with any history starts far from the bottom, so the answer is always "no"
+ * and the view never follows the answer being written. Measured in creator-os
+ * as 1141px from the bottom, unchanged, for an entire turn.
+ */
+let stickToBottom = true;
+
+function scrollToEnd(force = false) {
+  const box = $("messages");
+  if (!box || (!force && !stickToBottom)) return;
+  // `auto`, never smooth: a smooth scroll re-triggered on every token restarts
+  // before it arrives, so the view lags behind the text and drifts.
+  box.scrollTo({ top: box.scrollHeight, behavior: "auto" });
+}
+
+function watchThreadScroll() {
+  const box = $("messages");
+  if (!box || box.dataset.watched) return;
+  box.dataset.watched = "1";
+  box.addEventListener(
+    "scroll",
+    () => {
+      stickToBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    },
+    { passive: true },
+  );
+}
+
 /* ── live updates ──────────────────────────────────────────────────────── */
+
+/**
+ * The turn currently being written into.
+ *
+ * ⭐ Rendering here is SURGICAL, not wholesale. Re-rendering the transcript on
+ * every event - which is what this used to do - restarts every fade animation
+ * on every frame and makes the text strobe, so the assistant turn is built
+ * once and streamed into.
+ */
+const live = { messageID: null, turn: null, body: null, parts: new Map() };
+
+function liveReset() {
+  live.messageID = null;
+  live.turn = null;
+  live.body = null;
+  live.parts.clear();
+}
+
+/** The assistant bubble being streamed into, created on first content. */
+function liveTurn(messageID) {
+  if (live.turn?.isConnected && live.messageID === messageID) return live.turn;
+  liveReset();
+  const box = $("messages");
+  box.querySelector(".empty")?.remove();
+  const wrap = el("div", "msg assistant writing");
+  wrap.append(el("div", "role", "Omni Agent"));
+  const body = el("div", "body");
+  // Announced as it is written, not re-read from the top on every token.
+  body.setAttribute("aria-live", "polite");
+  wrap.append(body);
+  box.append(wrap);
+  Object.assign(live, { messageID, turn: wrap, body });
+  watchThreadScroll();
+  scrollToEnd(true);
+  return wrap;
+}
+
+/** The node a streaming text part writes into. */
+function liveTextPart(messageID, partID) {
+  const known = live.parts.get(partID);
+  if (known?.isConnected) return known;
+  liveTurn(messageID);
+  const node = el("div", "stream-text");
+  live.body.append(node);
+  live.parts.set(partID, node);
+  return node;
+}
+
+/**
+ * A tool call, updated in place as it runs.
+ *
+ * Keyed by part id so `pending → running → completed` reuses one block instead
+ * of stacking three, and so the reader's expand/collapse survives the update.
+ */
+function liveToolPart(messageID, part) {
+  liveTurn(messageID);
+  let d = live.parts.get(part.id);
+  if (!d?.isConnected) {
+    d = el("details", "tool");
+    d.append(el("summary"));
+    live.body.append(d);
+    live.parts.set(part.id, d);
+  }
+  const status = part.state?.status ?? part.status;
+  const sum = d.querySelector("summary");
+  sum.replaceChildren();
+  sum.append(el("span", "tool-name", part.tool ?? part.name ?? "tool"));
+  sum.append(el("span", "muted", status === "running" || status === "pending" ? "running…" : (status ?? "done")));
+  d.classList.toggle("running", status === "running" || status === "pending");
+  const detail = part.state?.output ?? part.state?.input ?? part.output ?? part.input;
+  let pre = d.querySelector("pre");
+  if (detail != null) {
+    if (!pre) {
+      pre = el("pre");
+      d.append(pre);
+    }
+    pre.textContent = typeof detail === "string" ? detail : JSON.stringify(detail, null, 2);
+  }
+  scrollToEnd();
+}
+
+/** Settle the streamed turn against what the server actually stored. */
+function endTurn() {
+  live.turn?.classList.remove("writing");
+  setBusy(false);
+  // One authoritative re-render: the streamed text is deliberately literal, and
+  // this is what turns it into rendered markdown - the same trade creator-os
+  // makes. It also flattens the hundreds of per-fragment spans, which make
+  // selection and scrolling gritty once the animation is over.
+  scheduleRefresh();
+  refreshUsage();
+  loadSessions();
+  // A full re-render drops focus to <body>, so the next message would need a
+  // click before it could be typed.
+  $("prompt")?.focus();
+}
 
 let refreshTimer = null;
 function scheduleRefresh() {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(() => {
     refreshMessages();
-    refreshUsage();
     checkPermissions();
   }, 150);
 }
 
+/**
+ * Subscribe to the agent's event stream.
+ *
+ * ⚠️ The GLOBAL `/event`, filtered by session id - not `/api/session/{id}/event`,
+ * which this app used to subscribe to. Measured 2026-08-28: that route never
+ * sends response headers at all. The EventSource sat there forever, no event
+ * ever arrived, and the transcript only ever updated when the send request
+ * finally returned - which is exactly why answers landed in one lump instead
+ * of streaming.
+ */
 function subscribe(sessionID) {
   state.stream?.close();
-  const es = new EventSource(`/oc/api/session/${sessionID}/event?t=${encodeURIComponent(TOKEN)}`);
+  const es = new EventSource(`/oc/event?t=${encodeURIComponent(TOKEN)}`);
   state.stream = es;
   es.onmessage = (e) => {
     let ev;
@@ -430,23 +570,57 @@ function subscribe(sessionID) {
       return;
     }
     const t = ev.type ?? "";
-    // Events are the trigger, not the payload. Re-reading the message list on
-    // each one keeps rendering independent of an event schema that is still
-    // marked experimental in places, at the cost of one cheap local request.
-    if (t.startsWith("session.")) scheduleRefresh();
-    if (t.includes("step.started") || t.includes("prompted")) setBusy(true);
-    if (t.includes("step.completed") || t.includes("step.failed") || t.includes("idle")) setBusy(false);
+    const q = ev.properties ?? ev.data ?? {};
+    // The stream is global, so everything for another conversation is noise.
+    if (q.sessionID && q.sessionID !== state.sessionID) return;
+
+    if (t === "message.part.delta") {
+      // Deltas are INCREMENTAL fragments, and they only ever belong to an
+      // assistant text part - the user's own part is complete when created and
+      // never gets one. That is what makes it safe to open a live turn here
+      // without first working out whose message this is.
+      if (q.field !== "text" || typeof q.delta !== "string") return;
+      setBusy("streaming");
+      const node = liveTextPart(q.messageID, q.partID);
+      // One span per fragment: this is what produces the fade as it is written.
+      node.append(el("span", "tok", q.delta));
+      scrollToEnd();
+      return;
+    }
+
+    if (t === "message.part.updated" && q.part) {
+      if (q.part.type === "tool") {
+        setBusy("streaming");
+        liveToolPart(q.part.messageID, q.part);
+      }
+      return;
+    }
+
+    if (t === "session.idle" || t === "session.error") {
+      endTurn();
+      return;
+    }
     if (t.includes("permission") || t.includes("question")) checkPermissions();
+    // Anything else only matters when nothing is being written; mid-stream a
+    // re-render would destroy the turn being streamed into.
+    if (t.startsWith("session.") && !live.turn) scheduleRefresh();
   };
   es.onerror = () => {
     /* EventSource reconnects on its own; a closed session simply stops. */
   };
 }
 
-function setBusy(on) {
-  state.busy = on;
+/**
+ * Busy has two states and conflating them is what makes a working app look
+ * frozen: `sending` is "the request is in flight and unacknowledged",
+ * `streaming` is "the server has it and is answering".
+ */
+function setBusy(kind) {
+  state.busy = kind || false;
+  const on = !!kind;
   $("btn-stop").hidden = !on;
   $("send").disabled = on;
+  $("btn-stop").title = kind === "sending" ? "Cancel" : "Stop the agent";
   document.querySelectorAll(".s-item.active").forEach((n) => n.classList.toggle("busy", on));
 }
 
@@ -540,9 +714,12 @@ async function send(text) {
       $("title").textContent = name;
     }
   }
-  setBusy(true);
+  setBusy("sending");
   // Paint the question immediately rather than waiting for the round trip.
   scheduleRefresh();
+  // Sending is an explicit "show me the answer": follow it wherever the view
+  // happened to be, and keep following until the reader scrolls away.
+  stickToBottom = true;
 
   const body = {
     agent: agentFor(),
@@ -554,10 +731,10 @@ async function send(text) {
   // whole reply is finished, and the transcript should fill in as it arrives.
   ocall("POST", `/session/${id}/message`, body)
     .then((r) => {
-      setBusy(false);
       if (!r.ok) toast(r.data?.message ?? `The agent could not answer (${r.status})`, "bad");
-      scheduleRefresh();
-      loadSessions();
+      // `session.idle` normally settles the turn well before this resolves.
+      // This is the backstop for a model that streamed nothing at all.
+      endTurn();
     })
     .catch((e) => {
       setBusy(false);
