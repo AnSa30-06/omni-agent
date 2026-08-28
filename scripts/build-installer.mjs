@@ -224,6 +224,16 @@ async function main() {
   if (!fs.existsSync(npmCli)) throw new Error("the staged Node runtime has no npm; the bootstrap step would fail");
   say("  npm present in the bundled runtime.");
 
+  // The application executable. Built after staging because it is made from
+  // the staged node.exe, and copied in afterwards because staging is wiped.
+  say("");
+  say("Building OmniAgent.exe:");
+  const { buildExe } = await import("./build-exe.mjs");
+  const exe = await buildExe({ version: VERSION });
+  if (!exe.ok) throw new Error(`could not build OmniAgent.exe: ${exe.reason}`);
+  fs.copyFileSync(exe.path, path.join(STAGING, "OmniAgent.exe"));
+  say(`  OmniAgent.exe: ${(exe.bytes / 1048576).toFixed(1)} MB, icon ${exe.branded ? "stamped" : "not stamped"}`);
+
   say("");
   say("Compiling installer:");
   fs.mkdirSync(DIST, { recursive: true });

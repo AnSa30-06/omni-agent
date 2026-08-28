@@ -330,6 +330,106 @@ export const routes = {
     return ok({ prefs });
   },
 
+  // --- the working folder --------------------------------------------------
+  //
+  // A session's working directory is fixed when the session is created:
+  // `POST /session?directory=<absolute path>`. Measured 2026-08-28 - the
+  // session then remembers it, so messages do NOT have to repeat the query,
+  // and `GET /session` with no filter still lists sessions from every folder
+  // (adding ?directory= to that call filters the sidebar down to one folder,
+  // which is not what we want).
+  //
+  // So the folder is chosen BEFORE a conversation starts and cannot be moved
+  // afterwards. The UI says so rather than offering a control that silently
+  // does nothing.
+
+  async folders() {
+    const prefs = readPrefs();
+    const chosen = typeof prefs.folder === "string" ? prefs.folder : null;
+    const recent = Array.isArray(prefs.recentFolders) ? prefs.recentFolders : [];
+    return ok({
+      folder: chosen && fs.existsSync(chosen) ? chosen : PATHS.workspace,
+      workspace: PATHS.workspace,
+      // A folder that has since been deleted or unplugged is dropped rather
+      // than offered as a choice that will fail.
+      recent: recent.filter((p) => fs.existsSync(p)),
+    });
+  },
+
+  /**
+   * Set the folder new conversations will work in.
+   *
+   * Refuses anything that is not an existing directory: OpenCode accepts a
+   * nonexistent `directory` without complaint and the failure only shows up
+   * later, as an agent that cannot find any of the user's files.
+   */
+  async folderSet({ body }) {
+    const p = typeof body?.path === "string" ? body.path.trim() : "";
+    if (!p) return bad("no folder given");
+    let full;
+    try {
+      full = path.resolve(p);
+    } catch {
+      return bad(`${p} is not a usable path`);
+    }
+    let stat = null;
+    try {
+      stat = fs.statSync(full);
+    } catch {
+      return bad(`${full} does not exist`);
+    }
+    if (!stat.isDirectory()) return bad(`${full} is a file, not a folder`);
+
+    const prefs = readPrefs();
+    const recent = [full, ...(Array.isArray(prefs.recentFolders) ? prefs.recentFolders : [])]
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .slice(0, 8);
+    writePrefs({ ...prefs, folder: full, recentFolders: recent });
+    return ok({ folder: full, recent });
+  },
+
+  /**
+   * Open the real Windows "choose a folder" dialog.
+   *
+   * Typing a path is not a reasonable ask, and a browser cannot open a folder
+   * picker that yields a usable path. FolderBrowserDialog needs a
+   * single-threaded apartment, hence -STA, and an owner window that is
+   * TopMost - without one the dialog opens BEHIND the app and looks like a
+   * freeze.
+   */
+  async folderPick() {
+    if (process.platform !== "win32") return bad("the folder picker is Windows-only; type a path instead");
+    const script = [
+      "Add-Type -AssemblyName System.Windows.Forms",
+      "$owner = New-Object System.Windows.Forms.Form",
+      "$owner.TopMost = $true",
+      "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
+      "$d.Description = 'Choose the folder Omni Agent should work in'",
+      "$d.ShowNewFolderButton = $true",
+      "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.SelectedPath }",
+      "$owner.Dispose()",
+    ].join("; ");
+    // Asynchronously, and that is not a style choice: the dialog stays open
+    // for as long as the user browses, and execFileSync would block this
+    // server's event loop for all of it - the app would freeze mid-click.
+    const { spawn } = await import("node:child_process");
+    const picked = await new Promise((resolve) => {
+      const child = spawn("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      let out = "";
+      child.stdout.on("data", (b) => (out += b.toString()));
+      child.on("error", () => resolve(null));
+      child.on("close", () => resolve(out.trim()));
+    });
+    if (picked === null) return bad("the folder picker could not open");
+    if (!picked) return ok({ cancelled: true });
+    // `routes.folderSet`, not `this.folderSet`: the dispatcher pulls the
+    // function out of the table before calling it, so `this` is undefined.
+    return routes.folderSet({ body: { path: picked } });
+  },
+
   // --- transcripts ---------------------------------------------------------
 
   async transcripts() {

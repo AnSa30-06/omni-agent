@@ -57,21 +57,26 @@ Source: "..\staging\app\*";  DestDir: "{app}\app";  Flags: ignoreversion recurse
 ; A private Node.js runtime, so the machine needs nothing preinstalled.
 Source: "..\staging\node\*"; DestDir: "{app}\node"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Launcher shims.
+; The application executable itself (built by scripts/build-exe.mjs).
+Source: "..\staging\OmniAgent.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "OmniAgent.cmd";     DestDir: "{app}"; Flags: ignoreversion
 Source: "OmniAgentApp.cmd";  DestDir: "{app}"; Flags: ignoreversion
-Source: "OmniAgent.vbs";     DestDir: "{app}"; Flags: ignoreversion
 Source: "OmniAgentSetup.cmd";DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md";      DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-; wscript.exe runs the .vbs with no console window, so the shortcut behaves
-; like an application rather than opening a terminal. The icon is ours.
-Name: "{group}\{#AppName}";              Filename: "{sys}\wscript.exe"; Parameters: """{app}\OmniAgent.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
-Name: "{group}\{#AppName} in a terminal"; Filename: "{app}\OmniAgent.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
+; A real executable, built as a Windows-subsystem binary, so it opens the app
+; and never a console. IconFilename is still set because the icon cannot always
+; be stamped into the exe at build time (see scripts/build-exe.mjs).
+Name: "{group}\{#AppName}";              Filename: "{app}\OmniAgent.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
+; The same app, but in a visible console - the thing to run when the exe starts
+; nothing and you need to see why. OmniAgent.cmd is the general CLI shim and
+; takes arguments, so it is not a shortcut target.
+Name: "{group}\{#AppName} in a terminal"; Filename: "{app}\OmniAgentApp.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
 Name: "{group}\Set up {#AppName}";       Filename: "{app}\OmniAgentSetup.cmd"; WorkingDir: "{app}"
 Name: "{group}\Check {#AppName} health"; Filename: "{app}\node\node.exe"; Parameters: """{app}\app\bin\omni-agent.mjs"" doctor"; WorkingDir: "{app}"
 Name: "{group}\Uninstall {#AppName}";    Filename: "{uninstallexe}"
-Name: "{userdesktop}\{#AppName}";        Filename: "{sys}\wscript.exe"; Parameters: """{app}\OmniAgent.vbs"""; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
+Name: "{userdesktop}\{#AppName}";        Filename: "{app}\OmniAgent.exe"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
 
 [Run]
 Filename: "{app}\OmniAgentSetup.cmd"; Description: "Finish setup"; Flags: shellexec postinstall skipifsilent; Tasks: runsetup

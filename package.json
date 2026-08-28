@@ -41,13 +41,13 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
+    "@opencode-ai/plugin": "^1.18.23",
     "exceljs": "^4.4.0",
     "linkedom": "^0.18.12",
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^4.10.38",
     "playwright-core": "^1.58.0",
-    "turndown": "^7.2.4",
-    "@opencode-ai/plugin": "^1.18.23"
+    "turndown": "^7.2.4"
   },
   "repository": {
     "type": "git",
@@ -60,5 +60,9 @@
     "browser-automation",
     "web-research",
     "llm"
-  ]
+  ],
+  "devDependencies": {
+    "postject": "^1.0.0-alpha.6",
+    "rcedit": "^5.0.2"
+  }
 }

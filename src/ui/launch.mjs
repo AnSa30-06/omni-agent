@@ -79,9 +79,13 @@ export async function launchUI(opts = {}) {
       say(`    ${url}`);
     } else {
       say(`  Omni Agent is open (via ${w.via}).`);
-      // Closing the window closes the app. Without this the agent, the gateway
-      // and a hidden Node process keep running after the user thinks they have
-      // quit - which is exactly the complaint people have about local web apps.
+      // Closing the window closes the app. Without this the agent server and
+      // the UI server keep running after the user thinks they have quit, which
+      // is exactly the complaint people have about local web apps.
+      //
+      // The gateway is deliberately NOT stopped: it takes half a minute to
+      // boot, `ensureRunning` is idempotent, and the CLI shares it. It runs
+      // with no window and is stopped with `omni-agent gateway stop`.
       const openedAt = Date.now();
       w.child?.once?.("exit", () => {
         // A browser launched against a profile that is already open hands the

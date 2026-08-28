@@ -22,6 +22,7 @@ import { provisionGatewayToken } from "../gateway/provision.mjs";
 import { runDoctor, renderDoctor } from "./doctor.mjs";
 import { PRESETS } from "../routing/select.mjs";
 import { logger } from "../util/log.mjs";
+import { nodeExe } from "../util/node-exe.mjs";
 
 const log = logger("wizard");
 
@@ -36,7 +37,7 @@ export async function installBrowser({ onProgress = say } = {}) {
   }
   onProgress("Downloading the browser engine (about 150 MB, one time)...");
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [cli, "install", "chromium"], {
+    const child = spawn(nodeExe() ?? process.execPath, [cli, "install", "chromium"], {
       env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: PATHS.browsers },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,

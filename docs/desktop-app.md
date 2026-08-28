@@ -1,6 +1,7 @@
 # The desktop app
 
-`omni-agent ui`, or the Omni Agent shortcut on your desktop.
+**OmniAgent.exe** — the Omni Agent shortcut on your desktop and in the Start
+Menu. `omni-agent ui` starts the same thing from a terminal.
 
 Before this existed the product was a terminal interface (OpenCode's TUI) plus a
 handful of CLI commands. The app is a real window with the same engine behind it,
@@ -17,6 +18,7 @@ and it exposes the parts of the system the terminal never showed.
 | **Auto / Plan / Ask first** | How much the agent does before checking with you. Code only. |
 | **Model picker** | Every model the gateway can serve — 160-odd on a keyless install — with a search box. |
 | **Usage** | How full the conversation's context is, and any free allowance the provider actually publishes. |
+| **Working folder** | Which folder the agent reads and writes in. Chosen with the Windows folder picker, fixed when a conversation starts. |
 | **Routines** | Saved prompts on a schedule. |
 | **Transcripts** | A copy of every conversation, kept outside the agent, so deleting one is recoverable. |
 | **Tools & plugins** | Built-in tools, skills, and MCP connections you can add. |
@@ -28,12 +30,26 @@ and it exposes the parts of the system the terminal never showed.
 ## How it is built
 
 ```
-omni-agent ui
+OmniAgent.exe                               one process, no console
   ├─ the model gateway (OmniRoute)          started first, always
   ├─ `opencode serve`                       the agent, as an HTTP server
   ├─ the UI server (src/ui/server.mjs)      serves the page, proxies the rest
   └─ a browser window in --app mode         chromeless, its own taskbar entry
 ```
+
+**`OmniAgent.exe` is a real executable**, built by `scripts/build-exe.mjs`: a
+[Node Single Executable Application](https://nodejs.org/api/single-executable-applications.html)
+made from the same Node runtime the installer already bundles, with its PE
+subsystem flipped from CONSOLE to WINDOWS so double-clicking it opens the app
+and never a black terminal. It does not spawn a second process — SEA requires a
+CommonJS entry, but a dynamic `import()` of an ESM file works from inside one,
+so the exe loads `src/ui/launch.mjs` in-process. One process, one taskbar entry,
+no `node.exe` anywhere on screen.
+
+Because there is no console attached, everything it would have printed goes to
+`%LOCALAPPDATA%\OmniAgent\logs\launcher.log`, and a start-up failure raises a
+dialog rather than doing nothing. *Omni Agent in a terminal* in the Start Menu
+runs the identical thing with the console visible.
 
 **The order is load-bearing.** The gateway's OpenCode plugin registers this
 product's models by asking the gateway for them at boot. Start the agent first
@@ -68,6 +84,12 @@ message, returns 200, and never runs it — it is not used.
 and answers `200` with HTML, so a delete through it silently does nothing. The
 real one is `DELETE /session/{id}`.
 
+**`POST /api/session?directory=X` accepts the directory and ignores it.** It
+answers 200 and hands back a session rooted in the default workspace. The
+legacy `POST /session?directory=X` honours it. This is the same v2/legacy split
+as the message routes, and it fails the same way: silently, and in the wrong
+place.
+
 **Field names differ per route.** `POST /api/session/{id}/model` wants
 `{model: {providerID, id}}`; `POST /session/{id}/message` wants
 `{model: {providerID, modelID}}`.
@@ -75,6 +97,19 @@ real one is `DELETE /session/{id}`.
 **Preferences are on disk, not in the browser.** The UI server takes a fresh
 port each launch, so the page is a new origin every time and `localStorage`
 would start empty on every restart. They live in `ui-prefs.json`.
+
+**The gateway is started through `cmd /c start "" /B`, and both halves of that
+matter.** Spawning it `detached` makes it outlive whatever started it, but on
+Windows that also creates a console — a second window titled *omniroute
+(v16.2.12)* sitting next to the app, which `windowsHide` does not suppress.
+Spawning it attached hides the window but kills the gateway the moment the
+launcher exits. `start /B` is the only form that gives both.
+
+**The pid recorded for the gateway is the launcher, not whatever holds the
+port.** OmniRoute serves from a worker child, and killing that worker does not
+stop it: the launcher starts another one within seconds. `omni-agent gateway
+stop` therefore resolves the launcher from the process list — `start /B` means
+the handle we hold belongs to a `cmd` that has already exited.
 
 ## Models
 
@@ -90,6 +125,22 @@ key you have not added yet, and will answer `401`. So:
 Nothing about a model's health is guessed. The gateway publishes no per-model
 health — `theoldllm` reports `active: true` and answers `403` — so the only
 signal shown is what has already happened on this machine.
+
+## The working folder
+
+The pill next to the mode button shows the folder the agent is working in, and
+opens the ordinary Windows folder picker.
+
+**A conversation's folder is fixed when it starts.** OpenCode takes it as
+`POST /session?directory=<absolute path>` and the session remembers it from
+then on; there is no route that moves an existing session somewhere else. So
+the picker sets where your *next* conversation will work, and says so when one
+is already open rather than offering a control that quietly does nothing. An
+open conversation shows its own folder, not the one you have queued up.
+
+The default is `%USERPROFILE%\OmniAgent Workspace`. Recently used folders are
+remembered, and any that have since been deleted or unplugged are dropped from
+the list instead of being offered as a choice that will fail.
 
 ## Transcripts
 

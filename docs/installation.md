@@ -10,8 +10,9 @@ ask for an administrator password. It:
 - checks the architecture (x64) and warns if free disk is under 6 GB
 - installs the application and a **private Node.js runtime**, so the machine needs nothing
   preinstalled
-- creates Start Menu entries (*Omni Agent*, *Set up Omni Agent*, *Check Omni Agent health*)
-  and, optionally, a desktop shortcut
+- installs **`OmniAgent.exe`**, the application itself
+- creates Start Menu entries (*Omni Agent*, *Omni Agent in a terminal*, *Set up Omni Agent*,
+  *Check Omni Agent health*) and, optionally, a desktop shortcut
 - offers to run first-time setup immediately
 
 ### What happens on first run

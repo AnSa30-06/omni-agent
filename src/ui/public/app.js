@@ -105,6 +105,16 @@ const state = {
   // reports active:true and answers 403), so the only honest signal is what
   // has already gone wrong on this machine.
   unhealthy: {},
+  // The folder the NEXT conversation will work in. A session's folder is fixed
+  // when it is created and cannot be moved afterwards, so an open conversation
+  // shows its own folder instead of this one.
+  folder: null,
+  workspace: null,
+  recentFolders: [],
+  // The open conversation's own folder. Read from `GET /session/{id}` rather
+  // than the sidebar list: the v2 list the sidebar uses carries `location` and
+  // `subpath` but no `directory` at all.
+  sessionFolder: null,
 };
 
 // Preferences live on disk, not in localStorage. The UI server takes a fresh
@@ -159,6 +169,7 @@ function renderSessions() {
       if (!r.ok) return toast("Could not delete that conversation", "bad");
       if (state.sessionID === s.id) {
         state.sessionID = null;
+        state.sessionFolder = null;
         renderMessages([]);
         $("title").textContent = state.surface === "chat" ? "New conversation" : "New project";
       }
@@ -170,8 +181,20 @@ function renderSessions() {
   }
 }
 
+/**
+ * Start a conversation in the chosen folder.
+ *
+ * The LEGACY route, and the folder is why. Measured 2026-08-28:
+ * `POST /api/session?directory=X` returns 200 and silently ignores the
+ * directory - the session comes back rooted in the default workspace - while
+ * `POST /session?directory=X` honours it. The directory is only settable at
+ * creation; the session remembers it afterwards, so nothing else has to carry
+ * it.
+ */
 async function newSession() {
-  const r = await ocall("POST", "/api/session", {});
+  const dir = state.folder || state.workspace;
+  const q = dir ? "?directory=" + encodeURIComponent(dir) : "";
+  const r = await ocall("POST", "/session" + q, {});
   const id = r.data?.data?.id ?? r.data?.id;
   if (!id) return toast("Could not start a new session", "bad");
   state.kinds[id] = state.surface;
@@ -190,6 +213,13 @@ async function openSession(id) {
   $("title").textContent = s?.title || "New conversation";
   renderSessions();
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
+  state.sessionFolder = null;
+  paintFolder();
+  ocall("GET", `/session/${id}`).then((d) => {
+    if (state.sessionID !== id) return;
+    state.sessionFolder = d.data?.directory ?? null;
+    paintFolder();
+  });
   await refreshMessages();
   subscribe(id);
   refreshUsage();
@@ -622,6 +652,115 @@ function paintModel() {
   $("foot-model").textContent = modelName();
 }
 
+/* ── the working folder ────────────────────────────────────────────────── */
+
+const baseName = (p) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
+
+/** The folder that applies right now: the open session's, or the next one's. */
+function activeFolder() {
+  if (state.sessionID && state.sessionFolder) return state.sessionFolder;
+  return state.folder ?? state.workspace;
+}
+
+function paintFolder() {
+  const f = activeFolder();
+  $("folder-label").textContent = baseName(f) || "Workspace";
+  $("folder-btn").title = f ? `Working in ${f}` : "The folder it works in";
+  // The header chip used to show the default workspace and only that, which
+  // read as a lie the moment a conversation was working somewhere else.
+  const chip = $("workspace-chip");
+  chip.textContent = baseName(f) || "";
+  chip.title = f ?? "";
+}
+
+async function loadFolders() {
+  const r = await api("folders");
+  if (r.ok === false) return;
+  state.folder = r.folder ?? null;
+  state.workspace = r.workspace ?? null;
+  state.recentFolders = r.recent ?? [];
+  paintFolder();
+}
+
+async function chooseFolder(path) {
+  const r = await api("folderSet", { method: "POST", body: { path } });
+  if (r.ok === false) return toast(r.error, "bad");
+  state.folder = r.folder;
+  state.recentFolders = r.recent ?? [];
+  $("pop-model").hidden = true;
+  paintFolder();
+  toast(
+    state.sessionID
+      ? `Your next conversation will work in ${baseName(r.folder)}.`
+      : `Working in ${baseName(r.folder)}.`,
+  );
+}
+
+/**
+ * Pick where the agent works.
+ *
+ * The folder is fixed when a conversation starts, so this cannot move an open
+ * one. Rather than offering a control that quietly does nothing, the popover
+ * says which folder the current conversation is in and that a new one is what
+ * changes it.
+ */
+function openFolderPicker(e) {
+  const box = el("div", "pop-search-wrap");
+  const here = activeFolder();
+
+  if (state.sessionID) {
+    box.append(el("div", "pop-head", "This conversation works in"));
+    box.append(el("div", "pop-note", here || "the default workspace"));
+    box.append(el("div", "pop-head", "Choosing another folder starts your next conversation there"));
+  } else {
+    box.append(el("div", "pop-head", "New conversations will work in"));
+  }
+
+  const row = (label, sub, path, active) => {
+    const b = el("button", "pop-item" + (active ? " active" : ""));
+    b.append(document.createTextNode(label));
+    if (sub) b.append(el("small", null, sub));
+    b.onclick = () => chooseFolder(path);
+    return b;
+  };
+
+  if (state.workspace) {
+    box.append(
+      row("Default workspace", state.workspace, state.workspace, state.folder === state.workspace),
+    );
+  }
+  for (const p of state.recentFolders) {
+    if (p === state.workspace) continue;
+    box.append(row(baseName(p), p, p, state.folder === p));
+  }
+
+  const pick = el("button", "pop-item primary");
+  pick.append(document.createTextNode("Choose a folder…"));
+  pick.append(el("small", null, "opens the Windows folder picker"));
+  pick.onclick = async () => {
+    pick.disabled = true;
+    pick.replaceChildren(document.createTextNode("Waiting for the folder picker…"));
+    const r = await api("folderPick", { method: "POST" });
+    if (r.ok === false) return toast(r.error, "bad");
+    if (r.cancelled) {
+      $("pop-model").hidden = true;
+      return;
+    }
+    state.folder = r.folder;
+    state.recentFolders = r.recent ?? [];
+    $("pop-model").hidden = true;
+    paintFolder();
+    toast(
+      state.sessionID
+        ? `Your next conversation will work in ${baseName(r.folder)}.`
+        : `Working in ${baseName(r.folder)}.`,
+    );
+  };
+  box.append(pick);
+
+  popover(e.currentTarget, box);
+}
+
 function popover(anchor, node) {
   const pop = $("pop-model");
   pop.replaceChildren(node);
@@ -749,6 +888,8 @@ function setSurface(s) {
       : "The agent always asks before sending, buying, publishing or deleting anything.";
   $("mode-btn").hidden = s === "chat";
   state.sessionID = null;
+  state.sessionFolder = null;
+  paintFolder();
   renderSessions();
   showView("session");
   $("title").textContent = s === "chat" ? "New conversation" : "New project";
@@ -1381,6 +1522,7 @@ function wire() {
   $("toggle-side").onclick = () => $("app").classList.add("collapsed");
   $("show-side").onclick = () => $("app").classList.remove("collapsed");
   $("model-btn").onclick = openModelPicker;
+  $("folder-btn").onclick = openFolderPicker;
   $("mode-btn").onclick = openModePicker;
   $("btn-stop").onclick = async () => {
     if (state.sessionID) await ocall("POST", `/api/session/${state.sessionID}/interrupt`, {});
@@ -1422,9 +1564,8 @@ async function boot() {
   setSurface(prefs.surface === "code" ? "code" : "chat");
   $("mode-label").textContent = MODES[state.mode].label;
   const st = await api("status");
-  $("workspace-chip").textContent = (st.workspace ?? "").split(/[\\/]/).pop() ?? "";
   if (!st.agent?.running) toast("The agent server is not running — restart Omni Agent.", "bad");
-  await Promise.all([loadModels(), loadSessions()]);
+  await Promise.all([loadModels(), loadSessions(), loadFolders()]);
   refreshUsage();
   setInterval(loadSessions, 20_000);
 }

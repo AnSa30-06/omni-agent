@@ -21,6 +21,7 @@ import { setSecret, getSecret } from "../util/secrets.mjs";
 import { locateOmniRoute } from "./locate.mjs";
 import { ensureRunning, stop as stopGateway } from "./supervisor.mjs";
 import { logger } from "../util/log.mjs";
+import { nodeExe } from "../util/node-exe.mjs";
 
 const log = logger("provision");
 
@@ -54,7 +55,7 @@ function resetGatewayPassword(password) {
   if (!fs.existsSync(script)) return Promise.resolve({ ok: false, reason: "reset-password tool not found" });
 
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [script, "--password-stdin"], {
+    const child = spawn(nodeExe() ?? process.execPath, [script, "--password-stdin"], {
       env: { ...process.env, DATA_DIR: PATHS.gatewayData },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,

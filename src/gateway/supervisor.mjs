@@ -11,12 +11,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { PATHS, ensureDirs } from "../util/paths.mjs";
 import { logger } from "../util/log.mjs";
 import { loadConfig, gatewayBaseUrl } from "../config.mjs";
 import { locateOmniRoute } from "./locate.mjs";
 import { GatewayClient } from "./client.mjs";
+import { nodeExe } from "../util/node-exe.mjs";
 
 const log = logger("supervisor");
 const PID_FILE = () => path.join(PATHS.gatewayData, "omni-agent-gateway.pid");
@@ -64,6 +65,42 @@ function readPid() {
   }
 }
 
+/**
+ * The pid of the gateway process we started, recovered from the process list.
+ *
+ * Needed because the gateway is launched through `cmd start /B` (see below), so
+ * the child handle we hold belongs to a cmd that has already exited. Without
+ * this the pid file would hold a dead pid, `gateway status` would report "not
+ * running" and `gateway stop` would be a silent no-op.
+ *
+ * ⚠️ It matches the LAUNCHER, not whatever holds the port. omniroute serves
+ * from a worker child (`dist/server-ws.mjs`), and killing that worker does not
+ * stop the gateway - measured 2026-08-28, the port was listening again under a
+ * new pid within three seconds because the launcher simply started another one.
+ * Killing the launcher does take the worker with it.
+ *
+ * The `--port` match is what keeps this off a pre-existing `omniroute` install
+ * running on its own port.
+ */
+function gatewayPid(port) {
+  if (process.platform !== "win32") return null;
+  try {
+    const script =
+      `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ` +
+      `Where-Object { $_.CommandLine -like '*omniroute*' -and $_.CommandLine -like '*--port ${port}*' } | ` +
+      `Select-Object -First 1 -ExpandProperty ProcessId`;
+    const out = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 20_000,
+    });
+    const pid = Number(out.trim());
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
 function alive(pid) {
   if (!pid) return false;
   try {
@@ -99,9 +136,22 @@ export async function ensureRunning({ onProgress = () => {} } = {}) {
 
   const logFile = path.join(PATHS.logs, "gateway.log");
   const out = fs.openSync(logFile, "a");
+  const node = nodeExe() ?? process.execPath;
+  const gwArgs = [found.entry, "serve", "--port", String(cfg.gateway.port), "--no-open", "--no-tray"];
+  // Started through `cmd /c start "" /B` on Windows, and that is not
+  // decoration. Measured 2026-08-28:
+  //   detached:true + windowsHide:true  -> survives the parent, but puts a real
+  //                                        "omniroute (v16.2.12)" window on the
+  //                                        desktop next to the app
+  //   neither                           -> no window, but the gateway dies the
+  //                                        moment the CLI that started it exits
+  //   cmd start "" /B                   -> no window AND survives
+  // The gateway has to outlive whatever started it, and it must not look like
+  // a second application, so this is the only option that satisfies both.
+  const viaCmd = process.platform === "win32";
   const child = spawn(
-    process.execPath,
-    [found.entry, "serve", "--port", String(cfg.gateway.port), "--no-open", "--no-tray"],
+    viaCmd ? "cmd" : node,
+    viaCmd ? ["/c", "start", "", "/B", node, ...gwArgs] : gwArgs,
     {
       cwd: PATHS.gatewayData,
       env: {
@@ -113,23 +163,33 @@ export async function ensureRunning({ onProgress = () => {} } = {}) {
         OMNIROUTE_API_KEY: "",
         NODE_ENV: "production",
       },
-      detached: true,
+      // The log file handles are inherited straight through cmd, so the
+      // gateway's output still lands in gateway.log.
       stdio: ["ignore", out, out],
       windowsHide: true,
+      detached: !viaCmd,
     }
   );
   child.unref();
-  fs.writeFileSync(PID_FILE(), String(child.pid));
-  log.info("spawned gateway", { pid: child.pid, port: cfg.gateway.port, version: found.version });
+  // `child.pid` is cmd's, and cmd exits immediately - writing it would make
+  // `gateway status` report "not running" and `gateway stop` a no-op. The real
+  // pid is resolved from the listening port once the gateway answers.
+  log.info("spawned gateway", { port: cfg.gateway.port, version: found.version });
 
   const deadline = Date.now() + cfg.gateway.startTimeoutMs;
   let lastNote = 0;
   while (Date.now() < deadline) {
     if (await client.isUp(2_000)) {
+      const pid = gatewayPid(cfg.gateway.port) ?? child.pid;
+      try {
+        fs.writeFileSync(PID_FILE(), String(pid));
+      } catch {}
       onProgress("Model gateway is up.");
-      return { started: true, baseUrl, pid: child.pid, version: found.version, ok: true };
+      return { started: true, baseUrl, pid, version: found.version, ok: true };
     }
-    if (!alive(child.pid)) {
+    // Only meaningful when we spawned the gateway directly; through cmd the
+    // launcher is gone within milliseconds and says nothing about the gateway.
+    if (!viaCmd && !alive(child.pid)) {
       const tail = fs.readFileSync(logFile, "utf8").split("\n").slice(-15).join("\n");
       return { started: false, baseUrl, ok: false, reason: "gateway-exited", detail: tail };
     }

@@ -195,3 +195,38 @@ test("every public asset the page asks for exists", () => {
     assert.ok(fs.existsSync(path.join(dir, ref)), `index.html references ${ref}, which does not exist`);
   }
 });
+
+test("a conversation is created in the chosen folder, on the route that honours it", () => {
+  // Measured 2026-08-28: POST /api/session?directory=X answers 200 and ignores
+  // the directory - the session comes back rooted in the default workspace -
+  // while POST /session?directory=X honours it. A session created on the wrong
+  // route looks completely normal and quietly works in the wrong place.
+  const app = ui("public", "app.js");
+  assert.match(app, /ocall\("POST", "\/session" \+ q, \{\}\)/, "new sessions must use the legacy route");
+  assert.ok(!/ocall\("POST", "\/api\/session"/.test(app), "POST /api/session ignores ?directory=");
+  assert.match(app, /"\?directory=" \+ encodeURIComponent\(dir\)/);
+});
+
+test("the folder picker refuses anything that is not an existing directory", async () => {
+  // OpenCode accepts a nonexistent `directory` without complaint, and the
+  // failure only shows up later as an agent that cannot find any files.
+  const here = pkg("src", "ui", "api.mjs");
+  assert.equal((await routes.folderSet({ body: { path: "" } })).ok, false);
+  assert.equal((await routes.folderSet({ body: {} })).ok, false);
+  const missing = await routes.folderSet({ body: { path: path.join(pkg(), "no-such-folder-xyz") } });
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /does not exist/);
+  const file = await routes.folderSet({ body: { path: here } });
+  assert.equal(file.ok, false);
+  assert.match(file.error, /is a file, not a folder/);
+});
+
+test("the folder picker does not block the server while the dialog is open", () => {
+  // execFileSync would freeze the UI server's event loop for as long as the
+  // user browses - the whole app appears to hang mid-click.
+  const api = ui("api.mjs");
+  const pick = api.slice(api.indexOf("async folderPick("), api.indexOf("// --- transcripts"));
+  assert.ok(!/execFileSync\(/.test(pick), "the folder picker must not call execFileSync");
+  assert.match(pick, /spawn\("powershell\.exe"/);
+  assert.match(pick, /-STA/, "FolderBrowserDialog needs a single-threaded apartment");
+});

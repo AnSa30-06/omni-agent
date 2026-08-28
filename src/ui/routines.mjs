@@ -21,6 +21,7 @@ import { spawn } from "node:child_process";
 import { PATHS, ensureDirs, APP_ROOT } from "../util/paths.mjs";
 import { oc } from "./opencode-server.mjs";
 import { logger } from "../util/log.mjs";
+import { nodeExe } from "../util/node-exe.mjs";
 
 const log = logger("ui/routines");
 
@@ -198,7 +199,7 @@ export async function registerTask(r) {
   if (process.platform !== "win32") return { ok: false, reason: "scheduled tasks are Windows-only here" };
   const sched = schtasksSchedule(r);
   if (!sched) return { ok: false, reason: "that schedule cannot be mapped to a Windows task" };
-  const node = process.execPath;
+  const node = nodeExe() ?? process.execPath;
   const entry = path.join(APP_ROOT, "bin", "omni-agent.mjs");
   const cmd = `"${node}" "${entry}" routine run ${r.id}`;
   const res = await schtasks(["/create", "/f", "/tn", taskName(r), "/tr", cmd, ...sched]);

@@ -1,10 +1,11 @@
 @echo off
 rem Open the Omni Agent desktop app.
 rem
-rem This is what the Desktop and Start Menu shortcuts point at. It starts the
-rem gateway, the agent server and the interface, then opens a window. The
-rem console it runs in is minimised rather than hidden: closing it stops the
-rem agent, so the user needs to be able to find it again.
+rem The Desktop and Start Menu shortcuts point at OmniAgent.exe; this is the
+rem same app started in a VISIBLE console, which is what "Omni Agent in a
+rem terminal" runs. It exists so a failure the exe swallows can be read on
+rem screen. It starts the gateway, the agent server and the interface, then
+rem opens a window. Closing this console stops the agent.
 setlocal
 set "HERE=%~dp0"
 set "PATH=%HERE%node;%PATH%"

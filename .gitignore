@@ -5,6 +5,7 @@ runtime/
 # Build output
 dist/
 staging/
+build/
 *.exe
 *.zip
 
