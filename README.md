@@ -16,7 +16,7 @@ faster — but that is an upgrade, not a requirement.
 
 ## Install
 
-1. **Download** `OmniAgentSetup-1.0.0.exe` from the
+1. **Download** `OmniAgentSetup-1.1.0.exe` from the
    [Releases page](https://github.com/AnSa30-06/omni-agent/releases).
 2. **Run it.** No administrator password needed.
 3. When it finishes, it opens a setup window that downloads the rest and checks everything
@@ -38,7 +38,7 @@ That's it. Ask it something.
 
 ### If you would rather not use an installer
 
-Download `OmniAgent-Portable-1.0.0.zip`, extract it anywhere, and run `setup.bat` once,
+Download `OmniAgent-Portable-1.1.0.zip`, extract it anywhere, and run `setup.bat` once,
 then `start.bat`. Nothing is written outside the folder and your own data directory.
 
 ---
