@@ -240,6 +240,29 @@ export const routes = {
     if (!r.ok) return bad(r.reason);
     const all = r.data?.providers ?? r.data?.all ?? r.data?.data ?? [];
     const defaults = r.data?.default ?? {};
+    // Which upstreams are here because the reader added a key. The gateway's
+    // own connection list is the authority and cost is NOT: a free-tier key
+    // like Mistral's serves at zero cost, so the first version of this - "costs
+    // money means a key paid for it" - filed every free-tier key's models under
+    // Free and left "From your keys" answering a question nobody asked. When
+    // the gateway will not answer, this is empty and the UI says the list is
+    // incomplete rather than guessing.
+    const conn = await providers.connected();
+    // A model id's first segment is the provider's ALIAS, and 109 of the
+    // gateway's 222 providers publish an alias that is not their id -
+    // `github-models` serves `ghm/...`, `duckduckgo-web` serves `ddgw/...`.
+    // Matching a connection's provider id against the prefix alone would
+    // therefore miss half of them, so both spellings go in the set.
+    const mf = await providers.manifest();
+    const keyed = new Set();
+    for (const c of conn.connections ?? []) {
+      const id = String(c.provider ?? "").trim();
+      if (!id) continue;
+      keyed.add(id.toLowerCase());
+      const alias = mf?.get(id)?.alias;
+      if (alias) keyed.add(String(alias).toLowerCase());
+    }
+
     const groups = (Array.isArray(all) ? all : []).map((p) => ({
       id: p.id,
       name: p.name ?? p.id,
@@ -247,28 +270,36 @@ export const routes = {
       preferred: p.id === "opencode-omniroute",
       default: defaults[p.id] ?? null,
       models: Object.entries(p.models ?? {})
-        .map(([id, m]) => ({
-          id,
-          name: m.name ?? id,
+        .map(([id, m]) => {
           // The upstream the gateway is routing to, taken from the model id's
-          // first segment (`oc/hy3-free` -> `oc`, `openrouter/mistral-large` ->
-          // `openrouter`). Every model the gateway serves arrives under ONE
-          // provider id, so without this there is no way to tell a free model
-          // from one that only exists because the reader added a key - which is
-          // exactly the question "which models did my OpenRouter key give me?"
-          vendor: id.includes("/") ? id.slice(0, id.indexOf("/")) : null,
-          context: m.limit?.context ?? null,
-          output: m.limit?.output ?? null,
-          free: (m.cost?.input ?? 0) === 0 && (m.cost?.output ?? 0) === 0,
-          reasoning: !!m.reasoning,
-          attachments: !!m.attachment,
-          // Some providers list image and audio generators beside their chat
-          // models. They are real models and they cannot hold a conversation,
-          // so they must never be offered as a default: the gateway's own
-          // published default here is `pollinations/zimage`, an image model,
-          // which is what the picker landed on before this filter existed.
-          textOut: m.modalities?.output?.text !== false,
-        }))
+          // first segment (`oc/hy3-free` -> `oc`, `mistral/mistral-large` ->
+          // `mistral`). Every model the gateway serves arrives under ONE
+          // provider id, so without this there is no way to tell a keyless
+          // model from one that only exists because the reader added a key -
+          // which is exactly the question "which models did my key give me?"
+          const vendor = id.includes("/") ? id.slice(0, id.indexOf("/")) : null;
+          const free = (m.cost?.input ?? 0) === 0 && (m.cost?.output ?? 0) === 0;
+          return {
+            id,
+            name: m.name ?? id,
+            vendor,
+            context: m.limit?.context ?? null,
+            output: m.limit?.output ?? null,
+            free,
+            // Two independent ways to be certain a key is what put this model
+            // in the list: its upstream is a connection the reader made, or it
+            // costs money and so cannot be part of the keyless pool.
+            fromKey: (vendor !== null && keyed.has(vendor.toLowerCase())) || !free,
+            reasoning: !!m.reasoning,
+            attachments: !!m.attachment,
+            // Some providers list image and audio generators beside their chat
+            // models. They are real models and they cannot hold a conversation,
+            // so they must never be offered as a default: the gateway's own
+            // published default here is `pollinations/zimage`, an image model,
+            // which is what the picker landed on before this filter existed.
+            textOut: m.modalities?.output?.text !== false,
+          };
+        })
         .filter((m) => m.textOut),
     }));
     groups.sort((a, b) => Number(b.preferred) - Number(a.preferred) || a.id.localeCompare(b.id));
@@ -287,6 +318,10 @@ export const routes = {
       providers: groups,
       configured,
       total: groups.reduce((n, g) => n + g.models.length, 0),
+      // The connections themselves, so the UI can tell "you have added no keys"
+      // apart from "the gateway did not answer and this may be wrong".
+      connections: (conn.connections ?? []).map((c) => c.provider).filter(Boolean),
+      connectionsKnown: conn.ok === true,
     });
   },
 

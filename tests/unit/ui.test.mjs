@@ -489,13 +489,35 @@ test("a model says which upstream it comes from, and the picker can filter on it
   // models were mixed into the same list with nothing to tell them apart -
   // which is exactly the question "which models did my OpenRouter key give me?"
   const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
-  assert.match(api, /vendor: id\.includes\("\/"\) \? id\.slice\(0, id\.indexOf\("\/"\)\) : null,/);
+  assert.match(api, /const vendor = id\.includes\("\/"\) \? id\.slice\(0, id\.indexOf\("\/"\)\) : null;/);
   const app = ui("public", "app.js");
   assert.match(app, /lensBtn\("keys", "From your keys"\)/);
-  assert.match(app, /if \(lens === "free" && !m\.free\) return false;/);
   assert.match(app, /from your \$\{m\.vendor\} key/);
   // A search that finds nothing must name the route out, not dead-end.
   assert.match(app, /Adding the provider's key in Providers puts its models in this list/);
+});
+
+test("\"from your keys\" is decided by the gateway's connections, not by price", () => {
+  // The defect this replaced: a free-tier key (Mistral, Cerebras, GitHub
+  // Models) serves at zero cost, so a cost-based split filed the reader's own
+  // newly added models under "Free" and left "From your keys" showing nothing.
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  const fn = api.slice(api.indexOf("  async models("), api.indexOf("   * Usage, as percentages"));
+  assert.match(fn, /const conn = await providers\.connected\(\);/, "the connection list is the authority");
+  // A model id is prefixed with the provider's ALIAS, and 109 of the gateway's
+  // 222 providers have one that differs from their id (`github-models` serves
+  // `ghm/...`), so matching the id alone would miss half of them.
+  assert.match(fn, /const alias = mf\?\.get\(id\)\?\.alias;/);
+  assert.match(fn, /fromKey: \(vendor !== null && keyed\.has\(vendor\.toLowerCase\(\)\)\) \|\| !free,/);
+  assert.match(fn, /connectionsKnown: conn\.ok === true,/, "an unreachable gateway must not read as 'no keys'");
+
+  const app = ui("public", "app.js");
+  assert.match(app, /if \(lens === "keys" && !m\.fromKey\) return false;/);
+  // Free means "here without an account", so a keyed free-tier model is not in
+  // it. The two lenses have to be disjoint or the reader cannot tell them apart.
+  assert.match(app, /if \(lens === "free" && \(!m\.free \|\| m\.fromKey\)\) return false;/);
+  assert.match(app, /state\.connectionsKnown = r\.connectionsKnown === true;/);
+  assert.match(app, /the gateway did not answer when asked which keys are connected/i);
 });
 
 test("adding a provider key reports what it unlocked, not just that it was stored", () => {

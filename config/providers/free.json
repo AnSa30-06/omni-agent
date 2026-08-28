@@ -1,6 +1,7 @@
 {
-  "$commentDropped": "Mistral was in this list and was removed 2026-08-27: console.mistral.ai did not resolve from the checker, and an unverifiable signup link is worse than a missing provider. Re-add it if the console URL can be confirmed.",
+  "$commentDropped": "CORRECTION 2026-08-28: Mistral was removed on 2026-08-27 for \"console.mistral.ai did not resolve\" and that verdict was WRONG. The host is alive and answers 302; the checker followed an endless login redirect between console.mistral.ai, auth.mistral.ai and v2.auth.mistral.ai - a cookie-less client can never settle it - and reported the resulting `fetch failed` as a dead link. Mistral is back below, and check-provider-links.mjs now treats a redirect loop as a login wall rather than a 404.",
   "$comment": "Providers with a genuine free tier, curated. Every `id` is a real id in the gateway's own provider manifest (GET /api/v1/provider-plugin-manifest, 222 providers), so `omni-agent provider add <id>` resolves the base URL and auth mechanics from the gateway rather than from anything hardcoded here. `signup` is where a person goes to get the credential; those URLs are checked by scripts/check-provider-links.mjs and must not be shipped dead. `gives` is what the provider itself advertises - it is their claim, not a measurement, and the UI says so.",
+  "$commentRetired": "GitHub Models was about to be added here on 2026-08-28 and was NOT, because it is retired. https://models.github.ai/inference/chat/completions answers HTTP 410 {\"code\":\"github_models_retirement_brownout\"} and GitHub's own docs say it was fully retired on 2026-07-30 - playground, catalogue, inference API and BYOK. The gateway's manifest still carries `github-models` (alias `ghm`, apikey) and OmniRoute's Free-tiers page still advertises it, so BOTH are stale: a provider being in the manifest is not evidence that it works. GitHub Copilot is a different thing and is still live - it is the `github` OAuth entry under signIn, and it needs a paid seat.",
   "version": 1,
   "models": [
     {
@@ -19,6 +20,22 @@
       "gives": "Free credits to start, and the fastest inference on this list",
       "signup": "https://cloud.cerebras.ai/",
       "note": "Free credits, no card. Verified on their pricing page 2026-08-27. Best single addition for speed.",
+      "signupIsAuthority": true
+    },
+    {
+      "id": "mistral",
+      "label": "Mistral",
+      "auth": "apikey",
+      "gives": "Mistral Large, Small and Codestral, on whatever their current free tier allows",
+      "signup": "https://console.mistral.ai/",
+      "note": "Signed out, the console bounces you through auth.mistral.ai before showing a login. That is normal - it is not a broken link.",
+      "setup": [
+        "Open https://console.mistral.ai/ and sign in. Signed out it redirects through auth.mistral.ai first - that is their login flow, not a broken link.",
+        "Read their plan page before you pick one. Mistral's free tier has changed more than once and their page is the authority on what it currently includes.",
+        "Open 'API Keys' in the console's left-hand menu and create a key.",
+        "Run:  omni-agent provider add mistral YOUR-KEY",
+        "Its models then appear in the app's model picker under 'From your keys'."
+      ],
       "signupIsAuthority": true
     },
     {

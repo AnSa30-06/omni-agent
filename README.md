@@ -207,6 +207,26 @@ agent uses that subscription — nothing is charged twice:
 omni-agent provider signin claude
 ```
 
+### Anything else the gateway knows
+
+The fifteen are curated. The gateway itself knows **222 providers**, and any of
+them can be added by id — `mistral`, `cerebras`, `groq`, `cohere`, `together`,
+`sambanova`, `nebius`, `novita`, `deepinfra`, `hyperbolic`, `openrouter`:
+
+```bash
+omni-agent provider setup mistral      # the steps
+omni-agent provider add mistral YOUR-KEY
+```
+
+Its models then appear in the picker under **From your keys**. Full worked
+example, the full id list, and what to make of the dashboard's "1.6 B free
+tokens a day" — it is a sum over ~40 accounts you would open yourself, not a
+pool — are in [docs/providers.md](docs/providers.md#adding-one-of-the-free-providers-yourself).
+
+⚠️ **Being in the gateway's manifest is not evidence that a provider works.**
+GitHub Models is still listed there and was retired on 2026-07-30; its endpoint
+answers HTTP 410.
+
 ### Search keys
 
 Search works with **no key at all** — DuckDuckGo, then Brave's public results

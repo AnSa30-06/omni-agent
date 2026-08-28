@@ -941,6 +941,8 @@ async function refreshUsage() {
 async function loadModels(retries = 10) {
   const r = await api("models");
   state.models = r.providers ?? [];
+  state.connections = r.connections ?? [];
+  state.connectionsKnown = r.connectionsKnown === true;
   if (!state.models.length && retries > 0) {
     paintModel();
     setTimeout(() => loadModels(retries - 1), 3000);
@@ -1300,9 +1302,15 @@ function openModelPicker(e) {
   };
 
   // Three views of the same list, because "every model" and "the models my key
-  // paid for" are different questions and the second one had no answer at all:
+  // unlocked" are different questions and the second one had no answer at all:
   // the gateway serves everything under one provider id, so a key's models were
   // simply mixed into the same 115 rows with nothing to distinguish them.
+  //
+  // The split is on the gateway's connection list, NOT on price. A free-tier
+  // key - Mistral's, Cerebras', GitHub Models' - costs nothing per token, so
+  // splitting on cost put exactly the models the reader had just added under
+  // "Free" and left this lens empty. Free means "here without an account";
+  // From your keys means "here because you added one".
   let lens = "all";
   const lensRow = el("div", "pop-lens");
   const lensBtn = (id, label) => {
@@ -1329,11 +1337,8 @@ function openModelPicker(e) {
     let shown = 0;
     for (const p of state.models) {
       const hits = p.models.filter((m) => {
-        if (lens === "free" && !m.free) return false;
-        // "From your keys" is the complement of free, and it is honest about
-        // what it knows: a model that costs money is one the gateway can only
-        // serve because a key pays for it.
-        if (lens === "keys" && m.free) return false;
+        if (lens === "free" && (!m.free || m.fromKey)) return false;
+        if (lens === "keys" && !m.fromKey) return false;
         if (!q) return true;
         return (
           m.name.toLowerCase().includes(q) ||
@@ -1355,9 +1360,9 @@ function openModelPicker(e) {
         const bad = state.unhealthy[`${p.id}/${m.id}`];
         if (bad) bits.push("failed here before");
         if (m.id.startsWith("auto/")) bits.push("picks for you");
-        if (m.free) bits.push("free");
-        else if (m.vendor) bits.push(`from your ${m.vendor} key`);
-        if (m.vendor && m.free) bits.push(m.vendor);
+        if (m.fromKey) bits.push(m.vendor ? `from your ${m.vendor} key` : "from a key you added");
+        else if (m.free) bits.push("free");
+        if (m.vendor && !m.fromKey) bits.push(m.vendor);
         if (m.context) bits.push(fmtNum(m.context) + " context");
         if (bits.length) b.append(el("small", null, bits.join(" · ")));
         if (bad) b.classList.add("unhealthy");
@@ -1370,7 +1375,13 @@ function openModelPicker(e) {
       results.append(el("div", "pop-head", "Nothing matches that"));
       if (lens === "keys") {
         results.append(
-          el("div", "pop-note", "Paid models appear here once you add a provider key in Providers."),
+          el(
+            "div",
+            "pop-note",
+            state.connectionsKnown
+              ? "Nothing here yet. Add a provider key in Providers and its models appear in this list."
+              : "The gateway did not answer when asked which keys are connected, so this view may be missing models.",
+          ),
         );
       } else if (q) {
         // Naming the route rather than leaving a dead end: a model that is not

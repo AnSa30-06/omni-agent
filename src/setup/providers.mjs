@@ -217,8 +217,13 @@ export function setupSteps(id) {
       kind: model.auth === "oauth" ? "signin" : model.auth === "none" ? "keyless" : "model",
       gives: model.gives,
       note: model.note,
+      // A provider's own steps win when it has them: the generic three below say
+      // "create a free account" and "copy the API key from their dashboard",
+      // which is wrong wherever the account already exists or the credential is
+      // called something else.
       steps:
-        model.auth === "none"
+        model.setup ??
+        (model.auth === "none"
           ? [`Run:  omni-agent provider add ${id}`, "No account and no key are needed."]
           : model.auth === "oauth"
             ? [`Run:  omni-agent provider signin ${id}`, "Approve the sign-in in the browser it opens."]
@@ -226,7 +231,7 @@ export function setupSteps(id) {
                 model.signup ? `Open ${model.signup} and create a free account.` : "Create a free account with the provider.",
                 "Copy the API key from their dashboard.",
                 `Run:  omni-agent provider add ${id} YOUR-KEY`,
-              ],
+              ]),
       verify: "omni-agent models",
     };
   }

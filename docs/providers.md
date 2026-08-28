@@ -197,8 +197,15 @@ Signup links are checked, not trusted:
 node scripts/check-provider-links.mjs
 ```
 
-It caught one on the first run: `console.mistral.ai` did not resolve, so Mistral
-was dropped rather than shipped as a dead link.
+It caught one on the first run — `console.mistral.ai` "did not resolve", so
+Mistral was dropped rather than shipped as a dead link. **That verdict was wrong
+and was reversed on 2026-08-28.** The host is alive and answers `302`; signed
+out it redirects `console.mistral.ai` → `auth.mistral.ai` →
+`v2.auth.mistral.ai` → back again with a fresh flow id every time, which a
+cookie-less client can never settle. `fetch()` gives up after 20 hops and
+reports a bare `fetch failed`, which reads exactly like a dead host. The checker
+now recognises a redirect loop and marks it `warn` — a login wall, not a 404 —
+and Mistral is back in the catalogue.
 
 **Three different routes in, and they are not the same thing.**
 
@@ -215,6 +222,132 @@ saying nothing.
 
 OAuth returns a URL for the user to open. This program does not click through a
 consent screen on anyone's behalf.
+
+## Adding one of the free providers yourself
+
+`omni-agent provider list` shows a **curated** set. The gateway itself knows
+**222**, so anything in its manifest can be added by id whether or not it is in
+that list:
+
+```bash
+omni-agent provider add <id> YOUR-KEY
+```
+
+The base URL and auth mechanics come from the gateway's manifest, so an id it
+does not know fails by name (`the gateway does not know a provider called "x"`)
+rather than half-working. To see every id it will accept:
+
+```bash
+curl http://127.0.0.1:20129/api/v1/provider-plugin-manifest
+```
+
+That endpoint needs no authentication. Ids measured there on 2026-08-28 for the
+providers people ask about most: `mistral` · `cerebras` · `groq` · `cohere` ·
+`together` · `sambanova` · `scaleway` · `nebius` · `novita` · `deepinfra` ·
+`hyperbolic` · `llm7` · `nara` · `openrouter`.
+
+### Worked example: Mistral
+
+```bash
+omni-agent provider setup mistral      # the steps, without leaving the terminal
+```
+
+1. Open <https://console.mistral.ai/> and sign in. Signed out it redirects
+   through `auth.mistral.ai` first — that is their login flow, not a broken
+   link.
+2. Read their plan page before picking one. Mistral's free tier has changed more
+   than once; **their page is the authority**, not this one.
+3. Create a key under **API Keys** in the console's left-hand menu.
+4. `omni-agent provider add mistral YOUR-KEY`
+
+The command creates a **gateway provider connection**, then asks the gateway to
+make a real call against it and reports the verdict — so a bad key is caught
+there and then rather than on your next message. Its models then appear in the
+app's model picker under **From your keys**, prefixed `mistral/`.
+
+The same four steps are the whole procedure for `cerebras`, `groq`, `cohere` and
+the rest; only the console differs.
+
+### Which models did my key actually give me?
+
+The picker has three lenses — **All**, **Free**, **From your keys**. They split
+on the gateway's own connection list, **not on price**, because a free-tier key
+costs nothing per token: splitting on price filed the models you had just paid
+an account for under "Free" and left the lens you opened it for empty.
+
+A model id's first segment is the provider's **alias**, and 109 of the 222
+providers publish an alias that differs from their id — `duckduckgo-web` serves
+`ddgw/…`, `opencode` serves `oc/…`. Measured against what the gateway was
+actually serving on 2026-08-28: of ten distinct prefixes, **eight matched a
+manifest alias, one matched an id, and one was `auto`** (the gateway's own
+routing combos, not a provider at all). Matching on the id alone would have
+identified one of nine.
+
+### Not every provider in the manifest still exists
+
+**GitHub Models was going to be added here on 2026-08-28 and was not.** It is
+retired: `https://models.github.ai/inference/chat/completions` answers
+
+```
+HTTP 410  {"error":{"code":"github_models_retirement_brownout", ...}}
+```
+
+and GitHub's own documentation says the playground, catalogue, inference API and
+BYOK were fully retired on **2026-07-30**. The gateway's manifest still carries
+`github-models` (alias `ghm`), and the dashboard's Free-tiers page still
+advertises it. **Being in the manifest is not evidence that a provider works.**
+
+GitHub *Copilot* is a different product and is still live — it is the `github`
+OAuth entry, `omni-agent provider signin github`, and it needs a paid seat.
+
+## About that "1.6 billion tokens a day"
+
+The gateway dashboard has a **Free tiers** page listing around forty providers
+with a free allowance, each labelled with the allowance that provider
+advertises. Adding those up is where a headline figure like *1.6 B tokens/day*
+comes from. Three things are true about it, and the third is the one that
+matters:
+
+**It is a sum over ~40 separate accounts you would have to open yourself.** It
+is not a pool, and nothing hands you any part of it. Each row is one signup, one
+key, one `omni-agent provider add`. That page is a **signup directory** — there
+is no API behind it (`/api/free-tiers`, `/api/providers/free-tiers` and
+`/api/provider-limits` all return 404 on 3.8.49), which is why this product
+cannot mirror it and does not try.
+
+**The per-provider numbers are the providers' own claims.** Two were already
+stale when checked on 2026-08-27: Cerebras was listed at "1M tokens/day" and its
+own pricing page said free *credits*; Brave at "2,000 searches a month" against
+its own page's "$5 monthly credit". This product therefore shows what **kind**
+of thing a provider gives and links to their page, and never restates their
+numbers.
+
+**The blocking you are seeing is a different thing entirely.** With no keys, the
+gateway routes through shared, unauthenticated endpoints — everyone using them
+arrives from the same handful of egress IPs. Measured 2026-08-28 on this
+machine, `connections: 0`, one short completion per upstream:
+
+| Upstream | Result |
+|---|---|
+| `oc/hy3-free` | **200** — answered in 2.4 s |
+| `oc/big-pickle` | 429 rate limit exceeded |
+| `ddgw/gpt-5.4-mini` | 418 anti-abuse challenge failed, "retry from a less rate-limited IP" |
+| `aug/sonnet4.6` | 502 stream ended before a non-ping event |
+| `pepper/pepper-1` | 502 fetch failed |
+| `felo/felo-chat` | 400 thread creation failed |
+| `tllm/GPT_5_4` | 403 "blocked by Vercel for this server egress IP" |
+| `mcode/mimo-auto` | 400 unsupported model |
+
+One of eight. **Not one of those is a quota you exhausted** — they are
+anti-abuse, shared-IP blocks and upstream faults on endpoints nobody
+authenticated to. The agent still works, because the router falls back until
+something answers; it is slow because it is doing that.
+
+**A key is what changes it, and it changes it for a reason that has nothing to
+do with the token count.** Your own credential moves you off the shared pool
+onto your own authenticated rate limit, which is why the 418s and 403s stop.
+Four or five keys is where the returns flatten — enough that a failure has
+somewhere to fall back to. Forty is a chore that buys very little over five.
 
 ## What the gateway does NOT provide
 
