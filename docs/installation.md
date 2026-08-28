@@ -47,7 +47,9 @@ a file exists.
 
 ### Total footprint
 
-About **6 GB** once fully set up. The installer is ~46 MB; the rest is downloaded.
+About **6 GB** once fully set up. The installer is 74.5 MB and puts about 380 MB on disk
+(the application, a private Node.js runtime and `OmniAgent.exe`); the rest is downloaded on
+first run.
 
 ---
 

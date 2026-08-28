@@ -14,14 +14,53 @@ faster — but that is an upgrade, not a requirement.
 
 ---
 
+## Download
+
+**[⬇ Download OmniAgentSetup-1.1.0.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.1.0/OmniAgentSetup-1.1.0.exe)** — 74.5 MB, Windows 10/11 (64-bit)
+
+That link always gives you version 1.1.0. The
+[Releases page](https://github.com/AnSa30-06/omni-agent/releases/latest) has the newest
+version and the release notes.
+
+| | |
+|---|---|
+| **Windows version** | Windows 10 or 11, 64-bit |
+| **Administrator password** | Not needed |
+| **Space to start** | About 380 MB, then about 6 GB once it finishes setting itself up |
+| **API key** | Not needed |
+
+### Windows will warn you, and here is why
+
+The download is not code-signed — a signing certificate costs a few hundred pounds a year
+and this project does not have one — so Windows SmartScreen shows
+**"Windows protected your PC"** the first time you run it. That warning means *"nobody has
+paid to vouch for this file"*, not *"this file is known to be bad"*.
+
+To run it anyway: click **More info**, then **Run anyway**.
+
+If you would rather check the file is exactly the one that was published, run this in
+PowerShell in your Downloads folder before opening it:
+
+```powershell
+Get-FileHash .\OmniAgentSetup-1.1.0.exe -Algorithm SHA256
+```
+
+It should print:
+
+```
+116AF0B6D4E31BA8318EEE4CD989CC55F60768283DF56B4290CDE1A3E7044D24
+```
+
+If it prints anything else, delete the file and download it again.
+
+---
+
 ## Install
 
-1. **Download** `OmniAgentSetup-1.1.0.exe` from the
-   [Releases page](https://github.com/AnSa30-06/omni-agent/releases).
-2. **Run it.** No administrator password needed.
-3. When it finishes, it opens a setup window that downloads the rest and checks everything
+1. **Run the file you downloaded.** No administrator password needed.
+2. When it finishes, it opens a setup window that downloads the rest and checks everything
    works. This takes a while and needs about 4 GB — see [Disk and download](#disk-and-download).
-4. **Launch** *Omni Agent* from your Desktop or Start Menu — `OmniAgent.exe`, a real
+3. **Launch** *Omni Agent* from your Desktop or Start Menu — `OmniAgent.exe`, a real
    application, not a terminal. It opens as a window: Chat on one side, Code on the
    other, with everything else a click away in the sidebar.
    See [The desktop app](docs/desktop-app.md).
@@ -38,8 +77,13 @@ That's it. Ask it something.
 
 ### If you would rather not use an installer
 
-Download `OmniAgent-Portable-1.1.0.zip`, extract it anywhere, and run `setup.bat` once,
-then `start.bat`. Nothing is written outside the folder and your own data directory.
+**[⬇ Download OmniAgent-Portable-1.1.0.zip](https://github.com/AnSa30-06/omni-agent/releases/download/v1.1.0/OmniAgent-Portable-1.1.0.zip)** — 123.2 MB
+
+Extract it anywhere, run `setup.bat` once, then `app.bat` to open the app (or `start.bat`
+for the terminal interface). Nothing is written outside the folder and your own data
+directory, and nothing is added to the registry or the Start Menu.
+
+Its SHA-256 is `61426937f174a26cdf6980c37dde210fa4aa6f30b8ff955ea67a12a16b0db484`.
 
 ---
 
