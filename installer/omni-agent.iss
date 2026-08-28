@@ -14,7 +14,7 @@
 #define AppName "Omni Agent"
 #define AppExeName "OmniAgent.exe"
 #ifndef AppVersion
-  #define AppVersion "1.1.4"
+  #define AppVersion "1.1.5"
 #endif
 #define AppPublisher "Omni Agent contributors"
 #define AppURL "https://github.com/AnSa30-06/omni-agent"
