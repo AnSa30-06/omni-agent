@@ -152,7 +152,7 @@ The bootstrap is resumable: components already installed are skipped.
 It is unsigned. Check the published SHA-256 first:
 
 ```powershell
-Get-FileHash .\OmniAgentSetup-1.1.2.exe -Algorithm SHA256
+Get-FileHash .\OmniAgentSetup-1.1.3.exe -Algorithm SHA256
 ```
 
 Then *More info* → *Run anyway*.

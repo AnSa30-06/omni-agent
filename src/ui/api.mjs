@@ -10,6 +10,7 @@
 // so a malformed URL is a 404 rather than a call to something unintended.
 import { admin, dashboardPassword } from "../gateway/admin.mjs";
 import { gatewayBaseUrl, loadConfig, updateConfig, DEFAULTS } from "../config.mjs";
+import { writeOpenCodeConfig } from "../setup/opencode-config.mjs";
 import { status as gatewayStatus } from "../gateway/supervisor.mjs";
 import { PAGES, dashboardUrl, openInBrowser } from "../gateway/dashboard.mjs";
 import { TIERS, getSaving, setSaving, measure, ALWAYS_PRESERVED } from "../routing/compression.mjs";
@@ -24,6 +25,159 @@ import { PATHS } from "../util/paths.mjs";
 import { pkg } from "../util/paths.mjs";
 import fs from "node:fs";
 import path from "node:path";
+
+/* -- Windows file and folder dialogs -------------------------------------
+ *
+ * THE BUG THESE EXIST TO FIX, and the first version's comment claimed the fix
+ * while the code did not implement it: a WinForms dialog shown from a process
+ * that has never had foreground opens BEHIND the app. The button says "waiting
+ * for the folder picker..." forever, the user clicks again, and each click
+ * stacks another invisible dialog. Measured 2026-08-28 against the shipped
+ * 1.1.2: three orphaned "Browse For Folder" windows sitting behind the app.
+ *
+ * What fixes it is an owner window that EXISTS - see the note on DIALOG_OWNER
+ * for what "exists" has to mean here, because the obvious way to make one
+ * (Show it) breaks the dialog outright.
+ *
+ * And only ever one at a time. Without the guard a second click is a second
+ * dialog, and that pile-up is what made a window in the wrong place look like a
+ * freeze.
+ */
+
+// The owner is a real window, parked off-screen at 1x1, that is never SHOWN.
+//
+// 🔴 `$owner.Show()` is the trap, and it is a worse bug than the one it was
+// meant to fix. The picker is spawned with `windowsHide: true`, which starts
+// the process with a one-shot SW_HIDE that Windows applies to the first window
+// the process shows - so Show() consumes it on the owner, the owner is hidden,
+// and the dialog it owns is hidden with it. Measured 2026-08-28: with Show()
+// the child exits code 0 in under a second, prints nothing, and the app reports
+// a cancelled picker that the user never saw.
+//
+// ⭐ Touching `.Handle` creates the window WITHOUT calling ShowWindow, so the
+// SW_HIDE is never spent and the dialog opens normally - measured at z-order 3
+// of 17 with the app window at 17, i.e. comfortably in front. `Form.TopMost` is
+// left off deliberately: it is a no-op on a form that was never shown, and
+// SetWindowPos(HWND_TOPMOST) on the owner was measured to change nothing about
+// where the dialog lands. It is in front; it does not need to outrank
+// everything on the desktop.
+const DIALOG_OWNER = [
+  "Add-Type -AssemblyName System.Windows.Forms",
+  "Add-Type -AssemblyName System.Drawing",
+  "$owner = New-Object System.Windows.Forms.Form",
+  "$owner.ShowInTaskbar = $false",
+  "$owner.FormBorderStyle = 'None'",
+  "$owner.StartPosition = 'Manual'",
+  "$owner.Location = New-Object System.Drawing.Point(-32000, -32000)",
+  "$owner.Size = New-Object System.Drawing.Size(1, 1)",
+  "$null = $owner.Handle",
+];
+
+const FOLDER_DIALOG = [
+  ...DIALOG_OWNER,
+  "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
+  "$d.Description = 'Choose the folder Omni Agent should work in'",
+  "$d.ShowNewFolderButton = $true",
+  "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.SelectedPath }",
+  "$owner.Dispose()",
+].join("; ");
+
+const FILE_DIALOG = [
+  ...DIALOG_OWNER,
+  "$d = New-Object System.Windows.Forms.OpenFileDialog",
+  "$d.Title = 'Choose files to give the agent'",
+  "$d.Multiselect = $true",
+  "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $d.FileNames | ForEach-Object { Write-Output $_ } }",
+  "$owner.Dispose()",
+].join("; ");
+
+/** One dialog at a time, across every kind. See the note above. */
+let dialogOpen = false;
+
+async function showDialog(script) {
+  if (process.platform !== "win32") return bad("the picker is Windows-only; type a path instead");
+  if (dialogOpen) return bad("a picker is already open - finish or cancel it first");
+  dialogOpen = true;
+  try {
+    // Asynchronously, and that is not a style choice: the dialog stays open for
+    // as long as the user browses, and execFileSync would block this server's
+    // event loop for all of it - the app would freeze mid-click.
+    const { spawn } = await import("node:child_process");
+    const out = await new Promise((resolve) => {
+      // -STA because both dialogs need a single-threaded apartment.
+      const child = spawn("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      let buf = "";
+      child.stdout.on("data", (b) => (buf += b.toString()));
+      child.on("error", () => resolve(null));
+      child.on("close", () => resolve(buf));
+    });
+    if (out === null) return bad("the picker could not open");
+    const paths = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    return paths.length ? { ok: true, paths } : { ok: true, cancelled: true };
+  } finally {
+    dialogOpen = false;
+  }
+}
+
+/**
+ * How a chosen file should reach the model.
+ *
+ * Measured 2026-08-28, not assumed: a `file` part carrying `url: file://<path>`
+ * and a text mime puts the file's CONTENTS in front of the model with no tool
+ * call at all - a probe file was answered from an 11,350-token prompt while the
+ * agent was explicitly told not to use tools.
+ *
+ * Anything that is not text is offered as a PATH instead, for the agent's own
+ * readers to open. The product ships PDF/DOCX/XLSX readers and a browser, the
+ * free models it defaults to are mostly not vision models, and a binary pushed
+ * at a model that cannot take one fails the whole turn. A path always works.
+ */
+const TEXT_MIME = {
+  ".txt": "text/plain", ".md": "text/markdown", ".markdown": "text/markdown",
+  ".json": "application/json", ".jsonl": "application/json", ".csv": "text/csv",
+  ".tsv": "text/tab-separated-values", ".xml": "text/xml", ".yml": "text/yaml",
+  ".yaml": "text/yaml", ".toml": "text/plain", ".ini": "text/plain",
+  ".log": "text/plain", ".sql": "text/plain", ".html": "text/html",
+  ".htm": "text/html", ".css": "text/css", ".js": "text/javascript",
+  ".mjs": "text/javascript", ".cjs": "text/javascript", ".jsx": "text/javascript",
+  ".ts": "text/plain", ".tsx": "text/plain", ".py": "text/x-python",
+  ".rb": "text/plain", ".go": "text/plain", ".rs": "text/plain",
+  ".java": "text/plain", ".c": "text/plain", ".h": "text/plain",
+  ".cpp": "text/plain", ".cs": "text/plain", ".sh": "text/plain",
+  ".bat": "text/plain", ".cmd": "text/plain", ".ps1": "text/plain",
+};
+
+// Big text files are offered as a path too. The whole file goes into the prompt
+// otherwise, and one large log would spend the context window on message one.
+const INLINE_LIMIT = 256 * 1024;
+
+function describeFile(full) {
+  let stat = null;
+  try {
+    stat = fs.statSync(full);
+  } catch {
+    return null;
+  }
+  if (!stat.isFile()) return null;
+  const mime = TEXT_MIME[path.extname(full).toLowerCase()] ?? null;
+  const inline = Boolean(mime) && stat.size <= INLINE_LIMIT;
+  return {
+    path: full,
+    name: path.basename(full),
+    size: stat.size,
+    mime: mime ?? "application/octet-stream",
+    // The client uses this to choose between a file part and a mentioned path.
+    inline,
+    why: inline
+      ? "sent with your message"
+      : mime
+        ? "too big to send inline, so the agent will open it"
+        : "the agent will open this one itself",
+  };
+}
 
 const ok = (d = {}) => ({ ok: true, ...d });
 const bad = (reason, extra = {}) => ({ ok: false, error: reason, ...extra });
@@ -380,42 +534,32 @@ export const routes = {
    * Open the real Windows "choose a folder" dialog.
    *
    * Typing a path is not a reasonable ask, and a browser cannot open a folder
-   * picker that yields a usable path. FolderBrowserDialog needs a
-   * single-threaded apartment, hence -STA, and an owner window that is
-   * TopMost - without one the dialog opens BEHIND the app and looks like a
-   * freeze.
+   * picker that yields a usable path.
    */
   async folderPick() {
-    if (process.platform !== "win32") return bad("the folder picker is Windows-only; type a path instead");
-    const script = [
-      "Add-Type -AssemblyName System.Windows.Forms",
-      "$owner = New-Object System.Windows.Forms.Form",
-      "$owner.TopMost = $true",
-      "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
-      "$d.Description = 'Choose the folder Omni Agent should work in'",
-      "$d.ShowNewFolderButton = $true",
-      "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.SelectedPath }",
-      "$owner.Dispose()",
-    ].join("; ");
-    // Asynchronously, and that is not a style choice: the dialog stays open
-    // for as long as the user browses, and execFileSync would block this
-    // server's event loop for all of it - the app would freeze mid-click.
-    const { spawn } = await import("node:child_process");
-    const picked = await new Promise((resolve) => {
-      const child = spawn("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-      let out = "";
-      child.stdout.on("data", (b) => (out += b.toString()));
-      child.on("error", () => resolve(null));
-      child.on("close", () => resolve(out.trim()));
-    });
-    if (picked === null) return bad("the folder picker could not open");
-    if (!picked) return ok({ cancelled: true });
+    const r = await showDialog(FOLDER_DIALOG);
+    if (!r.ok) return r;
+    if (r.cancelled) return ok({ cancelled: true });
     // `routes.folderSet`, not `this.folderSet`: the dispatcher pulls the
     // function out of the table before calling it, so `this` is undefined.
-    return routes.folderSet({ body: { path: picked } });
+    return routes.folderSet({ body: { path: r.paths[0] } });
+  },
+
+  /** Open the real Windows "choose files" dialog, for attaching context. */
+  async filePick() {
+    const r = await showDialog(FILE_DIALOG);
+    if (!r.ok) return r;
+    if (r.cancelled) return ok({ cancelled: true, files: [] });
+    return ok({ files: r.paths.map(describeFile).filter(Boolean) });
+  },
+
+  /** Describe files chosen some other way (typed, or dropped onto the window). */
+  async fileDescribe({ body }) {
+    const list = Array.isArray(body?.paths) ? body.paths : [];
+    if (!list.length) return bad("no files given");
+    const files = list.map((f) => describeFile(String(f))).filter(Boolean);
+    if (!files.length) return bad("none of those are files that exist");
+    return ok({ files });
   },
 
   // --- transcripts ---------------------------------------------------------
@@ -481,10 +625,57 @@ export const routes = {
     });
   },
 
+  /**
+   * Add an MCP connection.
+   *
+   * 🔴 The shape is not the obvious one and getting it wrong is a 400 that
+   * blames the wrong field. OpenCode wants `{ name, config: { … } }` with
+   * `additionalProperties: false` on BOTH levels - so the flat
+   * `{ name, type, command, enabled }` this used to send failed validation on
+   * the unexpected `type` and the missing `config.command` at once, and the
+   * error surfaced as "command required", pointing at a field the user had
+   * filled in. Read from the server's own /doc, 2026-08-28.
+   *
+   * A URL is a remote connection and a command is a local one; the caller only
+   * has to say which it typed.
+   */
   async mcpAdd({ body }) {
-    if (!body.name) return bad("the connection needs a name");
-    const r = await oc("POST", "/mcp", body);
-    return r.ok ? ok({ added: body.name, data: r.data }) : bad(r.reason);
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    if (!name) return bad("the connection needs a name");
+    const url = typeof body?.url === "string" ? body.url.trim() : "";
+    const command = Array.isArray(body?.command)
+      ? body.command.map((c) => String(c).trim()).filter(Boolean)
+      : String(body?.command ?? "").trim().split(/\s+/).filter(Boolean);
+    if (!url && !command.length) return bad("give a command to run, or the URL of a remote server");
+    const config = url
+      ? { type: "remote", url, enabled: true }
+      : { type: "local", command, enabled: true };
+    const r = await oc("POST", "/mcp", { name, config });
+    if (!r.ok) return bad(r.reason);
+    // Persisted separately, because the route above connects the server for the
+    // RUNNING agent and writes nothing: measured, an added connection reported
+    // "connected", worked, and had vanished after a restart.
+    updateConfig((cfg) => ({ ...cfg, mcp: { ...(cfg.mcp ?? {}), [name]: config } }));
+    writeOpenCodeConfig();
+    return ok({ added: name, config, data: r.data });
+  },
+
+  /** Forget an MCP connection. Without this a broken one could never be undone. */
+  async mcpRemove({ body }) {
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    if (!name) return bad("which connection?");
+    let existed = false;
+    updateConfig((cfg) => {
+      const mcp = { ...(cfg.mcp ?? {}) };
+      existed = Object.hasOwn(mcp, name);
+      delete mcp[name];
+      return { ...cfg, mcp };
+    });
+    writeOpenCodeConfig();
+    // The running agent keeps it until it restarts; say so rather than implying
+    // it is gone this second.
+    await oc("POST", `/mcp/${encodeURIComponent(name)}/disconnect`, {});
+    return ok({ removed: name, existed });
   },
 
   // --- the gateway dashboard ----------------------------------------------

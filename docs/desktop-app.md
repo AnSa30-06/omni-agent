@@ -184,6 +184,36 @@ The default is `%USERPROFILE%\OmniAgent Workspace`. Recently used folders are
 remembered, and any that have since been deleted or unplugged are dropped from
 the list instead of being offered as a choice that will fail.
 
+You can also paste a path instead of browsing. That is not decoration: for the
+whole of 1.1.2 the dialog opened *behind* the app window, which looks exactly
+like a freeze, and a typed path was the only way through. It is also faster than
+browsing when the path is already on your clipboard.
+
+## Files
+
+The **+** button next to the folder pill attaches files to your next message.
+Chips appear above the box; they clear when the message is sent, and a message
+that has to be retried on another model carries the same files with it.
+
+**Two mechanisms, chosen per file, and the difference is visible on the chip.**
+
+| File | How it reaches the model | Chip says |
+|---|---|---|
+| Text under 256 KB (`.md`, `.csv`, `.json`, source code, …) | A real `file` part. Its **contents** go into the prompt, with no tool call | "sent with your message" |
+| A PDF, a spreadsheet, an image, a big log | Its **path** is named in the message, for the agent's own readers to open | "the agent will open this one itself" |
+
+⚠️ **The split is deliberate and not a shortcut.** A file part carrying a text
+mime was measured putting a probe file's contents in front of the model while
+the agent was explicitly told not to use tools. But the free models this ships
+with are mostly not vision models, and pushing a binary at one fails the whole
+turn — whereas a path always works, because the product ships PDF/DOCX/XLSX
+readers and a browser. Large text files are named rather than inlined for a
+different reason: one 5 MB log would spend the context window on message one.
+
+OpenCode expands an attachment server-side into a `Called the Read tool with…`
+block and marks it `synthetic`. Those parts are hidden in the transcript — shown
+as-is they sit above your own message and read as though *you* called a tool.
+
 ## Transcripts
 
 Every conversation is exported with `opencode export` into

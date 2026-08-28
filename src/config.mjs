@@ -22,6 +22,16 @@ export const DEFAULTS = {
     /** When set, overrides routing entirely and pins one model id. */
     pinnedModel: null,
   },
+  /**
+   * MCP connections the user added, keyed by name.
+   *
+   * They live here rather than only in OpenCode because POST /mcp connects a
+   * server for the RUNNING process and writes nothing - measured 2026-08-28: an
+   * added connection reported "connected", worked, and was gone after a
+   * restart. `writeOpenCodeConfig` emits these into opencode.json so they come
+   * back.
+   */
+  mcp: {},
   search: {
     /** Ordered. First provider that has its credential (or needs none) wins. */
     order: ["brave", "tavily", "serper", "duckduckgo", "bravehtml", "searxng", "browser"],

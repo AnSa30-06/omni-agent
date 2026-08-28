@@ -285,6 +285,11 @@ export function writeOpenCodeConfig(opts = {}) {
     },
   };
 
+  // Connections the user added in the app. Emitted here rather than merged
+  // into the file in place, because this function rewrites opencode.json
+  // wholesale and anything written directly to it is lost on the next setup.
+  if (cfg.mcp && Object.keys(cfg.mcp).length) config.mcp = cfg.mcp;
+
   const dest = path.join(ocConfigDir(), "opencode.json");
   fs.writeFileSync(dest, JSON.stringify(config, null, 2));
   log.info("wrote opencode config", { dest, skills: skillCount, omnirouteWired: !!omniroutePlugin });

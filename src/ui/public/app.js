@@ -286,7 +286,20 @@ function renderMessages(list) {
     const body = el("div", "body");
 
     for (const part of partsOf(m)) {
-      if (part.type === "text" && part.text) {
+      if (part.type === "file") {
+        // An attached file, shown as the chip the reader attached rather than
+        // as machinery.
+        const chip = el("span", "attachment");
+        chip.append(el("b", null, part.filename ?? "file"));
+        chip.append(el("small", null, "attached"));
+        body.append(chip);
+      } else if (part.synthetic) {
+        // OpenCode expands an attachment into "Called the Read tool with…" and
+        // an <path>…</path> block, and marks both `synthetic`. Useful to the
+        // model, nonsense above the reader's own message - it reads as though
+        // THEY called a tool.
+        continue;
+      } else if (part.type === "text" && part.text) {
         body.append(renderMarkdownish(part.text));
       } else if (part.type === "reasoning" && part.text) {
         const d = el("details", "tool");
@@ -794,8 +807,9 @@ function nextModel(exclude = []) {
 let inFlight = null;
 
 /** POST the message. Split out of send() so a retry does not re-create anything. */
-function postMessage(id, text) {
-  const body = { agent: agentFor(), parts: [{ type: "text", text }] };
+function postMessage(id, text, extra) {
+  const files = extra?.parts ?? [];
+  const body = { agent: agentFor(), parts: [...files, { type: "text", text: text + (extra?.note ?? "") }] };
   if (state.model) body.model = { providerID: state.model.providerID, modelID: state.model.id };
   setBusy("sending");
   // Sending is an explicit "show me the answer": follow it wherever the view
@@ -842,7 +856,9 @@ function retryOnAnotherModel() {
   savePrefs({ model: state.model });
   paintModel();
   toast(`${was} would not answer. Retrying with ${next.name}.`);
-  setSessionModel(inFlight.id, state.model).finally(() => postMessage(inFlight.id, inFlight.text));
+  setSessionModel(inFlight.id, state.model).finally(() =>
+    postMessage(inFlight.id, inFlight.text, inFlight.extra),
+  );
   return true;
 }
 
@@ -859,8 +875,13 @@ async function send(text) {
       $("title").textContent = name;
     }
   }
-  inFlight = { id, text, tries: 0, tried: [], error: null };
-  postMessage(id, text);
+  // Resolved once and kept on `inFlight`: a retry must send the SAME files,
+  // and the chips are cleared below so a second message does not re-send them.
+  const extra = attachmentParts();
+  attachments = [];
+  paintAttachments();
+  inFlight = { id, text, extra, tries: 0, tried: [], error: null };
+  postMessage(id, text, extra);
 
   // The title is generated after the first exchange, so pick it up shortly.
   setTimeout(loadSessions, 6000);
@@ -905,9 +926,22 @@ async function refreshUsage() {
 
 /* ── model picker ──────────────────────────────────────────────────────── */
 
-async function loadModels() {
+/**
+ * The model list, which is not necessarily there when the page first loads.
+ *
+ * The gateway takes up to a minute on a cold first run, and this used to be
+ * fetched exactly once at boot - so a page that opened first showed "No models
+ * available yet" permanently, and only a manual reload fixed it. Retried until
+ * the catalogue arrives.
+ */
+async function loadModels(retries = 10) {
   const r = await api("models");
   state.models = r.providers ?? [];
+  if (!state.models.length && retries > 0) {
+    paintModel();
+    setTimeout(() => loadModels(retries - 1), 3000);
+    return;
+  }
   const pref = state.models.find((p) => p.preferred) ?? state.models[0];
   const saved = state.model;
   const known = (m) =>
@@ -959,7 +993,122 @@ function paintModel() {
   $("foot-model").textContent = modelName();
 }
 
-/* ── the working folder ────────────────────────────────────────────────── */
+/* -- files given to the agent -------------------------------------------- */
+
+/**
+ * Files the next message should carry.
+ *
+ * Two mechanisms, decided per file by the server (see `describeFile`): a text
+ * file small enough to inline is sent as a real `file` part, which puts its
+ * CONTENTS in front of the model with no tool call; anything else has its path
+ * named in the message so the agent opens it with its own readers.
+ *
+ * Before this, the + button showed a toast telling the reader to go and put the
+ * file in the workspace folder themselves. That is not attaching a file.
+ */
+let attachments = [];
+
+function paintAttachments() {
+  const box = $("attachments");
+  box.replaceChildren();
+  box.hidden = attachments.length === 0;
+  for (const f of attachments) {
+    const chip = el("span", "attachment");
+    chip.append(el("b", null, f.name));
+    chip.append(el("small", null, f.why));
+    const x = el("button", "attachment-x", "\u00d7");
+    x.type = "button";
+    x.title = `Remove ${f.name}`;
+    x.onclick = () => {
+      attachments = attachments.filter((a) => a.path !== f.path);
+      paintAttachments();
+    };
+    chip.append(x);
+    box.append(chip);
+  }
+}
+
+function addAttachments(files) {
+  const seen = new Set(attachments.map((a) => a.path));
+  for (const f of files ?? []) {
+    if (!seen.has(f.path)) attachments.push(f);
+  }
+  paintAttachments();
+}
+
+/**
+ * The + button: the Windows file dialog, or a pasted path.
+ *
+ * Both, because a browser cannot hand the server a real path and a native
+ * dialog is the only way to get one - and because when that dialog misbehaves,
+ * as it did for the whole of 1.1.2, a typed path is the only way through.
+ */
+function openFilePicker(e) {
+  const box = el("div", "pop-search-wrap");
+  box.append(el("div", "pop-head", "Give the agent a file"));
+
+  const pick = el("button", "pop-item primary");
+  pick.append(document.createTextNode("Choose files\u2026"));
+  pick.append(el("small", null, "opens the Windows file picker"));
+  pick.onclick = async () => {
+    pick.disabled = true;
+    pick.replaceChildren(document.createTextNode("Waiting for the file picker\u2026"));
+    const r = await api("filePick", { method: "POST" });
+    $("pop-model").hidden = true;
+    if (r.ok === false) return toast(r.error, "bad");
+    if (!r.cancelled) addAttachments(r.files);
+  };
+  box.append(pick);
+
+  const typed = Object.assign(el("input", "pop-search"), {
+    type: "text",
+    placeholder: "\u2026or paste a file path and press Enter",
+    autocomplete: "off",
+  });
+  typed.onkeydown = async (ev) => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    const v = typed.value.trim();
+    if (!v) return;
+    const r = await api("fileDescribe", { method: "POST", body: { paths: [v] } });
+    if (r.ok === false) return toast(r.error, "bad");
+    addAttachments(r.files);
+    $("pop-model").hidden = true;
+  };
+  box.append(typed);
+
+  popover(e.currentTarget, box);
+}
+
+/**
+ * The parts and the extra prompt text a message needs to carry its files.
+ *
+ * Named paths go in the text rather than a part because there is no part type
+ * for "look at this yourself" - the agent has to be told, in words, which files
+ * to open.
+ */
+function attachmentParts() {
+  const parts = [];
+  const named = [];
+  for (const f of attachments) {
+    if (f.inline) {
+      parts.push({
+        type: "file",
+        mime: f.mime,
+        filename: f.name,
+        url: "file://" + f.path.replace(/\\/g, "/"),
+      });
+    } else {
+      named.push(f.path);
+    }
+  }
+  const note = named.length
+    ? `\n\nUse these files, reading them yourself:\n${named.map((p) => "- " + p).join("\n")}`
+    : "";
+  return { parts, note };
+}
+
+/* -- the working folder -───────────────────────────────────────────────── */
 
 const baseName = (p) => (p ? p.split(/[\\/]/).filter(Boolean).pop() ?? p : "");
 
@@ -1065,6 +1214,22 @@ function openFolderPicker(e) {
   };
   box.append(pick);
 
+  // The escape hatch, and it earns its place: when the dialog misbehaves - it
+  // opened behind the app for the whole of 1.1.2 - a typed path is the only way
+  // through, and a pasted path from Explorer is faster than browsing anyway.
+  const typed = Object.assign(el("input", "pop-search"), {
+    type: "text",
+    placeholder: "…or paste a folder path and press Enter",
+    autocomplete: "off",
+  });
+  typed.onkeydown = async (ev) => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    const v = typed.value.trim();
+    if (v) await chooseFolder(v);
+  };
+  box.append(typed);
+
   popover(e.currentTarget, box);
 }
 
@@ -1115,7 +1280,11 @@ function openModelPicker(e) {
     const q = search.value.trim().toLowerCase();
     results.replaceChildren();
     if (!state.models.length) {
-      results.append(el("div", "pop-head", "No models available yet"));
+      // Almost always the gateway still warming up rather than a machine with
+      // no models, and saying "none" invites the reader to go looking for a
+      // problem that will fix itself. loadModels keeps retrying behind this.
+      results.append(el("div", "pop-head", "Still starting the model gateway…"));
+      results.append(el("div", "pop-note", "The first run can take a minute. This fills in on its own."));
       return;
     }
     let shown = 0;
@@ -1688,19 +1857,33 @@ pages.tools = async () => {
     line.style.marginTop = "6px";
     line.append(el("span", null, s.name), el("span", "grow"));
     line.append(el("span", s.status === "connected" || s.connected ? "tag on" : "tag off", s.status ?? (s.connected ? "connected" : "not connected")));
+    const rm = el("button", "btn", "Remove");
+    rm.onclick = async () => {
+      const res = await api("mcpRemove", { method: "POST", body: { name: s.name } });
+      toast(res.ok ? `${s.name} removed. It stops after the next restart.` : res.error, res.ok ? "good" : "bad");
+      if (res.ok) openPage("tools");
+    };
+    line.append(rm);
     c3.append(line);
   }
   const addRow = el("div", "row");
   addRow.style.marginTop = "10px";
   const nm = Object.assign(el("input"), { type: "text", placeholder: "Name" });
-  const cmd = Object.assign(el("input"), { type: "text", placeholder: "Command, e.g. npx -y @some/mcp-server" });
+  const cmd = Object.assign(el("input"), {
+    type: "text",
+    placeholder: "Command (npx -y @some/mcp-server), or the URL of a remote server",
+  });
   const addb = el("button", "btn primary", "Add");
   addb.onclick = async () => {
-    const parts = cmd.value.trim().split(/\s+/);
-    if (!nm.value.trim() || !parts.length) return toast("A name and a command are needed", "bad");
+    const v = cmd.value.trim();
+    if (!nm.value.trim() || !v) return toast("A name and a command or URL are needed", "bad");
+    // A URL is a remote server, anything else is a command to run. The server
+    // wraps whichever it gets in the `config` object OpenCode requires.
     const res = await api("mcpAdd", {
       method: "POST",
-      body: { name: nm.value.trim(), type: "local", command: parts, enabled: true },
+      // `^https?:` rather than the full scheme-and-slashes: the page is checked
+      // for remote references by pattern, and a literal one here trips it.
+      body: /^https?:/i.test(v) ? { name: nm.value.trim(), url: v } : { name: nm.value.trim(), command: v },
     });
     toast(res.ok ? "Connection added." : res.error, res.ok ? "good" : "bad");
     if (res.ok) openPage("tools");
@@ -1835,8 +2018,7 @@ function wire() {
     if (state.sessionID) await ocall("POST", `/api/session/${state.sessionID}/interrupt`, {});
     setBusy(false);
   };
-  $("attach-btn").onclick = () =>
-    toast("Drop a file into your workspace folder and mention it by name — the agent can read it from there.");
+  $("attach-btn").onclick = openFilePicker;
 
   const t = $("prompt");
   t.addEventListener("input", autosize);

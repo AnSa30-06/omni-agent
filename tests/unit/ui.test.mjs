@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { nextRun } from "../../src/ui/routines.mjs";
 import { routes } from "../../src/ui/api.mjs";
@@ -221,14 +222,14 @@ test("the folder picker refuses anything that is not an existing directory", asy
   assert.match(file.error, /is a file, not a folder/);
 });
 
-test("the folder picker does not block the server while the dialog is open", () => {
+test("the pickers do not block the server while a dialog is open", () => {
   // execFileSync would freeze the UI server's event loop for as long as the
   // user browses - the whole app appears to hang mid-click.
   const api = ui("api.mjs");
-  const pick = api.slice(api.indexOf("async folderPick("), api.indexOf("// --- transcripts"));
-  assert.ok(!/execFileSync\(/.test(pick), "the folder picker must not call execFileSync");
-  assert.match(pick, /spawn\("powershell\.exe"/);
-  assert.match(pick, /-STA/, "FolderBrowserDialog needs a single-threaded apartment");
+  const run = api.slice(api.indexOf("async function showDialog("), api.indexOf("How a chosen file should"));
+  assert.ok(!/execFileSync\(/.test(api), "no picker may call execFileSync");
+  assert.match(run, /spawn\("powershell\.exe"/);
+  assert.match(run, /-STA/, "both dialogs need a single-threaded apartment");
 });
 
 test("live updates come from the global event stream, not the route that never answers", () => {
@@ -377,4 +378,93 @@ test("a fresh install starts on the model setup measured, not the one it was tol
   );
   // And it has to survive a restart, or the fix only holds for one session.
   assert.match(app, /state\.verifiedModel = prefs\.verifiedModel \?\? null;/);
+});
+
+test("the picker's owner window is never Show()n", () => {
+  // 🔴 The regression this guards is silent and total. The picker is spawned
+  // with windowsHide, which arms a one-shot SW_HIDE that Windows spends on the
+  // first window the process shows. Show() spends it on the owner, the owner is
+  // hidden, and the dialog it owns is hidden with it - measured: the child exits
+  // 0 in under a second, prints nothing, and the app reports a cancelled picker
+  // the user never saw. Touching .Handle makes the window without ShowWindow.
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  const owner = api.slice(api.indexOf("const DIALOG_OWNER = ["), api.indexOf("const FOLDER_DIALOG"));
+  assert.ok(!/\$owner\.Show\(\)/.test(owner), "Show() hides the dialog - use $owner.Handle");
+  assert.match(owner, /\$null = \$owner\.Handle/, "the owner window still has to exist");
+  assert.match(api, /if \(dialogOpen\) return bad/, "a second click must not stack a second dialog");
+});
+
+test("a chosen file is described by what can actually be done with it", async () => {
+  // Text small enough to inline goes as a file part, which puts its CONTENTS in
+  // front of the model. Everything else is a path for the agent's own readers -
+  // the default free models are not vision models, and a binary pushed at one
+  // fails the whole turn.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omni-files-"));
+  const txt = path.join(dir, "notes.md");
+  const bin = path.join(dir, "scan.pdf");
+  const big = path.join(dir, "huge.log");
+  fs.writeFileSync(txt, "hello");
+  fs.writeFileSync(bin, "%PDF-1.4");
+  fs.writeFileSync(big, "x".repeat(300 * 1024));
+
+  const r = await routes.fileDescribe({ body: { paths: [txt, bin, big, path.join(dir, "nope.txt")] } });
+  assert.equal(r.ok, true);
+  assert.equal(r.files.length, 3, "a path that does not exist is dropped, not reported as a file");
+  const [a, b, c] = r.files;
+  assert.equal(a.inline, true);
+  assert.equal(a.mime, "text/markdown");
+  assert.equal(b.inline, false, "a PDF must not be inlined");
+  assert.equal(c.inline, false, "a 300 KB log must not be inlined - it would spend the context window");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("attachments reach the model, and a retry sends the same ones", () => {
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("function attachmentParts("), app.indexOf("/* -- the working folder"));
+  assert.match(fn, /type: "file"/, "an inlinable file goes as a file part");
+  assert.match(fn, /"file:\/\/" \+ f\.path\.replace/, "the url must be a file:// URL");
+  assert.match(fn, /Use these files, reading them yourself/, "a non-inlinable file has to be named in words");
+  // The retry ladder re-sends the message; it must re-send the files with it.
+  assert.match(app, /inFlight = \{ id, text, extra,/);
+  assert.match(app, /postMessage\(inFlight\.id, inFlight\.text, inFlight\.extra\)/);
+  // And the chips must clear, or the next message re-sends them.
+  assert.match(app, /attachments = \[\];\s*\n\s*paintAttachments\(\);\s*\n\s*inFlight/);
+});
+
+test("OpenCode's own expansion of an attachment is not shown as the reader's words", () => {
+  // A file part is expanded server-side into "Called the Read tool with…" and a
+  // <path> block, both flagged `synthetic`. Rendered as-is they sit above the
+  // reader's own message and read as though THEY called a tool.
+  const app = ui("public", "app.js");
+  assert.match(app, /} else if \(part\.synthetic\) \{/);
+  assert.match(app, /if \(part\.type === "file"\) \{/, "an attachment should render as its own chip");
+});
+
+test("an MCP connection is wrapped the way OpenCode wants, and survives a restart", () => {
+  // POST /mcp takes { name, config } with additionalProperties:false on both
+  // levels, so the old flat { name, type, command, enabled } failed validation
+  // on the unexpected `type` AND the missing `config.command` - and surfaced as
+  // "command required", pointing at a field the user had filled in.
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  const fn = api.slice(api.indexOf("  async mcpAdd("), api.indexOf("  async mcpRemove("));
+  assert.match(fn, /oc\("POST", "\/mcp", \{ name, config \}\)/);
+  assert.match(fn, /type: "remote", url/, "a URL is a remote server");
+  assert.match(fn, /type: "local", command/, "anything else is a command");
+  // The route connects it for the RUNNING process and writes nothing, so an
+  // added connection was gone after a restart until this was added.
+  assert.match(fn, /updateConfig\(/);
+  assert.match(fn, /writeOpenCodeConfig\(\)/);
+  const oc = fs.readFileSync(pkg("src", "setup", "opencode-config.mjs"), "utf8");
+  assert.match(oc, /if \(cfg\.mcp && Object\.keys\(cfg\.mcp\)\.length\) config\.mcp = cfg\.mcp;/);
+});
+
+test("the model list is retried while the gateway is still warming up", () => {
+  // The gateway takes up to a minute on a cold first run. This was fetched once
+  // at boot, so a page that opened first said "No models available yet" for
+  // good, and only a reload fixed it.
+  const app = ui("public", "app.js");
+  const fn = app.slice(app.indexOf("async function loadModels("), app.indexOf("function paintModel("));
+  assert.match(fn, /loadModels\(retries = \d+\)/);
+  assert.match(fn, /if \(!state\.models\.length && retries > 0\)/);
+  assert.match(fn, /setTimeout\(\(\) => loadModels\(retries - 1\), \d+\)/);
 });
