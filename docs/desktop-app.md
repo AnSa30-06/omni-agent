@@ -133,6 +133,27 @@ Nothing about a model's health is guessed. The gateway publishes no per-model
 health — `theoldllm` reports `active: true` and answers `403` — so the only
 signal shown is what has already happened on this machine.
 
+### Which models are mine?
+
+The picker has three lenses — **All**, **Free**, and **From your keys** — because
+"every model" and "the models my key pays for" are different questions and the
+second one had no answer at all. Everything the gateway serves arrives under one
+provider id, so a key's models were mixed into the same list with nothing to
+tell them apart.
+
+Each model now carries the upstream it routes to, taken from the first segment
+of its id: `oc/hy3-free` is `oc`, `ddgw/mistral-small-2603` is `ddgw`. Free
+models show that vendor; paid ones say **"from your ‹vendor› key"**, since a
+model that costs money is one the gateway can only serve because a key pays for
+it.
+
+⚠️ **With no provider key configured, every model in the list is free** — measured
+on a fresh install: 121 models, none paid. A specific paid model (Mistral Large,
+say) is not missing or broken; it is unpaid for. Searching for one that is not in
+the catalogue says so and names the route: add that provider's key in
+**Providers**, and its models join the list. Adding a key reports how many models
+appeared and names a few, rather than only that a key was stored.
+
 ## Streaming
 
 Answers are written into the page as they arrive, tool calls included. Three
@@ -213,6 +234,19 @@ different reason: one 5 MB log would spend the context window on message one.
 OpenCode expands an attachment server-side into a `Called the Read tool with…`
 block and marks it `synthetic`. Those parts are hidden in the transcript — shown
 as-is they sit above your own message and read as though *you* called a tool.
+
+## Reasoning
+
+**Hidden by default. `Ctrl+O` shows it, `Ctrl+O` again hides it**, and the choice
+is remembered.
+
+A reasoning block routinely runs several times longer than the answer it
+precedes, so leaving it in the transcript buries the thing that was actually
+asked for. The shortcut does not fire while you are typing into the box — a
+shortcut that fires mid-sentence is a shortcut people turn off.
+
+Reasoning has never been *streamed*: only text deltas are, so thinking appears
+in the finished message rather than arriving token by token.
 
 ## Transcripts
 
