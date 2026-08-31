@@ -11,6 +11,9 @@
 import { admin, dashboardPassword } from "../gateway/admin.mjs";
 import { gatewayBaseUrl, loadConfig, updateConfig, DEFAULTS } from "../config.mjs";
 import { writeOpenCodeConfig } from "../setup/opencode-config.mjs";
+import { applyConfig } from "../setup/apply-config.mjs";
+import { clearCache as clearCatalogueCache } from "../routing/catalog.mjs";
+import { logger } from "../util/log.mjs";
 import { status as gatewayStatus } from "../gateway/supervisor.mjs";
 import { PAGES, dashboardUrl, openInBrowser } from "../gateway/dashboard.mjs";
 import { TIERS, getSaving, setSaving, measure, ALWAYS_PRESERVED } from "../routing/compression.mjs";
@@ -102,6 +105,36 @@ async function modelIds() {
     for (const id of Object.keys(p.models ?? {})) out.add(`${p.id}/${id}`);
   }
   return out;
+}
+
+/**
+ * Everything that has to happen after the set of connected providers changes.
+ *
+ * This is the fix for "I pasted my API key and the models were never used". Adding a
+ * provider used to touch the gateway and stop there, which left two stale things behind:
+ *
+ *   1. the routing catalogue, cached for five minutes and never invalidated - so
+ *      `selectModel` kept ranking against a model list that predated the new key;
+ *   2. `opencode.json`, whose pinned model is resolved ONCE at launch by `applyConfig()`.
+ *      Nothing rewrote it, so the agent went on running the model it picked at startup
+ *      no matter what was connected afterwards.
+ *
+ * `clearCache` had existed for exactly this purpose since the catalogue was written and
+ * had never had a single caller.
+ */
+const apiLog = logger("ui-api");
+
+async function providersChanged() {
+  clearCatalogueCache();
+  try {
+    const applied = await applyConfig();
+    return { rewired: true, model: applied.model };
+  } catch (err) {
+    // A failure here is not a reason to report the key as unsaved - it IS saved. Say what
+    // did and did not happen instead of collapsing both into one verdict.
+    apiLog.warn("provider added but the agent config could not be rewritten", { err: err.message });
+    return { rewired: false, model: null, problem: err.message };
+  }
 }
 
 /** One dialog at a time, across every kind. See the note above. */
@@ -477,16 +510,22 @@ export const routes = {
     const r = await providers.addModelProvider(body.id, body.key);
     if (!r.ok) return bad(r.reason);
     const t = r.connectionId ? await providers.testConnection(r.connectionId) : null;
+    // Invalidate the routing catalogue and re-resolve the agent's model BEFORE counting,
+    // so `newModels` reports what is actually reachable now rather than what the stale
+    // cache still remembers.
+    const rewire = await providersChanged();
     const after = await modelIds();
     const fresh = [...after].filter((id) => !before.has(id));
     return ok({
       added: r.id,
       connectionId: r.connectionId,
       works: t ? t.ok : null,
-      problem: t && !t.ok ? t.error : null,
+      problem: (t && !t.ok ? t.error : null) ?? rewire.problem ?? null,
       remedy: t?.remedy ?? null,
       newModels: fresh.length,
       examples: fresh.slice(0, 5),
+      agentModel: rewire.model,
+      rewired: rewire.rewired,
     });
   },
 
@@ -502,7 +541,9 @@ export const routes = {
   async providerRemove({ body }) {
     if (!body.connectionId) return bad("which connection?");
     const r = await providers.removeConnection(body.connectionId);
-    return r.ok ? ok({ removed: body.connectionId }) : bad(r.reason);
+    if (!r.ok) return bad(r.reason);
+    const rewire = await providersChanged();
+    return ok({ removed: body.connectionId, agentModel: rewire.model, rewired: rewire.rewired });
   },
 
   // --- search tools --------------------------------------------------------
