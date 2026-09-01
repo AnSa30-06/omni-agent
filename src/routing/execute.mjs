@@ -18,7 +18,13 @@ import { logger } from "../util/log.mjs";
 const log = logger("execute");
 
 /** Statuses where trying a different model is more useful than trying again. */
-const SWITCH_MODEL = new Set([402, 403, 429, 500, 502, 503, 504]);
+// 401 is included deliberately: on a keyless install an `auto/*` combo resolves
+// to a member model that needs a key and answers "[401]: Model <member> is not
+// supported" - a per-member refusal, not a dead gateway. Walking to the next
+// combo is exactly right, and the whole five-link chain gets a chance instead
+// of the probe stopping after two. When the gateway key itself is bad every
+// link 401s and the aggregated error still makes that plain.
+const SWITCH_MODEL = new Set([401, 402, 403, 429, 500, 502, 503, 504]);
 
 function isSwitchWorthy(err) {
   if (err instanceof HttpError) return SWITCH_MODEL.has(err.status);

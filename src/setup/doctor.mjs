@@ -139,14 +139,31 @@ export async function runDoctor(opts = {}) {
         );
       }
     } catch (err) {
+      // Tell "the free pool is busy right now" apart from "nothing works". The
+      // former is the COMMON state of a fresh keyless install under load, and
+      // failing setup over it told every such user their install was broken
+      // when it was fine. It is a WARN: the gateway is up, models are listed,
+      // and the app retries per message. Only a failure that is NOT purely
+      // rate-limiting / keyless refusal (a dead pool, a network fault) is a FAIL.
+      const busy = /\b(429|401|403)\b|rate.?limit|not supported|too many|quota|busy|ERR_BN_LIMIT/i.test(
+        err.message ?? ""
+      );
       rows.push(
-        row(
-          "Model responds",
-          FAIL,
-          err.message,
-          "Every model in the fallback chain refused. The free pool rate-limits under load - " +
-            "wait a minute and retry, or add a provider API key with `omni-agent config key <provider> <key>`."
-        )
+        busy
+          ? row(
+              "Model responds",
+              WARN,
+              `the free models are busy right now (${String(err.message).slice(0, 120)})`,
+              "This is normal on a fresh install under load - the app retries automatically. " +
+                "Adding a provider key with `omni-agent config key <provider> <key>` removes the wait."
+            )
+          : row(
+              "Model responds",
+              FAIL,
+              err.message,
+              "Every model in the fallback chain refused. If this persists, add a provider API key " +
+                "with `omni-agent config key <provider> <key>`."
+            )
       );
     }
   }

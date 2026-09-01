@@ -179,3 +179,20 @@ test("the agent's file tools cannot silently read the gateway's secrets", () => 
   assert.ok(!/\[glob\(PATHS\.home\)\]: "allow"/.test(src), "the whole-home allow is removed");
   assert.ok(!/"\*\*\/OmniAgent\/\*\*": "allow"/.test(src), "the broad OmniAgent name-net is removed");
 });
+
+test("a busy free pool does not fail first-run setup", () => {
+  // A fresh keyless install is commonly rate-limited on its very first probe.
+  // Failing setup over a 429/401 told every such user their install was broken
+  // when it was fine; a genuinely dead pool still fails.
+  const doctor = fs.readFileSync(pkg("src", "setup", "doctor.mjs"), "utf8");
+  assert.match(doctor, /const busy = \/[^\n]*429[^\n]*\.test\(/, "the model-responds failure is classified as busy-or-not");
+  assert.match(doctor, /busy\s*\?\s*row\(\s*\n?\s*"Model responds",\s*\n?\s*WARN/, "a busy pool is a WARN, not a FAIL");
+  // 401 must be switch-worthy so the probe walks the whole combo chain.
+  const exec = fs.readFileSync(pkg("src", "routing", "execute.mjs"), "utf8");
+  assert.match(exec, /SWITCH_MODEL = new Set\(\[401, 402, 403, 429, 500, 502, 503, 504\]\)/, "401 walks to the next model");
+  // doctor finishes what a rate-limited setup could not.
+  const bin = fs.readFileSync(pkg("bin", "omni-agent.mjs"), "utf8");
+  const dcmd = bin.slice(bin.indexOf('case "doctor":'), bin.indexOf('case "usage":'));
+  assert.match(dcmd, /if \(result\.ok\) \{\s*\n\s*updateConfig\(\{ configured: true \}\)/, "a passing doctor marks the install configured");
+  assert.match(dcmd, /rememberVerifiedModel\(result\.servedModel\)/, "and remembers the model that answered");
+});

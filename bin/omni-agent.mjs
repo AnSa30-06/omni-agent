@@ -141,6 +141,19 @@ async function main() {
     case "doctor": {
       await ensureReady({ quiet: true }).catch(() => {});
       const result = await runDoctor({ deep: !flags.has("--quick") });
+      // A passing doctor finishes what a rate-limited setup could not: mark the
+      // install configured and remember the model that actually answered, so
+      // the app stops printing "First run: writing configuration..." and starts
+      // on a model this machine has proven works. Setup tells people to run
+      // `omni-agent doctor` after a failure, and before this that never cleared
+      // the failure state.
+      if (result.ok) {
+        updateConfig({ configured: true });
+        if (result.servedModel) {
+          const { rememberVerifiedModel } = await import("../src/ui/prefs.mjs");
+          rememberVerifiedModel(result.servedModel);
+        }
+      }
       if (flags.has("--json")) say(JSON.stringify(result, null, 2));
       else say(renderDoctor(result));
       return process.exit(result.ok ? 0 : 1);
