@@ -450,6 +450,7 @@ async function main() {
       const r = await launchUI({ onProgress: say, open: !flags.has("--no-window") });
       if (!r.ok) return process.exit(1);
       say("");
+      if (r.ready === false) say("The start hit a problem. The window says what happened and what to do.");
       say("Omni Agent is open. Close the window when you are done.");
       say("Leave this running - closing it stops the agent.");
       // Nothing else to do; the HTTP servers hold the process open.

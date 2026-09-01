@@ -24,7 +24,8 @@ import { oc, credentials } from "./opencode-server.mjs";
 import * as transcripts from "./transcripts.mjs";
 import * as routines from "./routines.mjs";
 import { readPrefs, writePrefs } from "./prefs.mjs";
-import { PATHS } from "../util/paths.mjs";
+import { PATHS, APP_ROOT } from "../util/paths.mjs";
+import { startupSnapshot, retry as retryStartup } from "./startup.mjs";
 import { pkg } from "../util/paths.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -253,9 +254,49 @@ export const routes = {
       version,
       gateway: { running: gw.running, pid: gw.pid, baseUrl: gatewayBaseUrl() },
       agent: { running: !!agent, healthy: health.ok === true },
+      // How far the start has got. The page sits on its startup screen until
+      // this says ready, and shows the problem when a step failed.
+      startup: startupSnapshot(),
       home: PATHS.home,
       workspace: PATHS.workspace,
     });
+  },
+
+  /**
+   * "Try again" on the startup screen. Not awaited: a retry takes as long as
+   * a start, and the page is polling `status` for the outcome anyway.
+   */
+  async startupRetry() {
+    const r = retryStartup();
+    return r.ok ? ok({ retrying: true, startup: startupSnapshot() }) : bad(r.reason);
+  },
+
+  /**
+   * "Finish setup" on the startup screen.
+   *
+   * The installed layout puts OmniAgentSetup.cmd beside OmniAgent.exe, one
+   * directory above the app. It opens its own console - the same thing the
+   * installer's "Finish setup now" runs - so a person who unticked that box
+   * gets exactly the flow they skipped, from the button in front of them.
+   */
+  async setupRun() {
+    const script = path.join(APP_ROOT, "..", "OmniAgentSetup.cmd");
+    if (!fs.existsSync(script)) {
+      return bad(
+        'Open the Start Menu and run "Set up Omni Agent". ' +
+          "(A source checkout has no setup script: run node scripts/bootstrap.mjs, then node bin/omni-agent.mjs setup.)",
+      );
+    }
+    const { spawn } = await import("node:child_process");
+    try {
+      // `start` is a cmd builtin, hence the shell; the empty "" is the window
+      // title argument, without which a quoted path is swallowed as the title.
+      const child = spawn("cmd", ["/c", "start", "", script], { detached: true, stdio: "ignore", windowsHide: true });
+      child.unref();
+      return ok({ started: true });
+    } catch (err) {
+      return bad(err.message);
+    }
   },
 
   /**

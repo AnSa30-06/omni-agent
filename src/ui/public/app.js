@@ -2087,6 +2087,102 @@ pages.dashboard = async () => {
   }
 };
 
+/* ── starting up ───────────────────────────────────────────────────────── */
+
+/**
+ * Hold the page on its startup screen until the gateway and the agent answer.
+ *
+ * The window opens before either of them is started (see launch.mjs), so for
+ * the first half-minute of a cold start there is nothing behind this page. It
+ * used to boot regardless: toast "the agent server is not running - restart
+ * Omni Agent" at someone who had started it seconds earlier, and fetch the
+ * model list into a 503. Now it shows each step as it happens and boots when
+ * they are done. A failed step is shown with the one thing the reader can do.
+ */
+async function waitForReady() {
+  const box = $("startup");
+  for (;;) {
+    let st = null;
+    try {
+      st = await api("status");
+    } catch {
+      /* the server is there - the page came from it - so keep asking */
+    }
+    const s = st?.startup;
+    if (s?.ready) {
+      box.hidden = true;
+      return;
+    }
+    paintStartup(s);
+    await new Promise((r) => setTimeout(r, s?.problem ? 2500 : 800));
+  }
+}
+
+const STEP_MARKS = { pending: "·", running: "●", done: "✓", failed: "✕" };
+
+function paintStartup(s) {
+  const list = $("startup-steps");
+  list.replaceChildren();
+  const secs = s ? Math.round(s.elapsedMs / 1000) : 0;
+  for (const step of s?.steps ?? []) {
+    const li = el("li", step.status);
+    li.append(el("span", "mark", STEP_MARKS[step.status] ?? STEP_MARKS.pending));
+    li.append(el("span", null, step.label));
+    // The seconds are the "it is not stuck" signal: a number that keeps
+    // changing is the difference between waiting and worrying.
+    if (step.status === "running" && secs >= 5) li.append(el("span", "note", `${secs}s`));
+    list.append(li);
+  }
+  $("startup-sub").textContent =
+    secs > 90
+      ? "Still going. A slow disk or the very first start can take a few minutes."
+      : "The first start after installing can take a minute.";
+
+  const prob = $("startup-problem");
+  if (!s?.problem) {
+    prob.hidden = true;
+    return;
+  }
+  // Repainting the problem on every poll would reset a button the reader has
+  // just pressed, so it is drawn once per problem and left alone - except that
+  // its buttons follow the retry: disabled while one runs, back when it ends.
+  // Without that, a retry that fails the same way left the button dead.
+  const key = `${s.problem.title}|${s.problem.detail ?? ""}`;
+  if (prob.dataset.key === key && !prob.hidden) {
+    for (const b of prob.querySelectorAll("button")) b.disabled = s.retrying === true;
+    return;
+  }
+  prob.dataset.key = key;
+  prob.replaceChildren();
+  prob.append(el("h3", null, s.problem.title));
+  if (s.problem.detail) prob.append(el("p", null, s.problem.detail));
+  const acts = el("div", "startup-actions");
+  if (s.problem.action === "setup") {
+    const go = el("button", "btn primary", s.problem.actionLabel ?? "Finish setup");
+    go.onclick = async () => {
+      go.disabled = true;
+      const r = await api("setupRun", { method: "POST" });
+      if (r.ok === false) toast(r.error, "bad");
+      else toast("Setup opened in its own window. Come back here when it says it is ready.", "good");
+      go.disabled = false;
+    };
+    acts.append(go);
+  }
+  const again = el("button", s.problem.action === "setup" ? "btn" : "btn primary", s.problem.action === "setup" ? "I have finished setup" : (s.problem.actionLabel ?? "Try again"));
+  again.disabled = s.retrying === true;
+  again.onclick = async () => {
+    again.disabled = true;
+    const r = await api("startupRetry", { method: "POST" });
+    if (r.ok === false) {
+      toast(r.error, "bad");
+      again.disabled = false;
+    }
+  };
+  acts.append(again);
+  prob.append(acts);
+  prob.hidden = false;
+}
+
 /* ── wiring ────────────────────────────────────────────────────────────── */
 
 function wire() {
@@ -2159,8 +2255,9 @@ async function boot() {
   state.showReasoning = prefs.showReasoning === true;
   setSurface(prefs.surface === "code" ? "code" : "chat");
   $("mode-label").textContent = MODES[state.mode].label;
-  const st = await api("status");
-  if (!st.agent?.running) toast("The agent server is not running — restart Omni Agent.", "bad");
+  // Nothing below can answer until the gateway and the agent are up, and on
+  // a cold start that is half a minute after this page first paints.
+  await waitForReady();
   await Promise.all([loadModels(), loadSessions(), loadFolders()]);
   refreshUsage();
   setInterval(loadSessions, 20_000);

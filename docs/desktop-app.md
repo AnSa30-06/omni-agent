@@ -52,10 +52,27 @@ Because there is no console attached, everything it would have printed goes to
 dialog rather than doing nothing. *Omni Agent in a terminal* in the Start Menu
 runs the identical thing with the console visible.
 
-**The order is load-bearing.** The gateway's OpenCode plugin registers this
-product's models by asking the gateway for them at boot. Start the agent first
-and it registers nothing, falls back to OpenCode's own provider, and the first
-message fails with *"Model x-preview-f-free is not supported"*.
+**The window opens first, then the slow parts start.** The page is served and
+the window opened before the gateway or the agent is touched, and the page sits
+on a startup screen - *Starting the model gateway… 34s*, *Starting the agent* -
+polling `/x/status` until `startup.ready` is true, then boots. Before this the
+order was gateway → agent → window, and on a cold start (measured 2026-09-02:
+gateway 28 s, agent 3 s) the exe put nothing on screen for all of it. That reads
+as "it did not work", and the natural response - double-click again - started a
+second copy of everything. Now the window is up in about a second.
+
+When a step fails the same screen says what happened in plain words and offers
+the one thing the reader can do: **Finish setup** when the downloaded components
+are missing (it runs `OmniAgentSetup.cmd`, the same thing the installer's
+"Finish setup now" runs), or **Try again** for anything else, which re-runs the
+start in place. `launchUI` returns `ok: true` in that state - the window is open
+and showing the problem - so the exe only raises its dialog when no page could
+be served at all.
+
+**Inside that, the order is load-bearing.** The gateway's OpenCode plugin
+registers this product's models by asking the gateway for them at boot. Start
+the agent first and it registers nothing, falls back to OpenCode's own provider,
+and the first message fails with *"Model x-preview-f-free is not supported"*.
 
 **There is no Electron.** The window is the Chromium this product already
 downloads for browser automation, opened with `--app=`. If that copy cannot

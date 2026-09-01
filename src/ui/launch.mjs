@@ -1,11 +1,21 @@
-// Starting the desktop app, in the order the pieces actually depend on.
+// Starting the desktop app.
 //
-// The order is not cosmetic. The OmniRoute plugin registers this product's
-// models by asking the gateway for them when OpenCode boots; if the gateway is
-// not up yet the plugin registers nothing, OpenCode silently falls back to its
-// own provider, and the user gets "Model x-preview-f-free is not supported" on
-// their first message. Measured 2026-08-27 - so the gateway starts first and
-// the agent server second, always.
+// The window opens FIRST and shows what is happening; the gateway and the
+// agent are started after it. Before this the order was gateway, then agent,
+// then window, which is right for the wiring (see bringUp) and wrong for the
+// person waiting: measured 2026-09-02, the gateway took 28 s to answer on a
+// cold start and the agent 3 s more, and for all of that the exe put nothing
+// on screen. That reads as "it did not work", and the natural response -
+// double-click again - started a second copy of everything. Now the page is up
+// in well under a second and shows each step as it happens (see startup.mjs).
+//
+// Inside bringUp the order is still load-bearing: the OmniRoute plugin
+// registers this product's models by asking the gateway for them when OpenCode
+// boots; if the gateway is not up yet the plugin registers nothing, OpenCode
+// silently falls back to its own provider, and the user gets "Model
+// x-preview-f-free is not supported" on their first message. Measured
+// 2026-08-27 - so the gateway starts first and the agent server second, always.
+import path from "node:path";
 import { ensureRunning } from "../gateway/supervisor.mjs";
 import { applyConfig } from "../setup/apply-config.mjs";
 import { provisionGatewayToken } from "../gateway/provision.mjs";
@@ -15,23 +25,88 @@ import { openWindow } from "./window.mjs";
 import { startArchiver, stopArchiver } from "./transcripts.mjs";
 import { startScheduler, stopScheduler } from "./routines.mjs";
 import { loadConfig } from "../config.mjs";
+import { PATHS } from "../util/paths.mjs";
 import { logger } from "../util/log.mjs";
+import { startupBegin, startupStep, startupProblem, startupReady, onRetry } from "./startup.mjs";
 
 const log = logger("ui/launch");
 
-/**
- * @param {{onProgress?:(m:string)=>void, open?:boolean}} [opts]
- */
-export async function launchUI(opts = {}) {
-  const say = opts.onProgress ?? (() => {});
+const STEPS = [
+  { id: "gateway", label: "Starting the model gateway" },
+  { id: "agent", label: "Starting the agent" },
+];
 
+/**
+ * "The parts it downloads after installing were never downloaded."
+ *
+ * The third form is the agent binary being named but not there - a half-deleted
+ * install, or a runtime folder an antivirus quarantined - which surfaces as an
+ * ENOENT from spawn rather than as "not installed".
+ */
+function componentsMissing(reason) {
+  return /omniroute-not-installed|OpenCode is not installed|opencode.*ENOENT/i.test(String(reason ?? ""));
+}
+
+/**
+ * What the page says when a step fails - written for someone who cannot fix
+ * a computer, with the one thing they can actually do about it. The exe used
+ * to raise a dialog telling them to run a package-manager command.
+ */
+function problemFor(reason, detail) {
+  if (componentsMissing(reason)) {
+    return {
+      title: "Omni Agent has not finished setting itself up",
+      detail:
+        "The parts it downloads after installing are missing. Finishing setup downloads them " +
+        "(about 3 GB, one time) and can take 10-30 minutes. It opens in its own window; come " +
+        "back here when it says it is ready.",
+      action: "setup",
+      actionLabel: "Finish setup",
+    };
+  }
+  if (/start-timeout/.test(String(reason ?? ""))) {
+    return {
+      title: "The model gateway is taking too long to start",
+      detail:
+        "It usually answers within a minute; this time it did not within three. Trying again " +
+        `often works. Details: ${path.join(PATHS.logs, "gateway.log")}`,
+      action: "retry",
+      actionLabel: "Try again",
+    };
+  }
+  const tail = detail ? "\n" + String(detail).split("\n").slice(-4).join("\n") : "";
+  return {
+    title: "Omni Agent could not start",
+    detail: `${String(reason ?? "unknown reason")}${tail}\n\nDetails are in ${PATHS.logs}`,
+    action: "retry",
+    actionLabel: "Try again",
+  };
+}
+
+/**
+ * Start the gateway and then the agent, reporting each step to the page.
+ * Idempotent: ensureRunning and startAgent both return early when their
+ * process is already up, so a retry only redoes what failed.
+ */
+async function bringUp(say) {
+  startupBegin(STEPS);
+
+  startupStep("gateway", "running");
   say("Starting the model gateway...");
-  const gw = await ensureRunning({ onProgress: (m) => say("  " + m) });
+  const gw = await ensureRunning({
+    onProgress: (m) => {
+      say("  " + m);
+      startupStep("gateway", "running", m.trim());
+    },
+  });
   if (gw.ok === false) {
     say(`  The gateway did not start: ${gw.reason}`);
-    say("  The app will open, but no models will answer until this is fixed.");
     log.error("gateway failed", gw);
+    startupStep("gateway", "failed", gw.reason);
+    startupProblem(problemFor(gw.reason, gw.detail));
+    return { ok: false, reason: gw.reason };
   }
+  startupStep("gateway", "done");
 
   // A gateway that is up but has no credential leaves OpenCode with no models
   // for the same reason, so make sure one exists before the agent boots.
@@ -42,20 +117,38 @@ export async function launchUI(opts = {}) {
     await applyConfig();
   }
 
+  startupStep("agent", "running");
   say("Starting the agent...");
   const agent = await startAgent({ onProgress: (m) => say("  " + m) });
   if (!agent.ok) {
     say(`  The agent server did not start: ${agent.reason}`);
     if (agent.remedy) say(`  ${agent.remedy}`);
+    log.error("agent failed", agent);
+    startupStep("agent", "failed", agent.reason);
+    startupProblem(problemFor(agent.reason, agent.detail));
     return { ok: false, reason: agent.reason };
   }
+  startupStep("agent", "done");
 
-  say("Starting the interface...");
-  const ui = await startServer();
   startArchiver();
   startScheduler();
+  startupReady();
+  return { ok: true };
+}
 
+/**
+ * @param {{onProgress?:(m:string)=>void, open?:boolean}} [opts]
+ */
+export async function launchUI(opts = {}) {
+  const say = opts.onProgress ?? (() => {});
+
+  // The window first, so there is something to look at while the slow parts
+  // start. The page polls the startup state and boots itself when it is ready.
+  say("Starting the interface...");
+  startupBegin(STEPS);
+  const ui = await startServer();
   const url = uiUrl();
+
   const shutdown = () => {
     stopArchiver();
     stopScheduler();
@@ -110,6 +203,14 @@ export async function launchUI(opts = {}) {
     process.exit(0);
   });
 
-  log.info("ui launched", { url: ui.port });
-  return { ok: true, url, port: ui.port, shutdown };
+  // "Try again" on the startup screen runs this same sequence.
+  onRetry(() => bringUp(say));
+
+  const r = await bringUp(say);
+  log.info("ui launched", { url: ui.port, ready: r.ok });
+  // Deliberately ok:true even when a step failed: the window is open and is
+  // showing the problem with a way out, which is the point. ok:false is
+  // reserved for "no page could be served at all" - the case the exe turns
+  // into a dialog because there is nothing else it can do.
+  return { ok: true, url, port: ui.port, shutdown, ready: r.ok, reason: r.ok ? null : r.reason };
 }

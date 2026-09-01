@@ -529,3 +529,64 @@ test("adding a provider key reports what it unlocked, not just that it was store
   assert.match(fn, /const after = await modelIds\(\);/);
   assert.match(fn, /newModels: fresh\.length/);
 });
+
+test("the window opens before the slow parts start, and the page waits on a startup screen", () => {
+  // Before this the exe showed NOTHING until the gateway (up to a minute cold)
+  // and the agent were both up. That reads as "it did not work", and the
+  // natural response - double-click again - started a second copy of
+  // everything. Now the window opens first and shows each step as it happens.
+  const launch = ui("launch.mjs");
+  const body = launch.slice(launch.indexOf("export async function launchUI"));
+  const iServer = body.indexOf("await startServer()");
+  const iWindow = body.indexOf("openWindow(url)");
+  const iUp = body.indexOf("await bringUp(say)");
+  assert.ok(iServer > 0 && iWindow > iServer, "launch.mjs must serve the page and open the window first");
+  assert.ok(iUp > iWindow, "the gateway and the agent must be started after the window is open");
+  const up = launch.slice(launch.indexOf("async function bringUp"), launch.indexOf("export async function launchUI"));
+  assert.ok(up.indexOf("ensureRunning(") !== -1 && up.indexOf("startAgent(") > up.indexOf("ensureRunning("), "inside bringUp the gateway still starts before the agent");
+  const app = ui("public", "app.js");
+  assert.match(app, /await waitForReady\(\)/, "boot must wait for the stack before loading models and sessions");
+  assert.ok(
+    !/restart Omni Agent/.test(app),
+    "the old 'agent server is not running - restart' toast fired at someone who had just started it",
+  );
+  const html = ui("public", "index.html");
+  assert.match(html, /id="startup"/, "the startup screen is static markup so it paints before app.js loads");
+});
+
+test("missing components are explained with a way out, never as an npm command", () => {
+  // What a person gets when they untick "Finish setup now" in the installer
+  // and then double-click the desktop icon. It used to be a dialog saying
+  // "Install it with: npm install -g opencode-ai".
+  const launch = ui("launch.mjs");
+  assert.match(launch, /omniroute-not-installed\|OpenCode is not installed/, "both missing-component reasons are recognised");
+  assert.match(launch, /action: "setup"/, "a missing component offers to run setup");
+  assert.ok(!/npm install/.test(launch), "launch.mjs must not tell a user to run npm");
+  assert.ok(Object.hasOwn(routes, "setupRun"), "the page can start setup");
+  assert.ok(Object.hasOwn(routes, "startupRetry"), "the page can try the start again");
+});
+
+test("the startup state reports each step, then a problem with an action, then ready", async () => {
+  const s = await import("../../src/ui/startup.mjs");
+  s.startupBegin([
+    { id: "gateway", label: "Starting the model gateway" },
+    { id: "agent", label: "Starting the agent" },
+  ]);
+  s.startupStep("gateway", "running", "still starting...");
+  let snap = s.startupSnapshot();
+  assert.equal(snap.ready, false);
+  assert.equal(snap.steps[0].status, "running");
+  assert.equal(snap.steps[0].note, "still starting...");
+  assert.equal(snap.steps[1].status, "pending");
+  s.startupStep("gateway", "failed", "omniroute-not-installed");
+  s.startupProblem({ title: "Omni Agent has not finished setting itself up", action: "setup", actionLabel: "Finish setup" });
+  snap = s.startupSnapshot();
+  assert.equal(snap.problem.action, "setup");
+  assert.equal(snap.problem.actionLabel, "Finish setup");
+  // Nothing registered: a retry says so instead of pretending.
+  assert.equal(s.retry().ok, false);
+  s.startupReady();
+  snap = s.startupSnapshot();
+  assert.equal(snap.ready, true);
+  assert.equal(snap.problem, null, "a problem is cleared once the start succeeds");
+});

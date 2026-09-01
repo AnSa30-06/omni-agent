@@ -125,6 +125,20 @@
       </main>
     </div>
 
+    <!-- Shown from the first paint until the gateway and the agent are up.
+         Static markup on purpose: it is on screen before app.js has even
+         loaded, so a cold start never shows a blank window. app.js fills in
+         the steps and hides it when the stack is ready - see waitForReady. -->
+    <div id="startup" class="startup" role="status" aria-live="polite">
+      <div class="startup-card">
+        <img class="startup-mark" src="logo.svg" alt="" width="48" height="48" />
+        <h2 id="startup-title">Starting Omni Agent</h2>
+        <p class="startup-sub" id="startup-sub">The first start after installing can take a minute.</p>
+        <ul class="startup-steps" id="startup-steps"></ul>
+        <div class="startup-problem" id="startup-problem" hidden></div>
+      </div>
+    </div>
+
     <!-- popovers -->
     <div class="popover" id="pop-mode" hidden></div>
     <div class="popover" id="pop-model" hidden></div>
