@@ -5,7 +5,8 @@ import readline from "node:readline/promises";
 import { Readable, Writable } from "node:stream";
 import fs from "node:fs";
 import { makeAsk } from "../../src/setup/wizard.mjs";
-import { pkg } from "../../src/util/paths.mjs";
+import { permissionProfile } from "../../src/setup/opencode-config.mjs";
+import { pkg, PATHS } from "../../src/util/paths.mjs";
 
 /** A readline interface over a stdin that is already at end-of-file. */
 function eofInterface() {
@@ -140,4 +141,41 @@ test("the wizard's last words fit the person who installed the exe", () => {
   assert.ok(ready.indexOf("fs.existsSync(exe)") !== -1, "the desktop wording is shown only when the exe exists");
   assert.match(ready, /omni-agent ui/, "a source checkout is told the command that opens the app");
   assert.ok(!/Start the agent with:   omni-agent"/.test(ready), "the terminal command is no longer the headline");
+});
+
+test("the agent's file tools cannot silently read the gateway's secrets", () => {
+  // The whole data directory used to be allowed through the external-directory
+  // gate, which let a prompt-injected page make the agent read gateway\.env
+  // (JWT_SECRET, the admin password) and auth.json (the gateway admin token)
+  // and post them to an attacker with no prompt. The work directories stay
+  // allowed; everything else, the secrets included, falls to "ask".
+  const ext = permissionProfile("standard").external_directory;
+  assert.equal(typeof ext, "object", "external_directory is a rule map, not a bare string");
+  const norm = (p) => p.replace(/\\/g, "/").replace(/\/$/, "");
+  const rule = (target) => {
+    const t = norm(target);
+    let verdict = ext["*"] ?? "ask";
+    for (const [pat, v] of Object.entries(ext)) {
+      if (pat === "*") continue;
+      const suffix = pat.endsWith("/**") ? pat.slice(0, -3) : pat;
+      if (pat.startsWith("**/")) {
+        if (t.includes(norm(suffix).replace(/^\*\*\//, ""))) verdict = v;
+      } else if (t === norm(suffix) || t.startsWith(norm(suffix) + "/")) {
+        verdict = v;
+      }
+    }
+    return verdict;
+  };
+  // Work dirs: still allowed, or the agent cannot save the user's work.
+  assert.equal(rule(PATHS.workspace + "/site/index.html"), "allow", "the workspace stays writable");
+  assert.equal(rule(PATHS.downloads + "/report.pdf"), "allow", "downloads stay writable");
+  // Secrets: no longer silently allowed.
+  const home = PATHS.home;
+  assert.notEqual(rule(home + "/gateway/.env"), "allow", "gateway/.env is not silently readable");
+  assert.notEqual(rule(home + "/oc-data/opencode/auth.json"), "allow", "the gateway token file is not silently readable");
+  assert.notEqual(rule(home + "/credentials.dat"), "allow", "the credential store is not silently readable");
+  // And the broad allows are gone from the source.
+  const src = fs.readFileSync(pkg("src", "setup", "opencode-config.mjs"), "utf8");
+  assert.ok(!/\[glob\(PATHS\.home\)\]: "allow"/.test(src), "the whole-home allow is removed");
+  assert.ok(!/"\*\*\/OmniAgent\/\*\*": "allow"/.test(src), "the broad OmniAgent name-net is removed");
 });

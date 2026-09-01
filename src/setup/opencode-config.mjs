@@ -51,12 +51,13 @@ export function opencodeEnv(extra = {}) {
   };
 }
 
-function permissionProfile(name) {
+export function permissionProfile(name) {
   const all = JSON.parse(fs.readFileSync(pkg("config", "permissions.json"), "utf8"));
   const profile = all.profiles[name] ?? all.profiles.standard;
   const permission = structuredClone(profile.permission);
 
-  // Allow the app's own directories through the external-directory boundary.
+  // Allow the app's own WORK directories through the external-directory
+  // boundary - the folder the agent builds in, and where it downloads files.
   //
   // Without this the agent researches successfully and then cannot save the
   // result: OpenCode classifies a write to its own workspace as "external"
@@ -65,26 +66,36 @@ function permissionProfile(name) {
   // LocalCache. In a headless `opencode run`, "ask" auto-rejects, so an hour of
   // work is discarded at the last step. Observed exactly that.
   //
-  // Scoped to directories this product owns. The broad "*": "ask" stays first,
-  // and OpenCode evaluates the LAST matching rule, so these are the exceptions.
+  // 🔴 NOT the whole data directory. `%LOCALAPPDATA%\OmniAgent` holds the
+  // gateway's `.env` (JWT_SECRET, the admin password), the agent's `auth.json`
+  // (the gateway admin token) and `credentials.dat`. Allowing the entire home
+  // let a prompt-injected web page make the agent read `gateway\.env` and post
+  // it to an attacker with NO prompt - the product's own #1 threat, measured in
+  // the 2026-09-02 audit. The agent never needs those files, so a read or write
+  // outside the work directories now falls to the "*": "ask" gate and the user
+  // sees it. (This closes the read/edit/glob/grep tools, which is how an agent
+  // naturally reads a file. The bash `cat` tool is a separate, harder surface
+  // in config/permissions.json and is not addressed here.)
+  //
+  // OpenCode evaluates the LAST matching rule, so these allows are exceptions
+  // to the "*": "ask" default.
   const glob = (p) => p.replace(/\\/g, "/").replace(/\/$/, "") + "/**";
   if (permission.external_directory !== "allow") {
     permission.external_directory = {
       "*": typeof permission.external_directory === "string" ? permission.external_directory : "ask",
       [glob(PATHS.workspace)]: "allow",
       [glob(PATHS.downloads)]: "allow",
-      [glob(PATHS.home)]: "allow",
-      // Name-based safety net for redirected filesystems.
+      // Name-based safety nets for redirected filesystems.
       //
       // Under a Windows packaged (MSIX) app, writes to LOCALAPPDATA are
       // virtualised into the container's LocalCache. This process sees
-      // ...\Local\OmniAgent\... while OpenCode sees
-      // ...\Local\Packages\<pkg>\LocalCache\Local\OmniAgent\..., so the
-      // absolute patterns above simply do not match and every write is refused.
-      // Measured exactly that. These globs are still scoped to directories
-      // named after this application.
-      "**/OmniAgent/**": "allow",
+      // ...\Local\OmniAgent\downloads\... while OpenCode sees
+      // ...\Local\Packages\<pkg>\LocalCache\Local\OmniAgent\downloads\..., so
+      // the absolute patterns above do not match. These are scoped to the WORK
+      // directories only - the old "**/OmniAgent/**" net covered the secrets
+      // too, which is exactly the hole above.
       "**/OmniAgent Workspace/**": "allow",
+      "**/OmniAgent/downloads/**": "allow",
     };
   }
   return permission;
