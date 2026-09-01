@@ -5,15 +5,6 @@
   "version": 1,
   "models": [
     {
-      "id": "pollinations",
-      "label": "Pollinations",
-      "auth": "none",
-      "gives": "GPT, Llama and Claude-class models with no account at all",
-      "signup": null,
-      "note": "Nothing to sign up for. Add it and it works.",
-      "signupIsAuthority": true
-    },
-    {
       "id": "cerebras",
       "label": "Cerebras",
       "auth": "apikey",
@@ -135,6 +126,15 @@
       "gives": "A free tier on Gemini Flash models",
       "signup": "https://aistudio.google.com/apikey",
       "note": "Google publishes no quota API, so usage will read as unavailable.",
+      "signupIsAuthority": true
+    },
+    {
+      "id": "pollinations",
+      "label": "Pollinations",
+      "auth": "none",
+      "gives": "GPT, Llama and Claude-class models with no account - when it answers",
+      "signup": null,
+      "note": "Best-effort, and often refuses. OmniRoute's own provider reference records a verification on 2026-07-31 that returned 401 through the gateway and Cloudflare 1010 on direct probes from the same network. Keep it as a bonus, not as the thing you rely on: add Groq or Gemini as well.",
       "signupIsAuthority": true
     },
     {
