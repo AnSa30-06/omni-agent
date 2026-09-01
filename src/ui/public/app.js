@@ -749,6 +749,10 @@ function endTurn() {
     inFlight.error = null;
     if (retryOnAnotherModel()) return;
     toast(`No model would answer: ${String(err?.data?.message ?? err?.message ?? err).slice(0, 120)}`, "bad");
+  } else if (gotText && !inFlight?.error && inFlight?.tries > 0 && state.model) {
+    // The retry worked. NOW remember the model that answered - never the one
+    // that failed - so the next conversation opens on something that works.
+    savePrefs({ model: state.model });
   }
   // `inFlight` is deliberately NOT cleared here. endTurn runs for BOTH
   // session.error and session.idle, so the idle that follows a failure would
@@ -1053,9 +1057,10 @@ function retryOnAnotherModel() {
   inFlight.tries += 1;
   if (failed) inFlight.tried.push(failed);
   state.model = { providerID: next.providerID, id: next.id };
-  // Remembered, so the next conversation starts on something that answers
-  // instead of repeating this on every fresh session.
-  savePrefs({ model: state.model });
+  // NOT persisted here: this model has not answered yet, and saving it made a
+  // fresh install remember a model that had just FAILED, so the next
+  // conversation opened on it and failed the same way. endTurn persists the
+  // model that actually produces an answer instead.
   paintModel();
   toast(`${was} would not answer. Retrying with ${next.name}.`);
   setSessionModel(inFlight.id, state.model).finally(() =>
@@ -1150,6 +1155,10 @@ async function loadModels(retries = 10) {
   const saved = state.model;
   const known = (m) =>
     m && state.models.some((p) => p.id === m.providerID && p.models.some((x) => x.id === m.id));
+  // A model that has already failed on this machine is not a good place to
+  // start the next conversation - measured 2026-09-02, a fresh install opened
+  // its second project on the model that had just failed the first.
+  const healthy = (m) => m && !state.unhealthy[`${m.providerID}/${m.id}`];
   // Order matters: what the user chose, then what setup configured, then the
   // provider's own default, then anything. The provider default is third
   // because it is not chosen with chat in mind.
@@ -1161,9 +1170,10 @@ async function loadModels(retries = 10) {
         .flatMap((p) => p.models.map((m) => ({ providerID: p.id, id: m.id })))
         .find((m) => m.id === state.verifiedModel)
     : null;
-  if (known(saved)) state.model = saved;
-  else if (verified) state.model = verified;
+  if (known(saved) && healthy(saved)) state.model = saved;
+  else if (verified && healthy(verified)) state.model = verified;
   else if (r.configured) state.model = r.configured;
+  else if (known(saved)) state.model = saved;
   else if (pref?.default) state.model = { providerID: pref.id, id: pref.default };
   else if (pref?.models?.length) state.model = { providerID: pref.id, id: pref.models[0].id };
   paintModel();

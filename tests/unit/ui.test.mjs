@@ -315,7 +315,11 @@ test("a fallback is announced and remembered, never silent", () => {
   const app = ui("public", "app.js");
   const fn = app.slice(app.indexOf("function retryOnAnotherModel("), app.indexOf("async function send("));
   assert.match(fn, /toast\(`\$\{was\} would not answer\. Retrying with \$\{next\.name\}\.`\)/);
-  assert.match(fn, /savePrefs\(\{ model: state\.model \}\)/, "the working model becomes the default");
+  // The model that ANSWERS becomes the default - persisted in endTurn once the
+  // retry produced text, never at retry time (that saved a model before it had
+  // answered, and it had usually just failed).
+  assert.ok(!/savePrefs\(\{ model: state\.model \}\)/.test(fn), "the retry does not persist an unanswered model");
+  assert.match(app, /gotText && !inFlight\?\.error && inFlight\?\.tries > 0 && state\.model[\s\S]*?savePrefs\(\{ model: state\.model \}\)/, "the model that produced the answer becomes the default");
   assert.match(fn, /inFlight\.id !== state\.sessionID/, "must not resurrect a prompt from a left conversation");
 });
 
@@ -369,12 +373,18 @@ test("a fresh install starts on the model setup measured, not the one it was tol
   const fn = app.slice(app.indexOf("async function loadModels("), app.indexOf("function paintModel("));
   assert.match(fn, /state\.verifiedModel/, "the measured model must be consulted");
   assert.ok(
-    fn.indexOf("if (known(saved)) state.model = saved;") < fn.indexOf("else if (verified)"),
-    "a model the user chose must outrank the one setup measured",
+    fn.indexOf("if (known(saved) && healthy(saved)) state.model = saved;") < fn.indexOf("else if (verified && healthy(verified))"),
+    "a healthy model the user chose must outrank the one setup measured",
   );
   assert.ok(
-    fn.indexOf("else if (verified)") < fn.indexOf("else if (r.configured)"),
+    fn.indexOf("else if (verified && healthy(verified))") < fn.indexOf("else if (r.configured)"),
     "a measured model must outrank the gateway's published default, which is the auto/ combo that 401'd",
+  );
+  // A model that already FAILED here is skipped, but never at the cost of
+  // starting on nothing - a still-known saved model is the last resort.
+  assert.ok(
+    fn.indexOf("else if (r.configured)") < fn.indexOf("else if (known(saved))"),
+    "an unhealthy-but-known model is only the last resort",
   );
   // And it has to survive a restart, or the fix only holds for one session.
   assert.match(app, /state\.verifiedModel = prefs\.verifiedModel \?\? null;/);
@@ -679,4 +689,20 @@ test("an agent that dies is detected, restarted, and recovered on the page", () 
   assert.match(app, /if \(r\.status === 503\) recover\(\)/, "a 503 on any agent call starts recovery");
   assert.match(app, /async function recover\(\)/, "recover re-shows the startup screen and reloads");
   assert.match(app, /const list = r\.data\?\.data \?\? r\.data;\s*\n\s*state\.sessions = Array\.isArray\(list\) \? list : \[\]/, "a 503 body is never treated as a session list");
+});
+
+test("a failed model is never saved as the default, and a fresh start avoids one", () => {
+  // Measured 2026-09-02: the first question failed, the retry's model was saved
+  // before it answered, and the next conversation opened on that failed model
+  // and failed again. Now only the model that ANSWERS is remembered, and a
+  // conversation never opens on a model recorded as unhealthy.
+  const app = ui("public", "app.js");
+  const retry = app.slice(app.indexOf("function retryOnAnotherModel"), app.indexOf("async function send"));
+  assert.ok(!/savePrefs\(\{ model: state\.model \}\)/.test(retry), "the retry does not persist a model that has not answered");
+  assert.match(app, /gotText && !inFlight\?\.error && inFlight\?\.tries > 0 && state\.model[\s\S]*?savePrefs\(\{ model: state\.model \}\)/, "endTurn persists the model that produced the answer");
+  assert.match(app, /const healthy = \(m\) => m && !state\.unhealthy\[/, "loadModels knows which models have failed here");
+  assert.match(app, /if \(known\(saved\) && healthy\(saved\)\) state\.model = saved;/, "a healthy saved model is preferred");
+  assert.match(app, /else if \(verified && healthy\(verified\)\) state\.model = verified;/, "a healthy verified model is next");
+  // A still-known-but-unhealthy saved model is the last resort, never nothing.
+  assert.match(app, /else if \(known\(saved\)\) state\.model = saved;/, "there is still a fallback when everything is unhealthy");
 });
