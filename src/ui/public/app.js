@@ -31,6 +31,10 @@ async function ocall(method, path, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await r.text();
+  // 503 from the proxy means the agent server is not running - it died, or has
+  // not started yet. Re-show the startup screen and wait for it to come back
+  // (the server restarts it automatically; the screen offers Try again if not).
+  if (r.status === 503) recover();
   try {
     return { status: r.status, ok: r.ok, data: text ? JSON.parse(text) : null };
   } catch {
@@ -134,7 +138,11 @@ function agentFor() {
 
 async function loadSessions() {
   const r = await ocall("GET", "/api/session");
-  state.sessions = r.data?.data ?? r.data ?? [];
+  // A 503 (agent down) returns an {error} object, not a list. Storing it made
+  // renderSessions throw on .filter and blanked the sidebar with no message;
+  // recover() below is what actually brings the agent back.
+  const list = r.data?.data ?? r.data;
+  state.sessions = Array.isArray(list) ? list : [];
   renderSessions();
 }
 
@@ -149,7 +157,12 @@ function renderSessions() {
   }
   for (const s of mine) {
     const row = el("div", "s-row");
-    const b = el("button", "s-item" + (s.id === state.sessionID ? " active" : ""));
+    const b = el(
+      "button",
+      "s-item" +
+        (s.id === state.sessionID ? " active" : "") +
+        (state.busy && s.id === state.sessionID ? " busy" : ""),
+    );
     b.append(el("span", "s-dot"), el("span", "s-name", s.title || "Untitled"));
     b.append(el("span", "muted", fmtWhen(s.time?.updated)));
     b.onclick = () => openSession(s.id);
@@ -202,7 +215,7 @@ async function newSession() {
   await ocall("POST", `/api/session/${id}/agent`, { agent: agentFor() });
   if (state.model) await setSessionModel(id, state.model);
   await loadSessions();
-  openSession(id);
+  await openSession(id);
 }
 
 async function openSession(id) {
@@ -215,13 +228,17 @@ async function openSession(id) {
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
   state.sessionFolder = null;
   paintFolder();
-  ocall("GET", `/session/${id}`).then((d) => {
-    if (state.sessionID !== id) return;
-    state.sessionFolder = d.data?.directory ?? null;
-    paintFolder();
-  });
+  // The directory is fetched BEFORE subscribing, because the agent's event bus
+  // is scoped per folder: a stream opened without the session's directory
+  // receives nothing for a conversation in any folder but the default one.
+  // Measured 2026-09-02 - the whole "watch it work" experience was blank for
+  // anyone who chose their own folder.
+  const d = await ocall("GET", `/session/${id}`);
+  if (state.sessionID !== id) return;
+  state.sessionFolder = d.data?.directory ?? null;
+  paintFolder();
   await refreshMessages();
-  subscribe(id);
+  subscribe(id, state.sessionFolder);
   refreshUsage();
 }
 
@@ -341,7 +358,11 @@ function renderMessages(list) {
     }
 
     const err = m.info?.error ?? m.error;
-    if (err) {
+    if (err && (err.name === "MessageAbortedError" || /aborted/i.test(String(err.data?.message ?? err.message ?? err.name ?? "")))) {
+      // The reader pressed Stop. Not a failure, and never a reason to blame the
+      // model or offer "choose a different one".
+      body.append(el("p", "turn-end", "Stopped by you"));
+    } else if (err) {
       // The legacy message carries the model flat on `info` as modelID +
       // providerID, and the real text at error.data.message - not error.message,
       // which is undefined and rendered as "[object Object]".
@@ -765,9 +786,15 @@ function scheduleRefresh() {
  * finally returned - which is exactly why answers landed in one lump instead
  * of streaming.
  */
-function subscribe(sessionID) {
+function subscribe(sessionID, directory) {
   state.stream?.close();
-  const es = new EventSource(`/oc/event?t=${encodeURIComponent(TOKEN)}`);
+  // Scoped to the conversation's folder. The agent publishes streaming tokens,
+  // tool calls and permission requests onto a bus keyed by directory; without
+  // this the stream is silent for every folder but the default one, and a
+  // permission prompt never reaches the page, so the agent waits forever.
+  const qs = new URLSearchParams({ t: TOKEN });
+  if (directory) qs.set("directory", directory);
+  const es = new EventSource(`/oc/event?${qs.toString()}`);
   state.stream = es;
   es.onmessage = (e) => {
     let ev;
@@ -2270,6 +2297,31 @@ pages.dashboard = async () => {
  * model list into a 503. Now it shows each step as it happens and boots when
  * they are done. A failed step is shown with the one thing the reader can do.
  */
+let recovering = false;
+
+/**
+ * The agent stopped after the app was already running. Show the startup screen
+ * again and wait for it to come back - launch.mjs restarts it automatically,
+ * and shows a "Try again" problem if it keeps failing - then reload everything
+ * and reopen the conversation the reader was in.
+ */
+async function recover() {
+  if (recovering) return;
+  recovering = true;
+  try {
+    $("startup").hidden = false;
+    await waitForReady();
+    await Promise.all([loadModels(), loadSessions(), loadFolders()]);
+    if (state.sessionID) {
+      const id = state.sessionID;
+      state.sessionID = null;
+      await openSession(id);
+    }
+  } finally {
+    recovering = false;
+  }
+}
+
 async function waitForReady() {
   const box = $("startup");
   for (;;) {
@@ -2376,8 +2428,20 @@ function wire() {
   $("folder-btn").onclick = openFolderPicker;
   $("mode-btn").onclick = openModePicker;
   $("btn-stop").onclick = async () => {
-    if (state.sessionID) await ocall("POST", `/api/session/${state.sessionID}/interrupt`, {});
-    setBusy(false);
+    if (!state.sessionID) return;
+    // The route that actually stops a turn started on the legacy message
+    // route. `/api/session/{id}/interrupt` (v2) answers 204 and does nothing to
+    // it - measured 2026-09-02: files kept being written after "Stop". `/abort`
+    // ends the run with MessageAbortedError within ~1 s. setBusy(false) is NOT
+    // called here: the turn is left to settle (session.idle, or the message
+    // POST returning) so the button follows what really happened, and the
+    // stored MessageAbortedError renders as "Stopped by you".
+    const btn = $("btn-stop");
+    btn.disabled = true;
+    if (inFlight) inFlight.stopped = true;
+    const r = await ocall("POST", `/session/${state.sessionID}/abort`, {});
+    btn.disabled = false;
+    if (!r.ok) toast(`Could not stop the agent (${r.status})`, "bad");
   };
   $("attach-btn").onclick = openFilePicker;
 

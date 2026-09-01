@@ -32,6 +32,9 @@ import { logger } from "../util/log.mjs";
 const log = logger("ui/opencode");
 
 let _state = null;
+// Set while stop() is running, so the exit handler can tell a deliberate
+// shutdown from a crash and only report the crash.
+let _stopping = false;
 
 /** A port nothing is using, by letting the OS pick and immediately releasing it. */
 function freePort() {
@@ -66,6 +69,7 @@ export function running() {
 export async function start(opts = {}) {
   if (_state) return { ok: true, baseUrl: _state.baseUrl, reused: true };
   ensureDirs();
+  _stopping = false;
   const onProgress = opts.onProgress ?? (() => {});
 
   const exe = locateOpenCode();
@@ -135,10 +139,22 @@ export async function start(opts = {}) {
     return { ok: false, reason: baseUrl.error, detail: tail };
   }
 
-  _state = { child, baseUrl, password, workspace };
-  child.on("exit", () => {
-    log.warn("opencode serve exited");
+  _state = { child, baseUrl, password, workspace, onExit: opts.onExit };
+  child.on("exit", (code) => {
+    const wasDeliberate = _stopping;
+    const onExit = _state?.onExit;
     _state = null;
+    _stopping = false;
+    if (wasDeliberate) {
+      log.info("opencode serve stopped");
+    } else {
+      // The agent died on its own - a crash, an OOM, being ended from Task
+      // Manager. The launcher restarts it and the page re-shows its startup
+      // screen; without this hook the page would 503 every call forever and
+      // look permanently blank. Measured 2026-09-02.
+      log.warn("opencode serve exited unexpectedly", { code });
+      onExit?.(code);
+    }
   });
 
   onProgress(`Agent server ready at ${baseUrl}`);
@@ -148,10 +164,12 @@ export async function start(opts = {}) {
 
 export function stop() {
   if (!_state) return;
+  // Deliberate: the exit handler must NOT treat this as a crash and restart.
+  // _state is cleared by that handler, which then sees _stopping.
+  _stopping = true;
   try {
     _state.child.kill();
   } catch {}
-  _state = null;
 }
 
 /** Call the agent server with authentication attached. */

@@ -27,7 +27,7 @@ import { startScheduler, stopScheduler } from "./routines.mjs";
 import { loadConfig } from "../config.mjs";
 import { PATHS } from "../util/paths.mjs";
 import { logger } from "../util/log.mjs";
-import { startupBegin, startupStep, startupProblem, startupReady, onRetry } from "./startup.mjs";
+import { startupBegin, startupStep, startupProblem, startupReady, onRetry, retry as retryStartup } from "./startup.mjs";
 
 const log = logger("ui/launch");
 
@@ -35,6 +35,35 @@ const STEPS = [
   { id: "gateway", label: "Starting the model gateway" },
   { id: "agent", label: "Starting the agent" },
 ];
+
+// Reset to 0 by a successful bringUp. An agent that crashes is restarted a few
+// times; past that it is almost certainly a real fault, so the page is shown a
+// problem it can act on instead of a restart loop nobody can see.
+let agentCrashes = 0;
+
+/** What to do when `opencode serve` dies on its own after the app was running. */
+function onAgentExit(code, say) {
+  agentCrashes += 1;
+  if (agentCrashes <= 3) {
+    say(`The agent stopped unexpectedly (code ${code}); restarting it...`);
+    // retryStartup re-runs bringUp through the onRetry hook, which re-shows the
+    // startup screen; the page is already polling /x/status via recover().
+    retryStartup();
+  } else {
+    startupBegin(STEPS);
+    startupStep("gateway", "done");
+    startupStep("agent", "failed", "it keeps stopping");
+    startupProblem({
+      title: "The agent keeps stopping",
+      detail:
+        "It has stopped several times in a row. Your conversations are safe. " +
+        "Try again restarts it; if it keeps happening, close Omni Agent and open it again, " +
+        "or run \"Check Omni Agent health\" from the Start Menu.",
+      action: "retry",
+      actionLabel: "Try again",
+    });
+  }
+}
 
 /**
  * "The parts it downloads after installing were never downloaded."
@@ -119,7 +148,7 @@ async function bringUp(say) {
 
   startupStep("agent", "running");
   say("Starting the agent...");
-  const agent = await startAgent({ onProgress: (m) => say("  " + m) });
+  const agent = await startAgent({ onProgress: (m) => say("  " + m), onExit: (code) => onAgentExit(code, say) });
   if (!agent.ok) {
     say(`  The agent server did not start: ${agent.reason}`);
     if (agent.remedy) say(`  ${agent.remedy}`);
@@ -132,6 +161,7 @@ async function bringUp(say) {
 
   startArchiver();
   startScheduler();
+  agentCrashes = 0;
   startupReady();
   return { ok: true };
 }

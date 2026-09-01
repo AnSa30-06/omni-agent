@@ -625,3 +625,58 @@ test("opening a folder refuses anything that is not there", async () => {
   const r2 = await routes.openFolder({ body: {} });
   assert.equal(r2.ok, false);
 });
+
+test("the event stream is scoped to the conversation's folder", () => {
+  // The agent publishes streaming tokens, tool calls and permission requests on
+  // a bus keyed by directory. A stream opened without it is silent for every
+  // folder but the default one - so "watch it work" was blank for anyone who
+  // chose their own folder, and a permission prompt never arrived. Verified
+  // live 2026-09-02: a custom-folder turn streamed 14 text deltas + 3 tool
+  // events on the scoped stream and zero on the unscoped one.
+  const app = ui("public", "app.js");
+  assert.match(app, /function subscribe\(sessionID, directory\)/, "subscribe takes the folder");
+  assert.match(app, /if \(directory\) qs\.set\("directory", directory\)/, "the folder is added to the stream URL");
+  assert.match(app, /subscribe\(id, state\.sessionFolder\)/, "openSession subscribes with the session's own folder");
+  // The folder must be known BEFORE subscribing, so the GET is awaited, not
+  // fire-and-forget.
+  assert.match(app, /const d = await ocall\("GET", `\/session\/\$\{id\}`\)/, "the directory is fetched before subscribing");
+  assert.match(app, /await openSession\(id\)/, "newSession awaits openSession so the stream is live before the first message");
+});
+
+test("Stop uses the route that actually ends the turn, and a stop is not a failure", () => {
+  // /api/session/{id}/interrupt (v2) is a no-op for a turn started on the
+  // legacy message route - files kept being written after "Stop". /abort ends
+  // it with MessageAbortedError. Verified live 2026-09-02.
+  const app = ui("public", "app.js");
+  const wire = app.slice(app.indexOf('$("btn-stop").onclick'));
+  assert.match(wire, /ocall\("POST", `\/session\/\$\{state\.sessionID\}\/abort`/, "Stop calls /abort");
+  assert.ok(!/ocall\([^)]*\/interrupt`/.test(app), "the no-op interrupt CALL is gone (a comment may still name it)");
+  const stopBlock = app.slice(app.indexOf('$("btn-stop").onclick'), app.indexOf('$("attach-btn").onclick'));
+  // Strip the explanatory comment before checking: the code must not call
+  // setBusy(false) (the comment says it deliberately does not).
+  const stopCode = stopBlock.replace(/\/\/.*/g, "");
+  assert.ok(!/setBusy\(false\)/.test(stopCode), "Stop lets the turn settle instead of hiding the button blindly");
+  assert.match(app, /err\.name === "MessageAbortedError"[\s\S]*?Stopped by you/, "an aborted turn renders 'Stopped by you', not a model-failure card");
+});
+
+test("an agent that dies is detected, restarted, and recovered on the page", () => {
+  // When opencode.exe exits on its own the page used to 503 every call, throw
+  // on .filter, and sit blank forever with startup.ready still true. Verified
+  // live 2026-09-02: killing the agent flipped status to not-ready and a new
+  // agent came up healthy in ~2.3 s.
+  const oc = ui("opencode-server.mjs");
+  assert.match(oc, /let _stopping = false;/, "a deliberate stop is distinguished from a crash");
+  assert.match(oc, /if \(wasDeliberate\)[\s\S]*?else[\s\S]*?onExit\?\.\(code\)/, "an unexpected exit calls onExit");
+  assert.match(oc, /_stopping = true;/, "stop() marks the shutdown deliberate");
+
+  const launch = ui("launch.mjs");
+  assert.match(launch, /onExit: \(code\) => onAgentExit\(code, say\)/, "the agent is started with a crash hook");
+  assert.match(launch, /if \(agentCrashes <= 3\)[\s\S]*?retryStartup\(\)/, "a crash restarts the agent, bounded");
+  assert.match(launch, /The agent keeps stopping/, "repeated crashes show a problem the reader can act on");
+  assert.match(launch, /agentCrashes = 0;/, "a clean bring-up resets the crash counter");
+
+  const app = ui("public", "app.js");
+  assert.match(app, /if \(r\.status === 503\) recover\(\)/, "a 503 on any agent call starts recovery");
+  assert.match(app, /async function recover\(\)/, "recover re-shows the startup screen and reloads");
+  assert.match(app, /const list = r\.data\?\.data \?\? r\.data;\s*\n\s*state\.sessions = Array\.isArray\(list\) \? list : \[\]/, "a 503 body is never treated as a session list");
+});
