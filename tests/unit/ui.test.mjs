@@ -590,3 +590,38 @@ test("the startup state reports each step, then a problem with an action, then r
   assert.equal(snap.ready, true);
   assert.equal(snap.problem, null, "a problem is cleared once the start succeeds");
 });
+
+test("a tool call reads as a sentence, in the live view and the settled one", () => {
+  // "bash" and a block of JSON tell a beginner nothing about what just
+  // happened to their files. Both render paths go through one describer, so
+  // the words cannot drift apart between streaming and the re-render.
+  const app = ui("public", "app.js");
+  assert.equal((app.match(/paintToolSummary\(/g) ?? []).length, 3, "declared once, used by the live path and the render path");
+  assert.match(app, /case "bash":\s*\n\s*return \["Running"/);
+  assert.match(app, /case "edit":[\s\S]*?return \["Editing"/);
+  assert.match(app, /case "write":\s*\n\s*return \["Writing"/);
+  assert.match(app, /case "web_search":\s*\n\s*return \["Searching the web"/);
+  assert.match(app, /sum\.title = name;/, "the raw tool name stays reachable as a tooltip");
+  assert.ok(!/el\("span", "tool-name", name\)/.test(app), "the raw tool name is no longer the headline");
+});
+
+test("a turn ends with what it changed and that it finished", () => {
+  // OpenCode records the turn's file diffs on the USER message once it
+  // settles; that is the authority, with the write/edit tool calls as the
+  // fallback for a turn whose summary has not landed yet.
+  const app = ui("public", "app.js");
+  assert.match(app, /turn\.user\?\.info\?\.summary \?\? turn\.user\?\.summary/, "diffs come from the user message's summary");
+  assert.match(app, /if \(!file \|\| out\.has\(file\)\) continue;/, "a tool call never overrides a file the summary covers");
+  assert.match(app, /Finished in \$\{fmtSecs\(secs\)\}/);
+  assert.match(app, /if \(!done \|\| info\.error\) return;/, "an errored or still-running turn gets no 'finished' line");
+  assert.match(app, /api\("openFolder", \{ method: "POST", body: \{ path: folder \} \}\)/, "the card can open the folder");
+  assert.ok(Object.hasOwn(routes, "openFolder"));
+});
+
+test("opening a folder refuses anything that is not there", async () => {
+  const r = await routes.openFolder({ body: { path: path.join(os.tmpdir(), "omni-agent-no-such-dir-" + Date.now()) } });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /does not exist/);
+  const r2 = await routes.openFolder({ body: {} });
+  assert.equal(r2.ok, false);
+});

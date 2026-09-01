@@ -279,11 +279,23 @@ function renderMessages(list) {
     box.append(emptyState());
     return;
   }
+  // A turn is a user message and the assistant messages that answer it. Its
+  // end is where "what did that change?" and "is it finished?" get answered.
+  let turn = null;
   for (const m of list) {
     const role = roleOf(m);
+    if (role === "user") {
+      finishTurn(turn);
+      turn = { user: m, assistantBody: null, assistantInfo: null, parts: [] };
+    }
     const wrap = el("div", `msg ${role === "user" ? "user" : "assistant"}`);
     wrap.append(el("div", "role", role === "user" ? "You" : "Omni Agent"));
     const body = el("div", "body");
+    if (role !== "user" && turn) {
+      turn.assistantBody = body;
+      turn.assistantInfo = m.info ?? m;
+      turn.parts.push(...partsOf(m));
+    }
 
     for (const part of partsOf(m)) {
       if (part.type === "file") {
@@ -311,12 +323,9 @@ function renderMessages(list) {
         d.append(Object.assign(el("pre"), { textContent: part.text }));
         body.append(d);
       } else if (part.type === "tool" || part.tool) {
-        const name = part.tool ?? part.name ?? "tool";
         const d = el("details", "tool");
         const sum = el("summary");
-        const st = part.state?.status ?? part.status;
-        sum.append(el("span", "tool-name", name));
-        sum.append(el("span", "muted", st === "running" ? "running…" : (st ?? "done")));
+        paintToolSummary(sum, part);
         d.append(sum);
         const detail = part.state?.output ?? part.state?.input ?? part.output ?? part.input;
         if (detail != null) {
@@ -361,8 +370,173 @@ function renderMessages(list) {
     wrap.append(body);
     box.append(wrap);
   }
+  finishTurn(turn);
   watchThreadScroll();
   scrollToEnd();
+}
+
+/* ── what a turn did ───────────────────────────────────────────────────── */
+
+const baseOf = (p) => (p ? (String(p).split(/[\\/]/).filter(Boolean).pop() ?? String(p)) : "");
+const hostOf = (u) => {
+  try {
+    return new URL(String(u)).hostname.replace(/^www\./, "");
+  } catch {
+    return String(u ?? "");
+  }
+};
+
+/**
+ * A tool call as a sentence: "Editing index.html", "Running: npm test".
+ *
+ * The raw tool name and its JSON stay inside the disclosure for anyone who
+ * wants them. A beginner should never have to decode `bash` or
+ * `{"filePath": ...}` to know what just happened to their files.
+ */
+function describeTool(name, input = {}) {
+  const file = input.filePath ?? input.path ?? input.file ?? input.output ?? null;
+  switch (String(name)) {
+    case "read":
+      return ["Reading", baseOf(file)];
+    case "write":
+      return ["Writing", baseOf(file)];
+    case "edit":
+    case "patch":
+    case "multiedit":
+      return ["Editing", baseOf(file)];
+    case "bash":
+      return ["Running", input.description || input.command || "a command"];
+    case "glob":
+    case "grep":
+    case "list":
+      return ["Looking through the files", input.pattern ?? baseOf(file)];
+    case "webfetch":
+    case "web_fetch":
+      return ["Reading a web page", hostOf(input.url)];
+    case "websearch":
+    case "web_search":
+      return ["Searching the web", input.query ?? ""];
+    case "web_scrape":
+      return ["Reading a website", hostOf(input.url)];
+    case "browser":
+      return ["Using the browser", input.action ? String(input.action) + (input.url ? " " + hostOf(input.url) : "") : ""];
+    case "document_read":
+      return ["Reading a document", baseOf(file)];
+    case "document_write":
+      return ["Writing a document", baseOf(file)];
+    case "data_analyze":
+      return ["Analysing the data", baseOf(file)];
+    case "todowrite":
+    case "todoread":
+      return ["Planning the steps", ""];
+    case "task":
+      return ["Working on a sub-task", input.description ?? ""];
+    case "skill":
+      return ["Using a skill", input.name ?? ""];
+    case "question":
+      return ["Asking you a question", ""];
+    case "agent_status":
+      return ["Checking the model and usage", ""];
+    case "gateway":
+      return ["Talking to the model gateway", input.action ?? ""];
+    default:
+      return [String(name).replace(/[_-]+/g, " "), ""];
+  }
+}
+
+/** Fill a tool block summary line: what it is doing, to what, and whether it is done. */
+function paintToolSummary(sum, part) {
+  const name = part.tool ?? part.name ?? "tool";
+  const status = part.state?.status ?? part.status;
+  const [verb, what] = describeTool(name, part.state?.input ?? part.input ?? {});
+  sum.replaceChildren();
+  sum.title = name;
+  sum.append(el("span", "tool-verb", verb));
+  if (what) sum.append(el("span", "tool-what", String(what)));
+  const running = status === "running" || status === "pending";
+  const failed = status === "error";
+  sum.append(el("span", "muted status" + (failed ? " failed" : ""), running ? "working…" : failed ? "failed" : "done"));
+}
+
+/**
+ * The files a turn touched.
+ *
+ * OpenCode writes a diff summary onto the USER message once the turn settles
+ * (`info.summary.diffs`, with before/after and line counts), and that is the
+ * authority. The tool calls are the fallback for a turn whose summary has not
+ * landed yet - and never a second opinion on a file the summary covers.
+ */
+function changesOf(turn) {
+  const out = new Map();
+  const summary = turn.user?.info?.summary ?? turn.user?.summary;
+  for (const d of summary?.diffs ?? []) {
+    const file = d.file ?? d.path ?? d.filename;
+    if (!file) continue;
+    const kind = d.before === "" ? "new" : d.after === "" ? "gone" : "changed";
+    out.set(file, { file, kind, additions: d.additions, deletions: d.deletions });
+  }
+  for (const p of turn.parts) {
+    if (p.type !== "tool") continue;
+    if ((p.state?.status ?? p.status) !== "completed") continue;
+    const input = p.state?.input ?? p.input ?? {};
+    const file = input.filePath ?? input.path ?? input.output;
+    if (!file || out.has(file)) continue;
+    const name = p.tool ?? p.name;
+    if (name === "write" || name === "document_write") out.set(file, { file, kind: "new" });
+    else if (name === "edit" || name === "patch" || name === "multiedit") out.set(file, { file, kind: "changed" });
+  }
+  return [...out.values()];
+}
+
+function changesCard(diffs) {
+  const card = el("div", "changes");
+  card.append(el("h4", null, diffs.length === 1 ? "1 file changed" : `${diffs.length} files changed`));
+  const ul = el("ul");
+  for (const d of diffs) {
+    const li = el("li");
+    li.append(el("span", "kind " + d.kind, d.kind === "new" ? "new" : d.kind === "gone" ? "deleted" : "changed"));
+    li.append(el("b", null, baseOf(d.file)));
+    const where = el("span", "where", String(d.file));
+    where.title = String(d.file);
+    li.append(where);
+    if (d.additions != null || d.deletions != null) li.append(el("span", "muted", `+${d.additions ?? 0} \u2212${d.deletions ?? 0}`));
+    ul.append(li);
+  }
+  card.append(ul);
+  // Where it all is, and a button that opens it - the answer to "where did it
+  // put my project?" without a path having to be understood or typed.
+  const folder = activeFolder();
+  const row = el("div", "row");
+  const where = el("span", "muted grow", folder ? `in ${folder}` : "");
+  where.title = folder ?? "";
+  row.append(where);
+  if (folder) {
+    const open = el("button", "btn", "Open folder");
+    open.onclick = async () => {
+      const r = await api("openFolder", { method: "POST", body: { path: folder } });
+      if (r.ok === false) toast(r.error, "bad");
+    };
+    row.append(open);
+  }
+  card.append(row);
+  return card;
+}
+
+const fmtSecs = (s) => (s >= 90 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s}s`);
+
+/** Close a turn: what it changed, and that it finished. */
+function finishTurn(turn) {
+  if (!turn?.assistantBody) return;
+  const diffs = changesOf(turn);
+  if (diffs.length) turn.assistantBody.append(changesCard(diffs));
+  const info = turn.assistantInfo ?? {};
+  const started = turn.user?.info?.time?.created ?? turn.user?.time?.created;
+  const done = info.time?.completed;
+  // A turn that errored already carries its own explanation and a way out
+  // (see the error block above); a turn still running has no end to state.
+  if (!done || info.error) return;
+  const secs = started ? Math.max(1, Math.round((done - started) / 1000)) : null;
+  turn.assistantBody.append(el("p", "turn-end", secs ? `Finished in ${fmtSecs(secs)}` : "Finished"));
 }
 
 function emptyState() {
@@ -523,10 +697,7 @@ function liveToolPart(messageID, part) {
     live.parts.set(part.id, d);
   }
   const status = part.state?.status ?? part.status;
-  const sum = d.querySelector("summary");
-  sum.replaceChildren();
-  sum.append(el("span", "tool-name", part.tool ?? part.name ?? "tool"));
-  sum.append(el("span", "muted", status === "running" || status === "pending" ? "running…" : (status ?? "done")));
+  paintToolSummary(d.querySelector("summary"), part);
   d.classList.toggle("running", status === "running" || status === "pending");
   const detail = part.state?.output ?? part.state?.input ?? part.output ?? part.input;
   let pre = d.querySelector("pre");

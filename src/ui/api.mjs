@@ -272,6 +272,25 @@ export const routes = {
   },
 
   /**
+   * Open a folder in Windows Explorer - the "Open folder" button on a turn's
+   * files-changed card, and the answer to "where did it put my project?".
+   * Explorer rather than a shell, and only an existing directory, so a path is
+   * the only thing this can be handed.
+   */
+  async openFolder({ body }) {
+    const p = typeof body.path === "string" && body.path.trim() ? path.resolve(body.path.trim()) : "";
+    if (!p || !fs.existsSync(p)) return bad("That folder does not exist any more.");
+    const dir = fs.statSync(p).isDirectory() ? p : path.dirname(p);
+    const { spawn } = await import("node:child_process");
+    try {
+      spawn("explorer.exe", [dir], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+      return ok({ opened: dir });
+    } catch (err) {
+      return bad(err.message);
+    }
+  },
+
+  /**
    * "Finish setup" on the startup screen.
    *
    * The installed layout puts OmniAgentSetup.cmd beside OmniAgent.exe, one

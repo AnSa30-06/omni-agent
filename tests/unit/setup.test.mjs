@@ -130,3 +130,14 @@ test("stopping the gateway does not trust a stale pid file", () => {
   // The launcher restarts its worker, so one kill is not a stop.
   assert.match(stop, /const survivor = livePid\(\);/);
 });
+
+test("the wizard's last words fit the person who installed the exe", () => {
+  // They have a desktop shortcut and no terminal, and this block used to tell
+  // them to type `omni-agent`.
+  const src = fs.readFileSync(pkg("src", "setup", "wizard.mjs"), "utf8");
+  const ready = src.slice(src.indexOf('say("  Ready.")'));
+  assert.match(ready, /Open Omni Agent from your Desktop or Start Menu/);
+  assert.ok(ready.indexOf("fs.existsSync(exe)") !== -1, "the desktop wording is shown only when the exe exists");
+  assert.match(ready, /omni-agent ui/, "a source checkout is told the command that opens the app");
+  assert.ok(!/Start the agent with:   omni-agent"/.test(ready), "the terminal command is no longer the headline");
+});

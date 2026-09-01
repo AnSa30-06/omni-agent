@@ -345,9 +345,18 @@ export async function runSetup(opts = {}) {
     say("  Ready.");
     rule();
     say();
-    say("  Start the agent with:   omni-agent");
-    say("  Check quota and usage:  omni-agent usage");
-    say("  Re-run these checks:    omni-agent doctor");
+    // The person who installed the .exe has a desktop shortcut and no
+    // terminal, and this block used to tell them to type `omni-agent`. Say
+    // the thing they can actually do; keep the commands for a source checkout.
+    const exe = pkg("..", "OmniAgent.exe");
+    if (fs.existsSync(exe)) {
+      say("  Open Omni Agent from your Desktop or Start Menu.");
+      say(`  (or double-click ${exe})`);
+    } else {
+      say("  Open the app with:      omni-agent ui");
+      say("  Check quota and usage:  omni-agent usage");
+      say("  Re-run these checks:    omni-agent doctor");
+    }
     say();
     say(`  Your files live in: ${PATHS.home}`);
     if (listSecretNames().length) say(`  Credentials stored (encrypted): ${listSecretNames().join(", ")}`);
