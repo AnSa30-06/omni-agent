@@ -499,10 +499,12 @@ test("a model says which upstream it comes from, and the picker can filter on it
   // models were mixed into the same list with nothing to tell them apart -
   // which is exactly the question "which models did my OpenRouter key give me?"
   const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
-  assert.match(api, /const vendor = id\.includes\("\/"\) \? id\.slice\(0, id\.indexOf\("\/"\)\) : null;/);
+  assert.match(api, /const vendor = segments\.length > 1 \? segments\[0\] : null;/);
   const app = ui("public", "app.js");
   assert.match(app, /lensBtn\("keys", "From your keys"\)/);
-  assert.match(app, /from your \$\{m\.vendor\} key/);
+  // keyVendor, not vendor: a transform namespace sits in FRONT of the real
+  // provider, so the first segment reads "from your no-think key".
+  assert.match(app, /from your \$\{m\.keyVendor\} key/);
   // A search that finds nothing must name the route out, not dead-end.
   assert.match(app, /Adding the provider's key in Providers puts its models in this list/);
 });
@@ -518,7 +520,10 @@ test("\"from your keys\" is decided by the gateway's connections, not by price",
   // 222 providers have one that differs from their id (`github-models` serves
   // `ghm/...`), so matching the id alone would miss half of them.
   assert.match(fn, /const alias = mf\?\.get\(id\)\?\.alias;/);
-  assert.match(fn, /fromKey: \(vendor !== null && keyed\.has\(vendor\.toLowerCase\(\)\)\) \|\| !free,/);
+  // Any SEGMENT of the id, not just the first: `no-think/openrouter/...` is a
+  // paid OpenRouter model, and matching the prefix alone put 42 of them in Free.
+  assert.match(fn, /const keyVendor = segments\.find\(\(seg\) => keyed\.has\(seg\.toLowerCase\(\)\)\) \?\? null;/);
+  assert.match(fn, /fromKey: keyVendor !== null \|\| !free,/);
   assert.match(fn, /connectionsKnown: conn\.ok === true,/, "an unreachable gateway must not read as 'no keys'");
 
   const app = ui("public", "app.js");
@@ -866,4 +871,35 @@ test("a bad key can never destroy a connection that already works", () => {
   assert.match(add, /const hadConnection = /);
   assert.match(add, /if \(!hadConnection && r\.connectionId\) \{\s*\n\s*await providers\.removeConnection/);
   assert.match(add, /Your existing connection was left in place/);
+});
+
+test("'not connected' is never shown when the gateway could not be asked", () => {
+  // 🔴 The most expensive lie in this product. A corrupt gateway database made
+  // every provider render "not connected" beside a key that was connected and
+  // working, and sent a reader hunting their key for hours. Measured 2026-09-02.
+  const prov = fs.readFileSync(pkg("src", "setup", "providers.mjs"), "utf8");
+  assert.match(prov, /connected: conn\.ok \? have\.has\(p\.id\) : null/, "unknown is null, not false");
+  const app = ui("public", "app.js");
+  assert.match(app, /if \(p\.connected === true\) return el\("span", "tag on", "connected"\)/);
+  assert.match(app, /if \(p\.connected === false\) return el\("span", "tag off", "not connected"\)/);
+  assert.match(app, /can't check right now/, "the third state is shown, not guessed");
+  // Destructive controls must not appear on a guess.
+  assert.match(app, /if \(p\.connected === true && p\.connectionId\)/);
+});
+
+test("a damaged gateway database is detected and repaired, not shown as 'not connected'", () => {
+  // Force-killing the gateway - an installer, Task Manager, a power cut - can
+  // leave its SQLite malformed. Measured 2026-09-02: "database disk image is
+  // malformed", every route 500, and the app blamed the user's key.
+  assert.ok(Object.hasOwn(routes, "gatewayRepair"));
+  const api = ui("api.mjs");
+  const fn = api.slice(api.indexOf("async gatewayRepair"), api.indexOf("async folderCheck"));
+  assert.match(fn, /PRAGMA integrity_check/, "the damage is measured, not assumed");
+  assert.match(fn, /malformed\|corrupt\|not a database/);
+  // The old database is moved aside, never deleted - it is the only copy.
+  assert.match(fn, /corrupt-\$\{stamp\}/);
+  assert.match(fn, /fs\.renameSync/);
+  assert.ok(!/unlinkSync|rmSync/.test(fn), "a damaged database is quarantined, never destroyed");
+  // And the answer admits what was lost.
+  assert.match(fn, /provider keys will need adding again/);
 });

@@ -458,6 +458,14 @@ ol.steps code { font-family: var(--mono); font-size: 12px; background: var(--lin
 .folder-icon { opacity: .75; }
 #folder-label { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
 
+/* .pop-note breaks anywhere so a long model id cannot overflow its popover.
+   This one is a sentence, so it has to wrap on words instead. */
+.pop-note.prose { word-break: normal; }
+.linkish {
+  background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--accent); text-decoration: underline;
+}
+
 .pop-item.unhealthy { opacity: .62; }
 .pop-item.unhealthy small { color: var(--bad); }
 

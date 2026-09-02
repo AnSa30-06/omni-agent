@@ -1,0 +1,66 @@
+{
+  "$comment": "Keyless vendors that were MEASURED not to answer. The gateway serves ~77 models that need no key at all and publishes no health for any of them - `tllm` reports active:true and then answers HTTP 403 - so the only honest signal is a real completion. The app hides these vendors' models from the picker, never retries onto them, and always offers a one-click way to see them anyway. Re-measure with `node scripts/check-keyless-health.mjs`, which prints any vendor that has recovered or newly died.",
+  "$commentMethod": "Each verdict is 5 models per vendor, one at a time, 25 s apart, max_tokens 64. All three of those numbers are load-bearing. The gateway caches ONE upstream failure and replays it onto that vendor's other models for ~90 s, so back-to-back attempts can be a single failure counted five times. And a 8-token budget lets a reasoning model spend everything thinking and return an empty string: the first pass condemned `oc` for exactly that, and at 64 tokens `oc/big-pickle` answered \"OK\" straight away. A vendor is only listed here if EVERY model tried refused.",
+  "$commentScope": "`openrouter`, `no-think` and `auto` are deliberately not measured. The first two are namespaces over a connection the reader paid for, and `auto` is the gateway's own routing combo that resolves to some other model at call time.",
+  "$commentFinding": "Measured 2026-09-03: of the 9 keyless vendors on offer, 8 are dead and 1 works. 71 of the 77 keyless models cannot answer. `oc` (6 models) is the entire working free pool. That is the real state of this product without a key, and it is why the provider-key flow is the product rather than a nicety.",
+  "version": 1,
+  "measured": "2026-09-03",
+  "broken": [
+    {
+      "vendor": "aug",
+      "label": "Auggie",
+      "reason": "not answering right now",
+      "evidence": "HTTP 502 from all 5 models tried, 25 s apart"
+    },
+    {
+      "vendor": "tllm",
+      "label": "TheOldLLM",
+      "reason": "blocked by its host",
+      "evidence": "HTTP 403 from all 5 models tried; the vendor still reports active:true"
+    },
+    {
+      "vendor": "felo",
+      "label": "Felo",
+      "reason": "a search product, not a chat model",
+      "evidence": "HTTP 400 on felo-chat, felo-search and felo-social; HTTP 429 on the other two"
+    },
+    {
+      "vendor": "ddgw",
+      "label": "DuckDuckGo",
+      "reason": "refusing every request as automated",
+      "evidence": "HTTP 418 anti-abuse challenge on all 5 models tried"
+    },
+    {
+      "vendor": "pepper",
+      "label": "Pepper",
+      "reason": "not answering right now",
+      "evidence": "HTTP 502; it serves only one model"
+    },
+    {
+      "vendor": "mcode",
+      "label": "MiMo Code",
+      "reason": "not answering right now",
+      "evidence": "HTTP 400 unsupported; it serves only one model"
+    },
+    {
+      "vendor": "veo-free",
+      "label": "Veo (free)",
+      "reason": "a video generator, so it cannot hold a conversation",
+      "evidence": "no response within 90 s on both models"
+    },
+    {
+      "vendor": "veoaifree-web",
+      "label": "VeoAI (free)",
+      "reason": "a video generator, so it cannot hold a conversation",
+      "evidence": "no response within 90 s on both models"
+    }
+  ],
+  "working": [
+    {
+      "vendor": "oc",
+      "label": "OpenCode Zen",
+      "evidence": "oc/big-pickle answered on the first try, 2026-09-03",
+      "note": "The only keyless vendor of the nine that answers. Not used by the code - kept so the next measurement has something to disagree with."
+    }
+  ]
+}

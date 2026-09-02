@@ -34,6 +34,34 @@ export function catalogue() {
   return _catalogue;
 }
 
+let _keyless = null;
+/**
+ * Keyless vendors that were MEASURED not to answer, keyed by vendor prefix.
+ *
+ * 🔴 Why this file exists. The gateway advertises ~120 models that need no key
+ * at all, and it publishes no health for any of them: `tllm` reports
+ * `active: true` and then answers HTTP 403 because its host blocks the request.
+ * Measured 2026-09-03, most of that pool could not complete a one-word prompt
+ * from any of their models. Offering them anyway is what got reported as "all
+ * the models in the free list are screwed" - a reader has no way to tell a
+ * model that is momentarily busy from one that has never worked at all.
+ *
+ * ⚠️ This is a MEASUREMENT WITH A DATE, not a permanent judgement. A vendor can
+ * come back. `scripts/check-keyless-health.mjs` re-measures and prints what has
+ * changed; the app hides these models but always offers a way to see them.
+ */
+export function keylessHealth() {
+  if (_keyless) return _keyless;
+  let doc = { broken: [] };
+  try {
+    doc = JSON.parse(fs.readFileSync(pkg("config", "providers", "keyless-health.json"), "utf8"));
+  } catch (err) {
+    log.warn("keyless-health.json could not be read: %s", err.message);
+  }
+  _keyless = new Map((doc.broken ?? []).map((b) => [String(b.vendor).toLowerCase(), b]));
+  return _keyless;
+}
+
 let _manifest = null;
 /** The gateway's own provider directory, keyed by id. */
 export async function manifest() {
@@ -67,18 +95,23 @@ export async function listAll() {
   const secrets = new Set(listSecretNames());
   const mf = await manifest();
 
-  const models = cat.models.map((p) => ({
+  // 🔴 `connected` is only MEANINGFUL when the gateway actually answered.
+  //
+  // When it does not - it was down, its database was damaged, its credentials
+  // had gone stale - `have` is empty and every provider rendered as "not
+  // connected". That is a lie, and an expensive one: measured 2026-09-02, a
+  // corrupt gateway database showed a reader "not connected" beside a key that
+  // was connected and working, and sent us both hunting the key for hours. When
+  // the answer is unknown the page must say so, so `connected` is null rather
+  // than false.
+  const decorate = (p) => ({
     ...p,
-    connected: have.has(p.id),
+    connected: conn.ok ? have.has(p.id) : null,
     connectionId: connectionOf.get(p.id) ?? null,
     known: mf ? mf.has(p.id) : null,
-  }));
-  const signIn = cat.signIn.map((p) => ({
-    ...p,
-    connected: have.has(p.id),
-    connectionId: connectionOf.get(p.id) ?? null,
-    known: mf ? mf.has(p.id) : null,
-  }));
+  });
+  const models = cat.models.map(decorate);
+  const signIn = cat.signIn.map(decorate);
   const search = cat.search.map((p) => ({ ...p, connected: secrets.has(p.secret) }));
 
   // Anything connected that this product's curated list does not mention.
@@ -151,6 +184,25 @@ export async function addModelProvider(id, apiKey) {
  * @param {string[]} modelIds catalogue ids this connection just unlocked
  */
 /**
+ * The header a provider wants its key in.
+ *
+ * Not every provider takes `Authorization: Bearer`. The gateway's manifest
+ * declares which, and using the wrong one turns a good key into a 401 - a
+ * false accusation, which is the worst answer this check can give.
+ * Measured 2026-09-02 across all 13 key providers: bearer for most, `x-api-key`
+ * for zai, `x-goog-api-key` for gemini.
+ */
+function authHeaders(entry, apiKey) {
+  const declared = String(entry?.auth?.header ?? "bearer").toLowerCase();
+  const base = { accept: "application/json" };
+  if (declared === "bearer" || declared === "authorization") {
+    return { ...base, authorization: `Bearer ${apiKey}` };
+  }
+  // A named header, e.g. x-api-key or x-goog-api-key.
+  return { ...base, [declared]: apiKey };
+}
+
+/**
  * Ask the PROVIDER whether the key is good, without going through the gateway.
  *
  * ⭐ Why not through the gateway: measured 2026-09-02 with a key that was
@@ -159,55 +211,57 @@ export async function addModelProvider(id, apiKey) {
  * modes and the gateway caches ONE upstream failure and replays it for other
  * models for up to ~90 s. A perfect key reported "could not be checked".
  *
- * 🔴 AND WHY THIS IS A COMPLETION, NOT A MODEL LIST. The obvious shortcut -
- * `GET {base}/models` with the key - is WRONG and I shipped it for ten minutes
- * before the fake-key test caught it: OpenRouter serves that endpoint
- * PUBLICLY, so `sk-or-v1-` + 48 zeros came back 200 "ok". A check that passes
- * a garbage key is worse than no check, and is the exact defect 1.1.6 existed
- * to remove. The model list is used only to CHOOSE a model; the proof is a
- * one-token completion, which cannot succeed without a valid credential.
+ * 🔴 AND WHY A MODEL LIST IS NEVER THE PROOF. `GET {root}/models` looks like an
+ * authentication check. Measured with a deliberately fake key across all 13 key
+ * providers: EIGHT correctly answer 401, but FOUR serve it publicly and
+ * answered 200 - openrouter, nvidia, requesty and opencode-zen - and
+ * cloudflare-ai 404s because its API is not OpenAI-shaped at all. A version of
+ * this that trusted the listing shipped for ten minutes and called
+ * `sk-or-v1-` + 48 zeros "ok". So the listing may only ever CONDEMN a key
+ * (401/403) or supply model names; proof of life is a completion.
  *
  * @returns {"ok"|"rejected"|"unknown"}
  */
 async function askProviderDirectly(id, apiKey) {
-  if (!apiKey) return "unknown";
+  if (!apiKey || !id) return "unknown";
   const mf = await manifest();
-  const base = mf?.get(id)?.endpoints?.baseUrl;
+  const entry = mf?.get(id);
+  const base = entry?.endpoints?.baseUrl;
   if (!base) return "unknown";
   const root = base.replace(/\/chat\/completions\/?$/, "");
   if (!/^https:\/\//i.test(root)) return "unknown";
-  const H = { authorization: `Bearer ${apiKey}`, "content-type": "application/json" };
+  const H = authHeaders(entry, apiKey);
 
-  // Pick a model to speak to. This listing may be public - that is fine, it is
-  // not the evidence, only the shortlist.
+  // 1. The listing. A refusal here is decisive for the eight providers that
+  //    gate it; a 200 proves nothing and is used only for model names.
   let models = [];
   try {
     const r = await fetch(`${root}/models`, { headers: H, signal: AbortSignal.timeout(20_000) });
-    if (r.status === 401 || r.status === 403) return "rejected"; // some providers do gate it
+    if (r.status === 401 || r.status === 403) return "rejected";
     if (r.ok) {
-      const d = await r.json();
+      const d = await r.json().catch(() => null);
       models = (d?.data ?? d?.models ?? [])
-        .map((m) => m?.id)
+        .map((m) => (typeof m === "string" ? m : m?.id ?? m?.name))
         .filter((x) => typeof x === "string" && !/:(batch|thinking|extended|online|preview)$/i.test(x));
     }
   } catch {
-    return "unknown";
+    return "unknown"; // unreachable from here says nothing about the key
   }
-  if (!models.length) return "unknown";
 
-  // The actual proof: a one-token completion, which needs the credential.
+  // 2. Proof of life. Needs the credential, so it cannot be faked by a public
+  //    endpoint. Several models are tried because any one of them may be
+  //    retired, gated, or out of capacity without the key being at fault.
   for (const model of models.slice(0, 3)) {
     try {
       const r = await fetch(`${root}/chat/completions`, {
         method: "POST",
-        headers: H,
+        headers: { ...H, "content-type": "application/json" },
         body: JSON.stringify({ model, messages: [{ role: "user", content: "hi" }], max_tokens: 1 }),
         signal: AbortSignal.timeout(45_000),
       });
       if (r.ok) return "ok";
       if (r.status === 401 || r.status === 403) return "rejected";
-      // 402 (no credit), 404 (this model is not servable), 429 (busy) all say
-      // nothing conclusive about the key - try another model.
+      // 402 no credit, 404 model not servable, 429 busy: inconclusive, next.
     } catch {
       return "unknown";
     }

@@ -368,6 +368,11 @@ export const routes = {
       if (alias) keyed.add(String(alias).toLowerCase());
     }
 
+    // Vendors measured not to answer. Stamped onto each model so the picker can
+    // say WHY rather than letting the reader find out one failed message at a
+    // time - see keylessHealth() for what was measured and when.
+    const brokenBy = providers.keylessHealth();
+
     const groups = (Array.isArray(all) ? all : []).map((p) => ({
       id: p.id,
       name: p.name ?? p.id,
@@ -382,7 +387,17 @@ export const routes = {
           // provider id, so without this there is no way to tell a keyless
           // model from one that only exists because the reader added a key -
           // which is exactly the question "which models did my key give me?"
-          const vendor = id.includes("/") ? id.slice(0, id.indexOf("/")) : null;
+          const segments = id.split("/");
+          const vendor = segments.length > 1 ? segments[0] : null;
+          // 🔴 A gateway "transform" namespace hides the real provider in a
+          // LATER segment. `no-think/openrouter/anthropic/claude-opus-5` is the
+          // reader's own OpenRouter connection with thinking switched off, and
+          // it spends their OpenRouter credit. Matching only the FIRST segment
+          // filed every one of them under Free: measured 2026-09-03, 42 of the
+          // 94 models in the Free lens were paid models wearing a `no-think/`
+          // prefix. Segments are matched whole, so `ddgw/mistral-small-2603`
+          // is not mistaken for a Mistral key.
+          const keyVendor = segments.find((seg) => keyed.has(seg.toLowerCase())) ?? null;
           const free = (m.cost?.input ?? 0) === 0 && (m.cost?.output ?? 0) === 0;
           return {
             id,
@@ -394,7 +409,11 @@ export const routes = {
             // Two independent ways to be certain a key is what put this model
             // in the list: its upstream is a connection the reader made, or it
             // costs money and so cannot be part of the keyless pool.
-            fromKey: (vendor !== null && keyed.has(vendor.toLowerCase())) || !free,
+            fromKey: keyVendor !== null || !free,
+            // Which key it came from, for the row that says so. The first
+            // segment is the wrong answer whenever a transform namespace is in
+            // front of it - it would read "from your no-think key".
+            keyVendor,
             reasoning: !!m.reasoning,
             attachments: !!m.attachment,
             // Some providers list image and audio generators beside their chat
@@ -403,6 +422,9 @@ export const routes = {
             // published default here is `pollinations/zimage`, an image model,
             // which is what the picker landed on before this filter existed.
             textOut: m.modalities?.output?.text !== false,
+            // null for everything that works. A string is the measured reason,
+            // shown to the reader verbatim.
+            broken: (vendor && brokenBy.get(vendor.toLowerCase())?.reason) || null,
           };
         })
         .filter((m) => m.textOut),
@@ -818,6 +840,69 @@ export const routes = {
    * agent cannot resolve its own working directory - this is what turns that
    * into a sentence naming the folder.
    */
+  /**
+   * Put a broken gateway back together.
+   *
+   * The failure this exists for, measured 2026-09-02: force-killing the gateway
+   * (an installer, Task Manager, a power cut) can leave its SQLite file
+   * malformed. Every route then answers HTTP 500, the app cannot read which
+   * providers are connected, and it used to render that as "not connected"
+   * beside a key that was perfectly good.
+   *
+   * The database is moved aside rather than deleted - it is the only copy of
+   * the gateway's own history - and the gateway builds a fresh one on the next
+   * start. Provider connections have to be added again, which the answer says
+   * plainly rather than pretending nothing was lost.
+   */
+  async gatewayRepair() {
+    const { stop, ensureRunning } = await import("../gateway/supervisor.mjs");
+    const dbPath = path.join(PATHS.gatewayData, "storage.sqlite");
+    let malformed = false;
+    try {
+      const { DatabaseSync } = await import("node:sqlite");
+      const db = new DatabaseSync(dbPath, { readOnly: true });
+      const rows = db.prepare("PRAGMA integrity_check").all();
+      malformed = !rows.some((r) => String(Object.values(r)[0]).toLowerCase() === "ok");
+      db.close();
+    } catch (err) {
+      malformed = /malformed|corrupt|not a database/i.test(err.message);
+      if (!malformed) return bad(`The database could not be read: ${err.message}`);
+    }
+    if (!malformed) {
+      // Nothing wrong with the file - restarting is still the useful action.
+      await stop().catch(() => {});
+      const up = await ensureRunning();
+      return up.ok === false
+        ? bad(`The gateway would not start: ${up.reason}`)
+        : ok({ message: "The gateway was restarted. Its database was undamaged." });
+    }
+
+    await stop().catch(() => {});
+    const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15);
+    const quarantine = path.join(PATHS.gatewayData, `corrupt-${stamp}`);
+    fs.mkdirSync(quarantine, { recursive: true });
+    for (const suffix of ["", "-wal", "-shm"]) {
+      const from = dbPath + suffix;
+      if (fs.existsSync(from)) {
+        try {
+          fs.renameSync(from, path.join(quarantine, `storage.sqlite${suffix}`));
+        } catch {}
+      }
+    }
+    const up = await ensureRunning();
+    if (up.ok === false) return bad(`The database was moved aside but the gateway would not start: ${up.reason}`);
+    // A fresh database has no credential, and no connections.
+    const { provisionGatewayToken } = await import("../gateway/provision.mjs");
+    await provisionGatewayToken({ force: true }).catch(() => {});
+    await providersChanged();
+    return ok({
+      message:
+        "The gateway's database was damaged and has been rebuilt. Your conversations and settings are untouched, " +
+        "but any provider keys will need adding again.",
+      quarantined: quarantine,
+    });
+  },
+
   async folderCheck({ query }) {
     const p = typeof query.path === "string" ? query.path : "";
     return ok({ path: p, exists: !!p && fs.existsSync(p) });

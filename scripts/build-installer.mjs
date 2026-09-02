@@ -163,6 +163,11 @@ function verifyStagedApp(appStage) {
     ["src/tools/browser-proxy.mjs", "browser control from the plugin"],
     ["skills", "the skill library"],
     ["config/models/metadata.json", "model metadata"],
+    // Both provider catalogues. Neither crashes when absent - the app just
+    // silently offers no free providers, or stops hiding the dead ones - which
+    // is exactly the kind of loss a build must not ship quietly.
+    ["config/providers/free.json", "the free-provider catalogue"],
+    ["config/providers/keyless-health.json", "which keyless vendors are dead"],
   ];
   const missing = required.filter(([f]) => !fs.existsSync(path.join(appStage, f)));
   if (missing.length) {

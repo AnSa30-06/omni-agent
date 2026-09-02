@@ -1106,7 +1106,7 @@ function nextModel(exclude = []) {
       // `m.free` matters as much here as in the walk below: a model that costs
       // money needs a key, and retrying onto one answers "No active
       // credentials for provider: ..." instead of the question.
-      if (m && m.free && !bad.has(`${p.id}/${m.id}`) && !m.id.startsWith("auto/")) {
+      if (m && m.free && !m.broken && !bad.has(`${p.id}/${m.id}`) && !m.id.startsWith("auto/")) {
         return { providerID: p.id, id: m.id, name: m.name };
       }
     }
@@ -1128,6 +1128,9 @@ function nextModel(exclude = []) {
     for (const p of state.models) {
       for (const m of p.models) {
         if (m.id.startsWith("auto/") || !m.free) continue;
+        // Measured dead upstream. Retrying onto one spends the reader's turn on
+        // a model that cannot answer - and it was most of the free pool.
+        if (m.broken) continue;
         if (bad.has(`${p.id}/${m.id}`)) continue;
         if (strict && spent.has(vendor(m.id))) continue;
         return { providerID: p.id, id: m.id, name: m.name };
@@ -1759,6 +1762,12 @@ function openModelPicker(e) {
   // "Free" and left this lens empty. Free means "here without an account";
   // From your keys means "here because you added one".
   let lens = "all";
+  // Models whose upstream was measured dead are out of the list by default.
+  // 🔴 The complaint this answers, verbatim: "all the other models in the free
+  // list, auggie, the old llm, felo, all are fucked, why even write them if
+  // they're screwed". They stay REACHABLE - the note below turns them back on -
+  // because the measurement carries a date and a vendor can recover.
+  let showBroken = false;
   const lensRow = el("div", "pop-lens");
   const lensBtn = (id, label) => {
     const b = el("button", "pop-tab" + (lens === id ? " on" : ""), label);
@@ -1782,17 +1791,28 @@ function openModelPicker(e) {
       return;
     }
     let shown = 0;
+    let hidden = 0;
+    const hiddenVendors = new Set();
     for (const p of state.models) {
       const hits = p.models.filter((m) => {
         if (lens === "free" && (!m.free || m.fromKey)) return false;
         if (lens === "keys" && !m.fromKey) return false;
-        if (!q) return true;
-        return (
+        const matches =
+          !q ||
           m.name.toLowerCase().includes(q) ||
           m.id.toLowerCase().includes(q) ||
           p.name.toLowerCase().includes(q) ||
-          (m.vendor ?? "").toLowerCase().includes(q)
-        );
+          (m.vendor ?? "").toLowerCase().includes(q);
+        if (!matches) return false;
+        // Counted LAST, so the note underneath names only what this view would
+        // otherwise have shown. Counting first made "From your keys" report 69
+        // hidden models that were never going to appear in it anyway.
+        if (m.broken && !showBroken) {
+          hidden++;
+          if (m.vendor) hiddenVendors.add(m.vendor);
+          return false;
+        }
+        return true;
       });
       if (!hits.length) continue;
       results.append(el("div", "pop-head", `${p.name}${p.preferred ? " · included free" : ""} (${hits.length})`));
@@ -1805,18 +1825,36 @@ function openModelPicker(e) {
         b.append(document.createTextNode(m.name));
         const bits = [];
         const bad = state.unhealthy[`${p.id}/${m.id}`];
+        if (m.broken) bits.push(m.broken);
         if (bad) bits.push("failed here before");
         if (m.id.startsWith("auto/")) bits.push("picks for you");
-        if (m.fromKey) bits.push(m.vendor ? `from your ${m.vendor} key` : "from a key you added");
+        if (m.fromKey) bits.push(m.keyVendor ? `from your ${m.keyVendor} key` : "from a key you added");
         else if (m.free) bits.push("free");
         if (m.vendor && !m.fromKey) bits.push(m.vendor);
         if (m.context) bits.push(fmtNum(m.context) + " context");
         if (bits.length) b.append(el("small", null, bits.join(" · ")));
-        if (bad) b.classList.add("unhealthy");
+        if (bad || m.broken) b.classList.add("unhealthy");
         b.onclick = () => choose(p, m);
         results.append(b);
         shown++;
       }
+    }
+    if (hidden) {
+      const note = el("div", "pop-note prose");
+      note.append(
+        document.createTextNode(
+          `${hidden} model${hidden === 1 ? " is" : "s are"} not listed, because ` +
+            `${hiddenVendors.size === 1 ? "its provider" : "their providers"} stopped answering when we last checked ` +
+            `(${[...hiddenVendors].sort().join(", ")}). `,
+        ),
+      );
+      const link = el("button", "linkish", "Show them anyway");
+      link.onclick = () => {
+        showBroken = true;
+        paint();
+      };
+      note.append(link);
+      results.append(note);
     }
     if (!shown) {
       results.append(el("div", "pop-head", "Nothing matches that"));
@@ -1993,12 +2031,47 @@ pages.providers = async () => {
 
   const section = (label) => inner.append(el("h3", null, label));
 
+  // Three states, not two. `null` means the gateway could not be asked, and
+  // showing that as "not connected" is what made a working key look broken.
+  const statusTag = (p) => {
+    if (p.connected === true) return el("span", "tag on", "connected");
+    if (p.connected === false) return el("span", "tag off", "not connected");
+    return el("span", "tag warn", "can't check right now");
+  };
+
+  if (r.gatewayReachable === false || r.ok === false) {
+    const warn = el("div", "card");
+    warn.append(el("h3", null, "The model gateway is not answering"));
+    warn.append(
+      el(
+        "p",
+        null,
+        "Nothing below can be read or changed until it is back, so what each provider says about " +
+          "itself may be out of date. Your keys are safe - this is the gateway, not them.",
+      ),
+    );
+    const row = el("div", "row");
+    row.style.marginTop = "10px";
+    row.append(el("span", "grow"));
+    const fix = el("button", "btn primary", "Try to repair it");
+    fix.onclick = async () => {
+      fix.disabled = true;
+      fix.textContent = "Repairing\u2026";
+      const res = await api("gatewayRepair", { method: "POST" });
+      toast(res.ok ? (res.message ?? "Repaired.") : (res.error ?? "Could not repair it"), res.ok ? "good" : "bad");
+      openPage("providers");
+    };
+    row.append(fix);
+    warn.append(row);
+    inner.append(warn);
+  }
+
   section("Paste a free key");
   for (const p of r.models) {
     const c = el("div", "card");
     const h = el("h3");
     h.append(document.createTextNode(p.label));
-    h.append(el("span", p.connected ? "tag on" : "tag off", p.connected ? "connected" : "not connected"));
+    h.append(statusTag(p));
     c.append(h, el("p", null, p.gives));
     if (p.note) c.append(el("p", "muted", p.note));
     const row = el("div", "row");
@@ -2034,7 +2107,7 @@ pages.providers = async () => {
     // A key that turned out to be wrong, or an account that has run out of
     // credit, has to be removable - otherwise it sits there contributing models
     // that cannot answer, and the only way out was the gateway's own dashboard.
-    if (p.connected && p.connectionId) {
+    if (p.connected === true && p.connectionId) {
       const rm = el("button", "btn danger", "Remove");
       rm.title = `Disconnect ${p.label} and take its models out of the list`;
       rm.onclick = async () => {
@@ -2092,8 +2165,8 @@ pages.providers = async () => {
     const left = el("div", null);
     left.append(el("h3", null, p.label), el("p", null, p.gives + (p.note ? ` (${p.note})` : "")));
     row.append(left, el("span", "grow"));
-    const b = el("button", "btn", p.connected ? "Signed in" : "Sign in");
-    b.disabled = p.connected;
+    const b = el("button", "btn", p.connected === true ? "Signed in" : "Sign in");
+    b.disabled = p.connected === true;
     b.onclick = async () => {
       const res = await api("providerSignin", { query: { id: p.id } });
       if (res.ok) toast("Approve the sign-in in the browser window that opened.");

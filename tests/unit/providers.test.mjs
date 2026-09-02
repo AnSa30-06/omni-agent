@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { catalogue, setupSteps, renderSetup } from "../../src/setup/providers.mjs";
+import { catalogue, setupSteps, renderSetup, keylessHealth } from "../../src/setup/providers.mjs";
 import { pkg } from "../../src/util/paths.mjs";
 import { DEFAULTS } from "../../src/config.mjs";
 
@@ -134,7 +134,13 @@ test("a key is proved by a completion, never by a public model list", () => {
   assert.match(fn, /\/chat\/completions`/, "the evidence is a completion");
   assert.match(fn, /max_tokens: 1/, "and a cheap one");
   // The model list must never on its own return ok.
-  const listPart = fn.slice(fn.indexOf("`${root}/models`"), fn.indexOf("The actual proof"));
+  // Anchored on the numbered step, not on prose that gets reworded - the last
+  // version of this test silently sliced past the completion step when the
+  // comment changed, and stopped checking anything.
+  const iList = fn.indexOf("`${root}/models`");
+  const iProof = fn.indexOf("// 2. Proof of life");
+  assert.ok(iList > 0 && iProof > iList, "the listing step comes before the proof step");
+  const listPart = fn.slice(iList, iProof);
   assert.ok(!/return "ok"/.test(listPart), 'the model list must never conclude "ok" by itself');
   // 401/403 from the listing may still condemn a key (some providers gate it).
   assert.match(listPart, /r\.status === 401 \|\| r\.status === 403\) return "rejected"/);
@@ -159,4 +165,88 @@ test("adding a provider re-syncs the agent, or the models never show up", () => 
 
   const app = fs.readFileSync(pkg("src", "ui", "public", "app.js"), "utf8");
   assert.ok((app.match(/await loadModels\(\);/g) ?? []).length >= 3, "the picker reloads after add and after remove");
+});
+
+test("every key provider is checked with the header it actually wants", () => {
+  // Measured 2026-09-02 against all 13 key providers with a deliberately fake
+  // key: most take `Authorization: Bearer`, zai takes x-api-key and gemini
+  // x-goog-api-key. Sending the wrong one turns a GOOD key into a 401, which is
+  // a false accusation and the worst answer this check can give.
+  const prov = fs.readFileSync(pkg("src", "setup", "providers.mjs"), "utf8");
+  assert.match(prov, /function authHeaders\(entry, apiKey\)/);
+  assert.match(prov, /entry\?\.auth\?\.header \?\? "bearer"/, "the header comes from the manifest, not an assumption");
+  assert.match(prov, /\[declared\]: apiKey/, "a named header is used verbatim");
+  assert.match(prov, /const H = authHeaders\(entry, apiKey\);/);
+});
+
+test("the measured dead keyless vendors are named, dated and explained", () => {
+  // 🔴 The complaint, verbatim: "all the other models in the free list, auggie,
+  // the old llm, felo, all are fucked, why even write them if they're screwed".
+  // Measured 2026-09-03 with one real completion per model, 5 models per vendor,
+  // 25 s apart: of 9 keyless vendors, 8 answered nothing at all. 71 of the 77
+  // keyless models cannot reply. Only `oc` works.
+  const doc = JSON.parse(fs.readFileSync(pkg("config", "providers", "keyless-health.json"), "utf8"));
+  assert.match(doc.measured ?? "", /^\d{4}-\d{2}-\d{2}$/, "the file must carry the date it was measured");
+  const byVendor = new Map(doc.broken.map((b) => [b.vendor, b]));
+  for (const v of ["aug", "tllm", "felo"]) {
+    assert.ok(byVendor.has(v), `${v} was measured dead and must be listed`);
+  }
+  for (const b of doc.broken) {
+    // The reason is shown to the reader in the picker, so it has to read as
+    // plain English rather than as a status code.
+    assert.ok(b.reason && b.reason.length > 8, `${b.vendor} has no readable reason`);
+    assert.ok(!/^HTTP|^\d{3}\b/.test(b.reason), `${b.vendor}'s reason is a status code, not an explanation`);
+    // The code goes in `evidence`, which is for the record and not for the UI.
+    assert.ok(b.evidence, `${b.vendor} has no evidence recorded`);
+  }
+  // A vendor cannot be both dead and working.
+  const working = new Set((doc.working ?? []).map((w) => w.vendor));
+  for (const v of working) assert.ok(!byVendor.has(v), `${v} is listed as both working and broken`);
+
+  // And the loader has to actually read it.
+  const loaded = keylessHealth();
+  assert.equal(loaded.get("tllm")?.reason, byVendor.get("tllm").reason);
+  assert.equal(loaded.get("oc"), undefined, "a working vendor must not be marked broken");
+});
+
+test("dead keyless vendors are hidden from the picker and never retried onto", () => {
+  // Two halves, and the second is the one that wasted the reader's turns: the
+  // retry ladder walked straight onto felo, tllm and mcode in a row, because
+  // the gateway's own ordering has nothing to do with whether a model answers.
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  assert.match(api, /const brokenBy = providers\.keylessHealth\(\);/);
+  assert.match(api, /broken: \(vendor && brokenBy\.get\(vendor\.toLowerCase\(\)\)\?\.reason\) \|\| null,/);
+
+  const app = fs.readFileSync(pkg("src", "ui", "public", "app.js"), "utf8");
+  const walk = app.slice(app.indexOf("function nextModel"), app.indexOf("let inFlight = null"));
+  assert.match(walk, /if \(m\.broken\) continue;/, "the retry ladder skips a dead vendor");
+  assert.match(walk, /m\.free && !m\.broken/, "so does the previously-verified shortcut");
+
+  const picker = app.slice(app.indexOf("function openModelPicker"), app.indexOf("function openModePicker"));
+  assert.match(picker, /if \(m\.broken && !showBroken\)/, "dead models are out of the list by default");
+  // ⚠️ Hidden is not the same as gone. The measurement carries a date and a
+  // vendor can recover, so there must always be a way back to them.
+  assert.match(picker, /Show them anyway/);
+  assert.match(picker, /showBroken = true;/);
+  assert.match(picker, /if \(m\.broken\) bits\.push\(m\.broken\);/, "and the row says why");
+});
+
+test("a paid model wearing a free-looking prefix is filed under the key that pays for it", () => {
+  // 🔴 Measured 2026-09-03 in the running app: 42 of the 94 models in the Free
+  // lens were `no-think/openrouter/...` - the reader's own OpenRouter models
+  // with thinking switched off, billed to their OpenRouter credit. `fromKey`
+  // read only the FIRST segment of the id, so a transform namespace in front of
+  // the real provider hid it completely. After the fix the Free lens holds 52
+  // and "From your keys" holds 1046.
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  assert.match(api, /const keyVendor = segments\.find\(\(seg\) => keyed\.has\(seg\.toLowerCase\(\)\)\) \?\? null;/);
+  assert.match(api, /fromKey: keyVendor !== null \|\| !free,/);
+  // Whole segments only, or `ddgw/mistral-small-2603` would claim to be a
+  // Mistral key - the keyless DuckDuckGo proxy serves that model name.
+  assert.ok(!/keyed\.has\(id\.toLowerCase\(\)\)/.test(api));
+  assert.ok(!/id\.includes\(alias\)/.test(api));
+
+  const app = fs.readFileSync(pkg("src", "ui", "public", "app.js"), "utf8");
+  assert.match(app, /from your \$\{m\.keyVendor\} key/, "the row must name the key, not the prefix");
+  assert.ok(!/from your \$\{m\.vendor\} key/.test(app), "the first segment would read 'from your no-think key'");
 });
