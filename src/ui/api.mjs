@@ -587,6 +587,31 @@ export const routes = {
     // measured 2026-09-02, the gateway went from 119 models to 1151 while this
     // diff came back empty. An empty diff left the check below with nothing to
     // probe, so a bad key sailed through as "could not be checked".
+    // 🔴 CHECK THE KEY BEFORE TOUCHING THE GATEWAY, because adding is
+    // DESTRUCTIVE. Measured 2026-09-02: POST /api/providers for a provider that
+    // is already connected OVERWRITES that connection in place - the same
+    // connection id comes back - so a bad key silently replaces a working one.
+    // Combined with the old "a refused key leaves nothing behind" cleanup, one
+    // bad paste deleted a connection that had been working, and the app then
+    // said "not connected" with the models gone. That is what a reader hit
+    // repeatedly while being told their key was fine.
+    //
+    // Asking the provider first makes the whole operation safe: a key the
+    // provider refuses never reaches the gateway, so nothing that already works
+    // can be damaged by pasting the wrong thing.
+    const upfront = await providers.verifyModelProvider([], body.id, body.key);
+    if (upfront.state === "rejected") {
+      return ok({
+        added: body.id,
+        works: false,
+        newModels: 0,
+        problem: `${body.id} did not accept that key.`,
+        remedy:
+          "Check you copied the whole key, that it is for this provider, and that it is still active. " +
+          "Nothing was changed - anything you already had connected is untouched.",
+      });
+    }
+
     const gw = new GatewayClient();
     const gatewayIds = async () => {
       try {
@@ -596,6 +621,9 @@ export const routes = {
       }
     };
     const before = await gatewayIds();
+    // Whether this provider was ALREADY connected decides whether a failure may
+    // clean up after itself - see the rejected branch below.
+    const hadConnection = ((await providers.connected()).connections ?? []).some((c) => c.provider === body.id);
     const r = await providers.addModelProvider(body.id, body.key);
     if (!r.ok) return bad(r.reason);
     // Invalidate the routing catalogue and re-resolve the agent's model BEFORE counting,
@@ -620,18 +648,23 @@ export const routes = {
     const v = await providers.verifyModelProvider(fresh, body.id, body.key);
 
     if (v.state === "rejected") {
-      // Leave nothing behind. A refused key otherwise sits there as a
-      // connection contributing a thousand models that cannot answer, and the
-      // next thing the reader picks fails for a reason they cannot see.
-      if (r.connectionId) await providers.removeConnection(r.connectionId).catch(() => {});
+      // Only ever remove a connection THIS call created. An add overwrites an
+      // existing connection in place, so deleting on a late failure would
+      // destroy a connection the reader already had - which is exactly the
+      // "it says not connected again" loop this used to cause. When one
+      // existed beforehand it is left alone and the problem is stated instead.
+      if (!hadConnection && r.connectionId) {
+        await providers.removeConnection(r.connectionId).catch(() => {});
+      }
       await providersChanged();
       return ok({
         added: r.id,
         works: false,
         newModels: 0,
         problem: `${body.id} did not accept that key.`,
-        remedy:
-          "Check you copied the whole key, that it is for this provider, and that it is still active. Nothing was saved.",
+        remedy: hadConnection
+          ? "Your existing connection was left in place. Paste a working key to replace it."
+          : "Check you copied the whole key, that it is for this provider, and that it is still active. Nothing was saved.",
       });
     }
 

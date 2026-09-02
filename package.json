@@ -1,6 +1,6 @@
 {
   "name": "omni-agent",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "private": false,
   "description": "A downloadable, model-agnostic coding agent: OpenCode as the harness, OmniRoute as the model gateway, with browser automation, web research, scraping and document tools preconfigured.",
   "license": "MIT",

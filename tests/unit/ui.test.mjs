@@ -845,3 +845,25 @@ test("only one copy of the app owns a data directory", () => {
   const bin = fs.readFileSync(pkg("bin", "omni-agent.mjs"), "utf8");
   assert.match(bin, /if \(r\.alreadyRunning\) return process\.exit\(0\);/, "a second copy exits cleanly");
 });
+
+test("a bad key can never destroy a connection that already works", () => {
+  // 🔴 The loop a reader actually hit: paste a key, be told "not connected",
+  // paste again, same thing. Measured 2026-09-02: POST /api/providers for a
+  // provider that is ALREADY connected overwrites that connection in place -
+  // the identical connection id comes back - and the old "a refused key leaves
+  // nothing behind" cleanup then DELETED it. One bad paste, or one transient
+  // 401 from the stale-token bug, wiped a working connection and took its
+  // models with it.
+  const api = ui("api.mjs");
+  const add = api.slice(api.indexOf("async providerAdd"), api.indexOf("async providerSignin"));
+  // The key is checked with the provider BEFORE the gateway is touched, so a
+  // refused key never reaches the destructive write at all.
+  const iUpfront = add.indexOf("const upfront = await providers.verifyModelProvider");
+  const iAdd = add.indexOf("await providers.addModelProvider");
+  assert.ok(iUpfront >= 0 && iUpfront < iAdd, "the key is verified before the gateway is written to");
+  assert.match(add, /anything you already had connected is untouched/);
+  // And if it still fails later, only a connection THIS call created is removed.
+  assert.match(add, /const hadConnection = /);
+  assert.match(add, /if \(!hadConnection && r\.connectionId\) \{\s*\n\s*await providers\.removeConnection/);
+  assert.match(add, /Your existing connection was left in place/);
+});
