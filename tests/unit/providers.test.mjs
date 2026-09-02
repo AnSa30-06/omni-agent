@@ -99,3 +99,25 @@ test("a connection that is wrong or out of credit can be removed from the app", 
   assert.match(app, /api\("providerRemove", \{ method: "POST", body: \{ connectionId: p\.connectionId \} \}\)/);
   assert.match(app, /section\("Also connected"\)/);
 });
+
+test("in the app, the instructions point at the box on the page, not a terminal", () => {
+  // The "How?" button showed the CLI steps verbatim, so someone who has never
+  // opened a terminal was told to `Run: omni-agent provider add openrouter
+  // YOUR-KEY` directly above a box that already takes the key. That is the
+  // "I didn't know how to add it" half of the complaint.
+  for (const id of ["openrouter", "mistral", "cerebras"]) {
+    const inApp = setupSteps(id, { context: "app" });
+    assert.ok(inApp.ok, `${id} should have instructions`);
+    const joined = inApp.steps.join(" | ");
+    assert.ok(!/omni-agent provider add/.test(joined), `${id}: the app must not tell the reader to run a CLI command`);
+    assert.match(joined, /Paste the key into the box on this page/);
+    assert.ok(!/omni-agent models/.test(String(inApp.verify)), "the check is what the app does for you");
+
+    // The terminal wording is untouched for people actually in a terminal.
+    const cli = setupSteps(id);
+    assert.match(cli.steps.join(" | "), /Run:\s+omni-agent provider add/);
+  }
+  // A sign-in provider gets the button that is actually on screen.
+  const signin = setupSteps("claude", { context: "app" });
+  assert.match(signin.steps.join(" | "), /Press Sign in on this page/);
+});

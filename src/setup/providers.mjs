@@ -269,7 +269,41 @@ export function hasSearchKey(id) {
  * with the exact command - because "get an API key" is not an instruction to
  * someone who has never done it.
  */
-export function setupSteps(id) {
+/**
+ * Turn a CLI step into what to do on the page you are already looking at.
+ *
+ * The steps are written for the terminal, and in the app they were shown
+ * verbatim - so the "How?" button told someone who has never opened a terminal
+ * to `Run: omni-agent provider add openrouter YOUR-KEY`, directly above a box
+ * that already takes the key. That is the whole "I didn't know how to add it"
+ * half of the problem.
+ */
+function forTheApp(steps, kind) {
+  const inApp =
+    kind === "signin"
+      ? "Press Sign in on this page and approve it in the browser window that opens."
+      : "Paste the key into the box on this page and press Add.";
+  const out = [];
+  for (const step of steps) {
+    const text = String(step);
+    // Any step whose whole job is the CLI command becomes the in-app action.
+    if (/Run:\s*omni-agent provider (add|signin)/i.test(text)) {
+      if (!out.includes(inApp)) out.push(inApp);
+      continue;
+    }
+    out.push(text);
+  }
+  if (!out.includes(inApp)) out.push(inApp);
+  return out;
+}
+
+/**
+ * @param {string} id
+ * @param {{context?: "cli"|"app"}} [opts] "app" rewrites the terminal steps
+ *   into the buttons that are on screen.
+ */
+export function setupSteps(id, opts = {}) {
+  const inApp = opts.context === "app";
   const cat = catalogue();
   const search = cat.search.find((s) => s.id === id);
   const keyless = (cat.keyless ?? []).find((s) => s.id === id);
@@ -283,8 +317,8 @@ export function setupSteps(id) {
       kind: "search",
       gives: search.gives,
       note: search.note,
-      steps: search.setup ?? [],
-      verify: search.verify ?? null,
+      steps: inApp ? forTheApp(search.setup ?? [], "search") : (search.setup ?? []),
+      verify: inApp ? "The app tries a real search with it and tells you what happened." : (search.verify ?? null),
     };
   }
   if (keyless) {
@@ -309,7 +343,7 @@ export function setupSteps(id) {
       // "create a free account" and "copy the API key from their dashboard",
       // which is wrong wherever the account already exists or the credential is
       // called something else.
-      steps:
+      steps: (inApp ? (x) => forTheApp(x, model.auth === "oauth" ? "signin" : "model") : (x) => x)(
         model.setup ??
         (model.auth === "none"
           ? [`Run:  omni-agent provider add ${id}`, "No account and no key are needed."]
@@ -320,7 +354,10 @@ export function setupSteps(id) {
                 "Copy the API key from their dashboard.",
                 `Run:  omni-agent provider add ${id} YOUR-KEY`,
               ]),
-      verify: "omni-agent models",
+      ),
+      verify: inApp
+        ? "The app tries the key on a real model and tells you if it was accepted."
+        : "omni-agent models",
     };
   }
   if (signIn) {
@@ -330,11 +367,11 @@ export function setupSteps(id) {
       kind: "signin",
       gives: signIn.gives,
       note: signIn.note,
-      steps: [
+      steps: (inApp ? (x) => forTheApp(x, "signin") : (x) => x)([
         `Run:  omni-agent provider signin ${id}`,
         "Approve the sign-in in the browser it opens. Nothing is charged twice.",
-      ],
-      verify: "omni-agent provider list",
+      ]),
+      verify: inApp ? "This page shows it as connected once it works." : "omni-agent provider list",
     };
   }
   return { ok: false, reason: `nothing called "${id}" in the catalogue` };

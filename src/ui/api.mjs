@@ -527,7 +527,9 @@ export const routes = {
   },
 
   async providerSetup({ query }) {
-    const s = providers.setupSteps(query.id);
+    // The page has a paste box and buttons; telling its reader to run a
+    // terminal command is the "I didn't know how to add it" complaint.
+    const s = providers.setupSteps(query.id, { context: "app" });
     return s.ok ? ok(s) : bad(s.reason);
   },
 
