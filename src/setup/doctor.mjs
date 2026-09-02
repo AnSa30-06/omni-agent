@@ -31,10 +31,20 @@ export async function runDoctor(opts = {}) {
   const deep = opts.deep ?? true;
   const cfg = loadConfig();
   const rows = [];
+  // Every row is reported the moment it is known, not all of them at the end.
+  // The deep probes take 30-90 s between them, and printing nothing for that
+  // long is indistinguishable from a hang - measured 2026-09-02, the health
+  // check showed an empty console for 83 s and then closed.
+  const onRow = typeof opts.onRow === "function" ? opts.onRow : null;
+  const add = (r) => {
+    rows.push(r);
+    onRow?.(r);
+    return r;
+  };
 
   // --- Runtime -------------------------------------------------------------
   const major = Number(process.versions.node.split(".")[0]);
-  rows.push(
+  add(
     major >= 22
       ? row("Node.js", OK, `v${process.versions.node}`)
       : row("Node.js", FAIL, `v${process.versions.node} is too old`, "Install Node.js 22 or newer from nodejs.org.")
@@ -42,14 +52,14 @@ export async function runDoctor(opts = {}) {
 
   // --- OpenCode ------------------------------------------------------------
   const oc = locateOpenCode();
-  rows.push(
+  add(
     oc
       ? row("OpenCode", OK, oc)
       : row("OpenCode", FAIL, "not found on this machine", "Run: npm install -g opencode-ai")
   );
 
   const ocCfg = path.join(ocConfigDir(), "opencode.json");
-  rows.push(
+  add(
     fs.existsSync(ocCfg)
       ? row("OpenCode config", OK, ocCfg)
       : row("OpenCode config", FAIL, "not generated yet", "Run: omni-agent setup")
@@ -57,7 +67,7 @@ export async function runDoctor(opts = {}) {
 
   // --- Gateway -------------------------------------------------------------
   const found = locateOmniRoute();
-  rows.push(
+  add(
     found
       ? row("OmniRoute installed", OK, `v${found.version} at ${found.root}`)
       : row("OmniRoute installed", FAIL, "not found", "Run: npm install -g omniroute")
@@ -65,7 +75,7 @@ export async function runDoctor(opts = {}) {
 
   const client = new GatewayClient();
   const up = await client.isUp(5000);
-  rows.push(
+  add(
     up
       ? row("Gateway running", OK, gatewayBaseUrl(cfg))
       : row("Gateway running", FAIL, `nothing answering at ${gatewayBaseUrl(cfg)}`, "Run: omni-agent gateway start")
@@ -76,16 +86,16 @@ export async function runDoctor(opts = {}) {
     try {
       catalogue = await client.listModels();
       const tools = catalogue.filter((m) => m.capabilities?.tool_calling).length;
-      rows.push(
+      add(
         catalogue.length
           ? row("Model catalogue", OK, `${catalogue.length} models, ${tools} can call tools`)
           : row("Model catalogue", FAIL, "gateway returned an empty catalogue", "Check the gateway log: " + path.join(PATHS.logs, "gateway.log"))
       );
     } catch (err) {
-      rows.push(row("Model catalogue", FAIL, err.message, "Check that the gateway finished starting."));
+      add(row("Model catalogue", FAIL, err.message, "Check that the gateway finished starting."));
     }
   } else {
-    rows.push(row("Model catalogue", FAIL, "gateway not running"));
+    add(row("Model catalogue", FAIL, "gateway not running"));
   }
 
   // --- A real completion ---------------------------------------------------
@@ -122,7 +132,7 @@ export async function runDoctor(opts = {}) {
       const said = (r.content || "").toLowerCase();
       const fellBack = r.fellBackFrom ? ` after falling back from ${r.fellBackFrom.join(", ")}` : "";
       if (said.includes("ready")) {
-        rows.push(
+        add(
           row(
             "Model responds",
             OK,
@@ -131,9 +141,9 @@ export async function runDoctor(opts = {}) {
           )
         );
       } else if (r.content != null) {
-        rows.push(row("Model responds", WARN, `answered but not as asked: ${JSON.stringify(said).slice(0, 80)}${fellBack}`));
+        add(row("Model responds", WARN, `answered but not as asked: ${JSON.stringify(said).slice(0, 80)}${fellBack}`));
       } else {
-        rows.push(
+        add(
           row("Model responds", WARN, `empty content, finish_reason=${r.finishReason}`,
             "Usually a reasoning model spending the whole budget on thinking.")
         );
@@ -148,7 +158,7 @@ export async function runDoctor(opts = {}) {
       const busy = /\b(429|401|403)\b|rate.?limit|not supported|too many|quota|busy|ERR_BN_LIMIT/i.test(
         err.message ?? ""
       );
-      rows.push(
+      add(
         busy
           ? row(
               "Model responds",
@@ -170,7 +180,7 @@ export async function runDoctor(opts = {}) {
 
   // --- Providers -----------------------------------------------------------
   const provs = configuredProviders();
-  rows.push(
+  add(
     provs.length
       ? row("Provider keys", OK, provs.join(", "))
       : row("Provider keys", WARN, "none configured", "Not required - the gateway serves free models. Add keys for speed and higher limits.")
@@ -179,21 +189,21 @@ export async function runDoctor(opts = {}) {
   // --- Search --------------------------------------------------------------
   const searchProviders = availableProviders(cfg);
   if (!searchProviders.length) {
-    rows.push(row("Web search", FAIL, "no search provider available", "Should never happen - DuckDuckGo needs no key."));
+    add(row("Web search", FAIL, "no search provider available", "Should never happen - DuckDuckGo needs no key."));
   } else if (deep) {
     try {
       const { webSearch } = await import("../tools/search.mjs");
       const r = await webSearch("site:iana.org example domain", { count: 3 });
-      rows.push(
+      add(
         r.results.length
           ? row("Web search", OK, `${r.provider} returned ${r.results.length} results`)
           : row("Web search", WARN, `${r.provider} returned nothing`, "Often transient rate limiting. Retry.")
       );
     } catch (err) {
-      rows.push(row("Web search", FAIL, err.message, "Check the network connection."));
+      add(row("Web search", FAIL, err.message, "Check the network connection."));
     }
   } else {
-    rows.push(row("Web search", OK, `providers: ${searchProviders.join(", ")}`));
+    add(row("Web search", OK, `providers: ${searchProviders.join(", ")}`));
   }
 
   // --- Web fetch -----------------------------------------------------------
@@ -201,48 +211,48 @@ export async function runDoctor(opts = {}) {
     try {
       const { webFetch } = await import("../tools/web.mjs");
       const r = await webFetch("https://example.com/");
-      rows.push(
+      add(
         r.ok && (r.content || "").length > 20
           ? row("Web fetch", OK, `example.com returned ${r.content.length} characters of readable text`)
           : row("Web fetch", FAIL, "fetched but extracted nothing", "Check the network connection or a proxy.")
       );
     } catch (err) {
-      rows.push(row("Web fetch", FAIL, err.message));
+      add(row("Web fetch", FAIL, err.message));
     }
   }
 
   // --- Browser -------------------------------------------------------------
   if (!chromiumInstalled()) {
-    rows.push(row("Browser", FAIL, "Chromium is not installed", "Run: omni-agent setup --browser"));
+    add(row("Browser", FAIL, "Chromium is not installed", "Run: omni-agent setup --browser"));
   } else if (deep) {
     try {
       const browser = await import("../tools/browser.mjs");
       const nav = await browser.navigate("https://example.com/");
       const snap = await browser.snapshot();
       await browser.close();
-      rows.push(
+      add(
         nav.status === 200 && snap.refCount >= 0
           ? row("Browser", OK, `launched Chromium, loaded example.com, found ${snap.refCount} interactive elements`)
           : row("Browser", WARN, `loaded with status ${nav.status}`)
       );
     } catch (err) {
-      rows.push(row("Browser", FAIL, err.message, "Run: omni-agent setup --browser"));
+      add(row("Browser", FAIL, err.message, "Run: omni-agent setup --browser"));
     }
   } else {
-    rows.push(row("Browser", OK, "Chromium present at " + PATHS.browsers));
+    add(row("Browser", OK, "Chromium present at " + PATHS.browsers));
   }
 
   // --- Documents -----------------------------------------------------------
   try {
     const { parseCsv } = await import("../tools/documents.mjs");
     const rowsParsed = parseCsv('a,b\n1,"x,y"\n');
-    rows.push(
+    add(
       rowsParsed.length === 2 && rowsParsed[1][1] === "x,y"
         ? row("Document tools", OK, "CSV/PDF/DOCX/XLSX readers loaded")
         : row("Document tools", FAIL, "CSV parser produced the wrong result")
     );
   } catch (err) {
-    rows.push(row("Document tools", FAIL, err.message));
+    add(row("Document tools", FAIL, err.message));
   }
 
   // --- Filesystem ----------------------------------------------------------
@@ -250,14 +260,14 @@ export async function runDoctor(opts = {}) {
     const probe = path.join(PATHS.home, ".write-probe");
     fs.writeFileSync(probe, "ok");
     fs.unlinkSync(probe);
-    rows.push(row("Data directory", OK, PATHS.home));
+    add(row("Data directory", OK, PATHS.home));
   } catch (err) {
-    rows.push(row("Data directory", FAIL, err.message, "Check permissions on " + PATHS.home));
+    add(row("Data directory", FAIL, err.message, "Check permissions on " + PATHS.home));
   }
 
   // --- Usage / quota -------------------------------------------------------
   const mgmt = await client.management("/api/free-tier/summary");
-  rows.push(
+  add(
     mgmt.ok
       ? row("Usage API", OK, "gateway free-tier figures are readable")
       : row(
@@ -273,21 +283,25 @@ export async function runDoctor(opts = {}) {
   return { rows, failed, warned, ok: failed === 0, servedModel };
 }
 
-export function renderDoctor(result) {
-  const mark = { ok: "[ OK ]", warn: "[WARN]", fail: "[FAIL]" };
-  const L = ["", "OMNI AGENT HEALTH CHECK", ""];
-  for (const r of result.rows) {
-    L.push(`${mark[r.status]}  ${r.name}`);
-    if (r.detail) L.push(`         ${r.detail}`);
-    if (r.fix && r.status !== "ok") L.push(`         Fix: ${r.fix}`);
-  }
-  L.push("");
-  L.push(
-    result.ok
-      ? result.warned
-        ? `System ready. ${result.warned} optional item(s) not configured.`
-        : "System ready."
-      : `${result.failed} check(s) failed. Fix those before using the agent.`
-  );
+const MARK = { ok: "[ OK ]", warn: "[WARN]", fail: "[FAIL]" };
+
+/** One check, as the lines it prints. Used live and in the full report. */
+export function renderRow(r) {
+  const L = [`${MARK[r.status]}  ${r.name}`];
+  if (r.detail) L.push(`         ${r.detail}`);
+  if (r.fix && r.status !== "ok") L.push(`         Fix: ${r.fix}`);
   return L.join("\n");
+}
+
+/** The verdict line, printed after the checks whether or not they streamed. */
+export function renderSummary(result) {
+  return result.ok
+    ? result.warned
+      ? `System ready. ${result.warned} optional item(s) not configured.`
+      : "System ready."
+    : `${result.failed} check(s) failed. Fix those before using the agent.`;
+}
+
+export function renderDoctor(result) {
+  return ["", "OMNI AGENT HEALTH CHECK", "", ...result.rows.map(renderRow), "", renderSummary(result)].join("\n");
 }

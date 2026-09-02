@@ -14,7 +14,7 @@ import { locateOpenCode } from "../src/gateway/locate.mjs";
 import { opencodeEnv, ocConfigDir } from "../src/setup/opencode-config.mjs";
 import { applyConfig } from "../src/setup/apply-config.mjs";
 import { runSetup, installBrowser } from "../src/setup/wizard.mjs";
-import { runDoctor, renderDoctor } from "../src/setup/doctor.mjs";
+import { runDoctor, renderDoctor, renderRow, renderSummary } from "../src/setup/doctor.mjs";
 import { buildDashboard, renderDashboard } from "../src/usage/dashboard.mjs";
 import { getCatalogue } from "../src/routing/catalog.mjs";
 import { selectModel, PRESETS } from "../src/routing/select.mjs";
@@ -139,8 +139,20 @@ async function main() {
     }
 
     case "doctor": {
-      await ensureReady({ quiet: true }).catch(() => {});
-      const result = await runDoctor({ deep: !flags.has("--quick") });
+      const asJson = flags.has("--json");
+      // Not quiet any more: starting the gateway is the longest silent phase of
+      // all, and the supervisor already narrates it ("first run can take a
+      // minute"). Only --json stays silent, so its output remains parseable.
+      await ensureReady({ quiet: asJson }).catch(() => {});
+      if (!asJson) {
+        say("");
+        say("OMNI AGENT HEALTH CHECK");
+        say("");
+      }
+      const result = await runDoctor({
+        deep: !flags.has("--quick"),
+        onRow: asJson ? undefined : (r) => say(renderRow(r)),
+      });
       // A passing doctor finishes what a rate-limited setup could not: mark the
       // install configured and remember the model that actually answered, so
       // the app stops printing "First run: writing configuration..." and starts
@@ -154,8 +166,13 @@ async function main() {
           rememberVerifiedModel(result.servedModel);
         }
       }
-      if (flags.has("--json")) say(JSON.stringify(result, null, 2));
-      else say(renderDoctor(result));
+      if (asJson) say(JSON.stringify(result, null, 2));
+      else {
+        // The rows already printed as they were checked; only the verdict is
+        // left. renderDoctor still exists for callers that want it whole.
+        say("");
+        say(renderSummary(result));
+      }
       return process.exit(result.ok ? 0 : 1);
     }
 

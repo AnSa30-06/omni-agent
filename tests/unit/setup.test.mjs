@@ -196,3 +196,35 @@ test("a busy free pool does not fail first-run setup", () => {
   assert.match(dcmd, /if \(result\.ok\) \{\s*\n\s*updateConfig\(\{ configured: true \}\)/, "a passing doctor marks the install configured");
   assert.match(dcmd, /rememberVerifiedModel\(result\.servedModel\)/, "and remembers the model that answered");
 });
+
+test("the health check reports each result as it happens, and its window stays open", () => {
+  // Every error message in this product points at "Check Omni Agent health".
+  // It ran node.exe directly, so the console closed on the same millisecond
+  // the report appeared, and nothing printed for the 83 s before that
+  // (measured 2026-09-02) - a blank window that then vanished.
+  const doctor = fs.readFileSync(pkg("src", "setup", "doctor.mjs"), "utf8");
+  assert.match(doctor, /const onRow = typeof opts\.onRow === "function" \? opts\.onRow : null;/);
+  assert.match(doctor, /const add = \(r\) => \{\s*\n\s*rows\.push\(r\);\s*\n\s*onRow\?\.\(r\);/, "add pushes then reports - never calls itself");
+  assert.ok(!/rows\.push\(\s*\n?\s*row\(/.test(doctor), "every check goes through add(), so every check streams");
+  assert.ok((doctor.match(/\badd\(/g) ?? []).length > 20, "all the checks stream, not a couple");
+  assert.match(doctor, /export function renderRow/);
+  assert.match(doctor, /export function renderSummary/);
+
+  // The CLI prints them live, and only --json stays silent so it stays parseable.
+  const bin = fs.readFileSync(pkg("bin", "omni-agent.mjs"), "utf8");
+  const cmd = bin.slice(bin.indexOf('case "doctor":'), bin.indexOf('case "usage":'));
+  assert.match(cmd, /onRow: asJson \? undefined : \(r\) => say\(renderRow\(r\)\)/);
+  assert.match(cmd, /ensureReady\(\{ quiet: asJson \}\)/, "the gateway's own slow start is narrated too");
+
+  // And the shortcut goes through a .cmd that pauses.
+  const doc = fs.readFileSync(pkg("installer", "OmniAgentDoctor.cmd"), "utf8");
+  assert.match(doc, /omni-agent\.mjs" doctor/);
+  assert.match(doc, /\npause\r?\n/, "the console must wait before closing");
+  const iss = fs.readFileSync(pkg("installer", "omni-agent.iss"), "utf8");
+  assert.match(iss, /Source: "OmniAgentDoctor\.cmd";/, "the .cmd is installed");
+  assert.match(
+    iss,
+    /Name: "\{group\}\\Check \{#AppName\} health"; Filename: "\{app\}\\OmniAgentDoctor\.cmd"/,
+    "the shortcut runs the .cmd, not node.exe directly",
+  );
+});

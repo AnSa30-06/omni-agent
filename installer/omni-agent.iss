@@ -66,6 +66,7 @@ Source: "..\staging\OmniAgent.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "OmniAgent.cmd";     DestDir: "{app}"; Flags: ignoreversion
 Source: "OmniAgentApp.cmd";  DestDir: "{app}"; Flags: ignoreversion
 Source: "OmniAgentSetup.cmd";DestDir: "{app}"; Flags: ignoreversion
+Source: "OmniAgentDoctor.cmd";DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md";      DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
@@ -78,7 +79,9 @@ Name: "{group}\{#AppName}";              Filename: "{app}\OmniAgent.exe"; Workin
 ; takes arguments, so it is not a shortcut target.
 Name: "{group}\{#AppName} in a terminal"; Filename: "{app}\OmniAgentApp.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
 Name: "{group}\Set up {#AppName}";       Filename: "{app}\OmniAgentSetup.cmd"; WorkingDir: "{app}"
-Name: "{group}\Check {#AppName} health"; Filename: "{app}\node\node.exe"; Parameters: """{app}\app\bin\omni-agent.mjs"" doctor"; WorkingDir: "{app}"
+; Through a .cmd so the console stays open - run directly, node.exe closed
+; the window in the same millisecond the report appeared.
+Name: "{group}\Check {#AppName} health"; Filename: "{app}\OmniAgentDoctor.cmd"; WorkingDir: "{app}"
 Name: "{group}\Uninstall {#AppName}";    Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#AppName}";        Filename: "{app}\OmniAgent.exe"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
 
