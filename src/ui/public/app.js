@@ -119,7 +119,52 @@ const state = {
   // than the sidebar list: the v2 list the sidebar uses carries `location` and
   // `subpath` but no `directory` at all.
   sessionFolder: null,
+  // Assistant messages this page abandoned because the model produced nothing
+  // within FIRST_TOKEN_TIMEOUT_MS. They end up carrying MessageAbortedError,
+  // exactly like a turn the reader stopped by hand, so the transcript needs
+  // this to tell the two apart and not blame the reader for a model's silence.
+  // In memory only - it describes one page's session, not a stored preference.
+  noAnswer: new Set(),
 };
+
+/**
+ * How long to wait for the FIRST sign of life from a model before giving up on
+ * it and trying another.
+ *
+ * Measured 2026-09-02: a rate-limited model was waited on for 84 s before the
+ * upstream itself gave up, and with two retries behind it a first question
+ * could dead-end for two and a half minutes having shown nothing. A model that
+ * WAS working, on the same busy pool, produced its first content in 9.7 s. So
+ * 25 s is comfortably past a healthy slow start and far short of the dead wait.
+ *
+ * It is a FIRST-token timeout, not an inactivity timeout: once anything has
+ * arrived the watchdog is cleared for good, so a model that streams slowly is
+ * never killed half way through an answer.
+ */
+const FIRST_TOKEN_TIMEOUT_MS = 25_000;
+
+/**
+ * How long a failure keeps a model out of the automatic retry ladder.
+ *
+ * The free pool's failures are overwhelmingly transient - a 429 while it is
+ * busy, an anti-abuse challenge, a cold upstream. Treating them as permanent
+ * poisons the pool: measured 2026-09-02 this machine had blacklisted TEN
+ * models, `auto/coding` among them, which answers reliably and is the default
+ * the product ships. So a failure is evidence about the last half hour, not
+ * forever. The picker still shows "failed here before" as history, because
+ * that is true and worth knowing - it just stops excluding the model.
+ */
+const UNHEALTHY_FOR_MS = 30 * 60 * 1000;
+
+/** Did this model fail here recently enough for that to still mean anything? */
+function recentlyFailed(key) {
+  const rec = state.unhealthy[key];
+  if (!rec) return false;
+  // An older record with no timestamp is from before this was tracked; treat
+  // it as stale rather than as a permanent sentence.
+  if (!rec.when) return false;
+  return Date.now() - rec.when < UNHEALTHY_FOR_MS;
+}
 
 // Preferences live on disk, not in localStorage. The UI server takes a fresh
 // port every launch, which makes the page a new browser origin each time, so
@@ -359,9 +404,15 @@ function renderMessages(list) {
 
     const err = m.info?.error ?? m.error;
     if (err && (err.name === "MessageAbortedError" || /aborted/i.test(String(err.data?.message ?? err.message ?? err.name ?? "")))) {
-      // The reader pressed Stop. Not a failure, and never a reason to blame the
-      // model or offer "choose a different one".
-      body.append(el("p", "turn-end", "Stopped by you"));
+      // Aborted - but by whom? A turn this page abandoned because the model
+      // said nothing must not be reported as something the reader did.
+      const mid = m.info?.id ?? m.id;
+      if (mid && state.noAnswer.has(mid)) {
+        const which = m.info?.modelID ?? m.modelID ?? "that model";
+        body.append(el("p", "turn-end failed", `${which} did not answer, so another model was tried`));
+      } else {
+        body.append(el("p", "turn-end", "Stopped by you"));
+      }
     } else if (err) {
       // The legacy message carries the model flat on `info` as modelID +
       // providerID, and the real text at error.data.message - not error.message,
@@ -375,8 +426,15 @@ function renderMessages(list) {
       e.append(el("p", null, text));
       // Remember it, so the picker can warn the next person who scrolls past
       // it, and offer the obvious next move right here.
-      if (key && !state.unhealthy[key]) {
-        state.unhealthy[key] = { message: String(text).slice(0, 160), when: Date.now() };
+      //
+      // Stamped with the MESSAGE's own time, never Date.now(). This block runs
+      // again on every re-render of the same transcript, so "now" would keep
+      // refreshing an ancient failure and it would never age out of the retry
+      // ladder (see recentlyFailed). The message time makes the write
+      // idempotent, while a genuinely NEWER failure still moves the stamp on.
+      const failedAt = m.info?.time?.completed ?? m.info?.time?.created ?? Date.now();
+      if (key && (state.unhealthy[key]?.when ?? 0) < failedAt) {
+        state.unhealthy[key] = { message: String(text).slice(0, 160), when: failedAt };
         savePrefs({ unhealthy: state.unhealthy });
       }
       const pick = el("button", "btn primary", "Choose a different model");
@@ -386,12 +444,24 @@ function renderMessages(list) {
     }
     if (!body.childNodes.length) {
       if (role === "user") continue; // an empty user turn is not worth a bubble
-      body.append(el("p", "muted", "…"));
+      const mid = m.info?.id ?? m.id;
+      const abandoned = mid && state.noAnswer.has(mid);
+      // A turn still waiting for its first token gets NO bubble at all - the
+      // "Waiting for X… 12s" row below is already saying exactly this, and the
+      // two together read as two half-answers. Only the in-flight last message
+      // is suppressed, so a genuinely empty older turn still shows.
+      if (!abandoned && state.busy === "sending" && m === list[list.length - 1]) continue;
+      // An abandoned turn keeps its bubble: finishTurn writes the reason into
+      // it. Everything else gets the placeholder.
+      if (!abandoned) body.append(el("p", "muted", "…"));
     }
     wrap.append(body);
     box.append(wrap);
   }
   finishTurn(turn);
+  // renderMessages replaces every child, so the waiting row has to be put back
+  // after a refresh or the countdown vanishes 150 ms after every send.
+  paintWaiting();
   watchThreadScroll();
   scrollToEnd();
 }
@@ -553,6 +623,18 @@ function finishTurn(turn) {
   const info = turn.assistantInfo ?? {};
   const started = turn.user?.info?.time?.created ?? turn.user?.time?.created;
   const done = info.time?.completed;
+  // A turn this page gave up on is not a turn that finished. Aborting a model
+  // that had produced NOTHING completes its message with no error at all
+  // (measured 2026-09-02 - unlike aborting one mid-stream, which sets
+  // MessageAbortedError), so without this it printed "Finished in 22s" for a
+  // model that never said a word.
+  if (info.id && state.noAnswer.has(info.id)) {
+    const which = info.modelID ?? "That model";
+    turn.assistantBody.append(
+      el("p", "turn-end failed", `${which} did not answer, so another model was tried`),
+    );
+    return;
+  }
   // A turn that errored already carries its own explanation and a way out
   // (see the error block above); a turn still running has no end to state.
   if (!done || info.error) return;
@@ -678,6 +760,7 @@ function liveTurn(messageID) {
   liveReset();
   const box = $("messages");
   box.querySelector(".empty")?.remove();
+  box.querySelector(".waiting-row")?.remove();
   const wrap = el("div", "msg assistant writing");
   wrap.append(el("div", "role", "Omni Agent"));
   const body = el("div", "body");
@@ -735,6 +818,8 @@ function liveToolPart(messageID, part) {
 /** Settle the streamed turn against what the server actually stored. */
 function endTurn() {
   live.turn?.classList.remove("writing");
+  clearWatchdog();
+  clearWaiting();
   setBusy(false);
 
   // A model that refused is worth one more try on a different model, because on
@@ -744,7 +829,17 @@ function endTurn() {
   // Partial text means the model DID answer and merely stopped; swapping models
   // and re-asking would throw away what the reader already has.
   const gotText = !!live.body?.querySelector(".stream-text")?.textContent?.trim();
-  if (inFlight?.error && isModelFailure(inFlight.error, gotText)) {
+  // Checked BEFORE the error branch: the turn was aborted by us, so it carries
+  // MessageAbortedError, which isModelFailure deliberately refuses to retry
+  // (that rule is there for a reader who pressed Stop). A model that never
+  // spoke is the opposite case and is exactly what should be retried.
+  if (inFlight?.timedOut && !gotText) {
+    inFlight.timedOut = false;
+    inFlight.error = null;
+    const was = modelName();
+    if (retryOnAnotherModel()) return;
+    toast(`${was} did not answer, and no other model would either.`, "bad");
+  } else if (inFlight?.error && isModelFailure(inFlight.error, gotText)) {
     const err = inFlight.error;
     inFlight.error = null;
     if (retryOnAnotherModel()) return;
@@ -818,6 +913,7 @@ function subscribe(sessionID, directory) {
       // never gets one. That is what makes it safe to open a live turn here
       // without first working out whose message this is.
       if (q.field !== "text" || typeof q.delta !== "string") return;
+      sawFirstToken();
       setBusy("streaming");
       const node = liveTextPart(q.messageID, q.partID);
       // One span per fragment: this is what produces the fade as it is written.
@@ -828,9 +924,21 @@ function subscribe(sessionID, directory) {
 
     if (t === "message.part.updated" && q.part) {
       if (q.part.type === "tool") {
+        // A tool call is a sign of life too - a model that starts working
+        // before it writes anything must not be given up on.
+        sawFirstToken();
         setBusy("streaming");
         liveToolPart(q.part.messageID, q.part);
       }
+      return;
+    }
+
+    if (t === "message.updated") {
+      // The assistant's message is announced about 8 s before its first
+      // content (measured 2026-09-02: 1.3 s vs 9.7 s), which is what lets a
+      // turn abandoned for silence be labelled honestly later.
+      const info = q.info ?? q.message ?? q;
+      if (info?.role === "assistant" && info?.id && inFlight) inFlight.assistantID = info.id;
       return;
     }
 
@@ -983,7 +1091,27 @@ function isModelFailure(err, gotText = false) {
  * first message of every fresh keyless install died on it.
  */
 function nextModel(exclude = []) {
-  const bad = new Set([...Object.keys(state.unhealthy), ...exclude]);
+  const bad = new Set([...Object.keys(state.unhealthy).filter(recentlyFailed), ...exclude]);
+
+  // First choice: a model this machine has actually had an answer from - the
+  // one setup measured, or the one that answered a previous retry. The raw
+  // catalogue walk below is ordered by the gateway, not by whether a model
+  // works, and measured 2026-09-02 it offered `felo/felo-chat` (a search
+  // product, HTTP 400), `theoldllm` (403, blocked by its host) and
+  // `mcode/mimo-auto` (400, unsupported) in a row. A model with a receipt
+  // beats three guesses.
+  if (state.verifiedModel) {
+    for (const p of state.models) {
+      const m = p.models.find((x) => x.id === state.verifiedModel);
+      // `m.free` matters as much here as in the walk below: a model that costs
+      // money needs a key, and retrying onto one answers "No active
+      // credentials for provider: ..." instead of the question.
+      if (m && m.free && !bad.has(`${p.id}/${m.id}`) && !m.id.startsWith("auto/")) {
+        return { providerID: p.id, id: m.id, name: m.name };
+      }
+    }
+  }
+
   // The vendor is the first segment of the model id - `ddgw/gpt-5.4-nano`,
   // `oc/north-mini-code-free` - because the gateway serves every vendor under
   // one provider id of its own.
@@ -1012,6 +1140,94 @@ function nextModel(exclude = []) {
 /** What is in flight, so a model refusal can be retried with another model. */
 let inFlight = null;
 
+/* -- waiting for the first token ---------------------------------------- */
+
+let watchdog = null;
+let waitingTicker = null;
+let waitingSince = 0;
+
+function clearWatchdog() {
+  if (watchdog) clearTimeout(watchdog);
+  watchdog = null;
+}
+
+/** Take down the "Waiting for X" row and its ticker. */
+function clearWaiting() {
+  if (waitingTicker) clearInterval(waitingTicker);
+  waitingTicker = null;
+  $("messages")?.querySelector(".waiting-row")?.remove();
+}
+
+/**
+ * Start waiting for a model to say something.
+ *
+ * Both halves matter: the countdown is what tells the reader the app is not
+ * frozen, and the timer is what stops a silent model eating 84 s of their time.
+ */
+function armWatchdog() {
+  clearWatchdog();
+  if (waitingTicker) clearInterval(waitingTicker);
+  waitingSince = Date.now();
+  paintWaiting();
+  waitingTicker = setInterval(paintWaiting, 1000);
+  watchdog = setTimeout(giveUpOnModel, FIRST_TOKEN_TIMEOUT_MS);
+}
+
+/** Anything arrived: the model is alive, so stop watching it. */
+function sawFirstToken() {
+  clearWatchdog();
+  clearWaiting();
+}
+
+/**
+ * The model has said nothing at all. Stop it and let endTurn try another.
+ *
+ * The abort is what makes this worth doing - without it the abandoned request
+ * keeps running against the same rate-limited upstream while the retry runs.
+ */
+async function giveUpOnModel() {
+  watchdog = null;
+  if (!inFlight || inFlight.id !== state.sessionID) return clearWaiting();
+  inFlight.timedOut = true;
+  // The turn the transcript will show as aborted, so it can be labelled as a
+  // model that went quiet rather than as something the reader did.
+  if (inFlight.assistantID) state.noAnswer.add(inFlight.assistantID);
+  clearWaiting();
+  await ocall("POST", `/session/${inFlight.id}/abort`, {});
+  // endTurn does the retry, from session.idle or the message POST returning.
+}
+
+/**
+ * The "Waiting for <model>… 12s" row.
+ *
+ * Re-appended by renderMessages, because the refresh 150 ms after a send
+ * replaces every child of the transcript and would otherwise wipe it.
+ */
+function paintWaiting() {
+  const box = $("messages");
+  if (!box) return;
+  const existing = box.querySelector(".waiting-row");
+  if (!(state.busy === "sending" && !live.turn && inFlight)) {
+    existing?.remove();
+    return;
+  }
+  const secs = Math.max(0, Math.round((Date.now() - waitingSince) / 1000));
+  const label = `Waiting for ${modelName()}\u2026 ${secs}s`;
+  if (existing) {
+    existing.querySelector(".waiting-text").textContent = label;
+    return;
+  }
+  box.querySelector(".empty")?.remove();
+  const wrap = el("div", "msg assistant waiting-row");
+  wrap.append(el("div", "role", "Omni Agent"));
+  const body = el("div", "body");
+  body.append(el("span", "waiting-text", label));
+  wrap.append(body);
+  box.append(wrap);
+  watchThreadScroll();
+  scrollToEnd(true);
+}
+
 /** POST the message. Split out of send() so a retry does not re-create anything. */
 function postMessage(id, text, extra) {
   const files = extra?.parts ?? [];
@@ -1021,6 +1237,7 @@ function postMessage(id, text, extra) {
   // Sending is an explicit "show me the answer": follow it wherever the view
   // happened to be, and keep following until the reader scrolls away.
   stickToBottom = true;
+  armWatchdog();
   scheduleRefresh();
 
   // Deliberately not awaited for rendering: this route only returns once the
@@ -1033,6 +1250,8 @@ function postMessage(id, text, extra) {
       endTurn();
     })
     .catch((e) => {
+      clearWatchdog();
+      clearWaiting();
       setBusy(false);
       toast(e.message, "bad");
     });
@@ -1158,7 +1377,7 @@ async function loadModels(retries = 10) {
   // A model that has already failed on this machine is not a good place to
   // start the next conversation - measured 2026-09-02, a fresh install opened
   // its second project on the model that had just failed the first.
-  const healthy = (m) => m && !state.unhealthy[`${m.providerID}/${m.id}`];
+  const healthy = (m) => m && !recentlyFailed(`${m.providerID}/${m.id}`);
   // Order matters: what the user chose, then what setup configured, then the
   // provider's own default, then anything. The provider default is third
   // because it is not chosen with chat in mind.

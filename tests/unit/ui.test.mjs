@@ -700,9 +700,64 @@ test("a failed model is never saved as the default, and a fresh start avoids one
   const retry = app.slice(app.indexOf("function retryOnAnotherModel"), app.indexOf("async function send"));
   assert.ok(!/savePrefs\(\{ model: state\.model \}\)/.test(retry), "the retry does not persist a model that has not answered");
   assert.match(app, /gotText && !inFlight\?\.error && inFlight\?\.tries > 0 && state\.model[\s\S]*?savePrefs\(\{ model: state\.model \}\)/, "endTurn persists the model that produced the answer");
-  assert.match(app, /const healthy = \(m\) => m && !state\.unhealthy\[/, "loadModels knows which models have failed here");
+  assert.match(app, /const healthy = \(m\) => m && !recentlyFailed\(/, "loadModels knows which models have failed here recently");
   assert.match(app, /if \(known\(saved\) && healthy\(saved\)\) state\.model = saved;/, "a healthy saved model is preferred");
   assert.match(app, /else if \(verified && healthy\(verified\)\) state\.model = verified;/, "a healthy verified model is next");
   // A still-known-but-unhealthy saved model is the last resort, never nothing.
   assert.match(app, /else if \(known\(saved\)\) state\.model = saved;/, "there is still a fallback when everything is unhealthy");
+});
+
+test("a model that says nothing is given up on, not waited out", () => {
+  // Measured 2026-09-02: a rate-limited model was waited on for 84 s before the
+  // upstream gave up, so a first question could dead-end for 2.5 minutes with
+  // nothing on screen. A working model on the same busy pool answered in 9.7 s.
+  const app = ui("public", "app.js");
+  assert.match(app, /const FIRST_TOKEN_TIMEOUT_MS = 25_000;/, "there is a first-token deadline");
+  assert.match(app, /watchdog = setTimeout\(giveUpOnModel, FIRST_TOKEN_TIMEOUT_MS\)/, "the deadline is armed");
+  assert.match(app, /armWatchdog\(\);/, "postMessage arms it");
+  // Cleared for good on the first sign of life, so a slow-but-working stream is
+  // never killed part way through.
+  assert.match(app, /function sawFirstToken\(\)[\s\S]*?clearWatchdog\(\)[\s\S]*?clearWaiting\(\)/);
+  const sub = app.slice(app.indexOf("function subscribe(sessionID, directory)"), app.indexOf("function setBusy"));
+  assert.ok((sub.match(/sawFirstToken\(\);/g) ?? []).length >= 2, "both a text delta and a tool call count as a sign of life");
+  // Giving up aborts, so the abandoned request stops competing with the retry.
+  assert.match(app, /giveUpOnModel[\s\S]*?ocall\("POST", `\/session\/\$\{inFlight\.id\}\/abort`/);
+});
+
+test("a turn the app abandoned is never reported as finished or as the reader's doing", () => {
+  // Aborting a model that produced NOTHING completes its message with no error
+  // at all, so the transcript printed "Finished in 22s" for a model that never
+  // said a word. It must also not say "Stopped by you" - the reader did not.
+  const app = ui("public", "app.js");
+  assert.match(app, /noAnswer: new Set\(\)/, "the app records which turns it abandoned");
+  assert.match(app, /if \(inFlight\.assistantID\) state\.noAnswer\.add\(inFlight\.assistantID\)/);
+  // The id is available early: message.updated names the assistant message
+  // about 8 s before its first content.
+  assert.match(app, /info\?\.role === "assistant" && info\?\.id && inFlight\) inFlight\.assistantID = info\.id/);
+  const fStart = app.indexOf("function finishTurn");
+  const finish = app.slice(fStart, app.indexOf("\nfunction ", fStart + 10));
+  assert.match(finish, /state\.noAnswer\.has\(info\.id\)[\s\S]*?did not answer, so another model was tried/);
+  // Comments stripped first: the explanation above the check quotes
+  // "Finished in 22s", which would otherwise be found before the code it
+  // describes and make this order check pass or fail for the wrong reason.
+  const code = finish.replace(/\/\/.*/g, "");
+  const iAbandoned = code.indexOf("noAnswer");
+  const iFinished = code.indexOf("Finished in");
+  assert.ok(iAbandoned >= 0 && iFinished > iAbandoned, "the abandoned check must come before the 'Finished in' line");
+  // And the timed-out turn is retried, even though it carries an abort.
+  assert.match(app, /if \(inFlight\?\.timedOut && !gotText\)[\s\S]*?retryOnAnotherModel\(\)/);
+});
+
+test("a failure stops counting against a model after half an hour", () => {
+  // The free pool's failures are transient. Treating them as permanent had
+  // blacklisted ten models on this machine, auto/coding among them - the
+  // default the product ships, which answers reliably.
+  const app = ui("public", "app.js");
+  assert.match(app, /const UNHEALTHY_FOR_MS = 30 \* 60 \* 1000;/);
+  assert.match(app, /function recentlyFailed\(key\)[\s\S]*?Date\.now\(\) - rec\.when < UNHEALTHY_FOR_MS/);
+  assert.match(app, /Object\.keys\(state\.unhealthy\)\.filter\(recentlyFailed\)/, "the retry ladder only avoids recent failures");
+  // The stamp must come from the message, or a re-render would keep an ancient
+  // failure looking fresh and it would never age out.
+  assert.match(app, /const failedAt = m\.info\?\.time\?\.completed \?\? m\.info\?\.time\?\.created \?\? Date\.now\(\);/);
+  assert.match(app, /if \(key && \(state\.unhealthy\[key\]\?\.when \?\? 0\) < failedAt\)/);
 });

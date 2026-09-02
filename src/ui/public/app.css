@@ -549,3 +549,14 @@ ol.steps code { font-family: var(--mono); font-size: 12px; background: var(--lin
 /* "Finished in 42s" under a turn: the moment the agent stopped, stated. */
 .turn-end { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
 .turn-end.failed { color: var(--bad); }
+
+/* "Waiting for <model>… 12s" - shown from the send until the model's first
+   content. The ticking number is the "it is not stuck" signal; the app gives
+   up on a silent model at 25 s and tries another. */
+.waiting-row .body { color: var(--ink-soft); font-size: 13.5px; }
+.waiting-text::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 9px;
+  border-radius: 50%; background: var(--accent); vertical-align: middle;
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .waiting-text::before { animation: none; } }
