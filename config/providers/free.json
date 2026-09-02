@@ -93,15 +93,6 @@
       "signupIsAuthority": true
     },
     {
-      "id": "cloudflare-ai",
-      "label": "Cloudflare Workers AI",
-      "auth": "apikey",
-      "gives": "50+ models on a free daily allowance",
-      "signup": "https://dash.cloudflare.com/",
-      "note": "Needs a Cloudflare account ID as well as a token.",
-      "signupIsAuthority": true
-    },
-    {
       "id": "nvidia",
       "label": "NVIDIA NIM",
       "auth": "apikey",
@@ -282,5 +273,6 @@
       "label": "Bundled browser",
       "note": "Last resort. Runs the search in the real Chromium this product already ships. Slower, but survives plain-HTTP endpoints being throttled."
     }
-  ]
+  ],
+  "$commentDroppedCloudflare": "REMOVED 2026-09-03: cloudflare-ai cannot be added with an API key alone and so could never work from this app. The gateway's manifest gives its base URL as https://api.cloudflare.com/client/v4/accounts - the account id that has to follow is not asked for anywhere, and the manifest declares no extra fields to ask for it. Measured: a key add took 64.8 s and concluded \"could not be checked\", because every model it contributed answered HTTP 502; the model listing 404s with and without a key, so the verifier cannot even condemn a bad one. Its advertised free tier was: 50+ models on a free daily allowance. Put it back only when the app can ask for an account id and a probe returns something other than 404."
 }

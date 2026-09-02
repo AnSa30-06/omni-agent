@@ -122,29 +122,40 @@ test("in the app, the instructions point at the box on the page, not a terminal"
   assert.match(signin.steps.join(" | "), /Press Sign in on this page/);
 });
 
-test("a key is proved by a completion, never by a public model list", () => {
-  // 🔴 The trap this guards, caught by testing a FAKE key against my own fix:
-  // `GET {base}/models` looks like an auth check and is served PUBLICLY by
-  // OpenRouter, so sk-or-v1- + 48 zeros came back 200 "ok". A check that passes
-  // a garbage key is worse than no check - it is the exact defect 1.1.6 removed.
-  // The listing may only choose a model; the proof must be a completion.
+test("a public model list can never prove a key, but a gated one can", () => {
+  // 🔴 The trap, caught by testing a FAKE key against my own fix: `GET
+  // {root}/models` looks like an auth check and OpenRouter serves it PUBLICLY,
+  // so sk-or-v1- + 48 zeros came back 200 "ok". A check that passes a garbage
+  // key is worse than no check.
+  //
+  // ⭐ The fix is not "never trust a listing" - it is ASK TWICE. Measured
+  // 2026-09-03 across all 13 key providers: 4 serve the listing publicly
+  // (openrouter, nvidia, requesty, opencode-zen) and the rest refuse it without
+  // a key. When the anonymous request is refused and ours succeeds, the key
+  // opened a door that is shut without it, and that IS proof. It is the only
+  // proof available for a provider that is not OpenAI-shaped: gemini has no
+  // /chat/completions at all and could never be checked before this.
   const prov = fs.readFileSync(pkg("src", "setup", "providers.mjs"), "utf8");
   const fn = prov.slice(prov.indexOf("async function askProviderDirectly"), prov.indexOf("export async function verifyModelProvider"));
   assert.ok(fn.length > 200, "askProviderDirectly exists");
-  assert.match(fn, /\/chat\/completions`/, "the evidence is a completion");
-  assert.match(fn, /max_tokens: 1/, "and a cheap one");
-  // The model list must never on its own return ok.
-  // Anchored on the numbered step, not on prose that gets reworded - the last
-  // version of this test silently sliced past the completion step when the
-  // comment changed, and stopped checking anything.
-  const iList = fn.indexOf("`${root}/models`");
-  const iProof = fn.indexOf("// 2. Proof of life");
-  assert.ok(iList > 0 && iProof > iList, "the listing step comes before the proof step");
-  const listPart = fn.slice(iList, iProof);
-  assert.ok(!/return "ok"/.test(listPart), 'the model list must never conclude "ok" by itself');
-  // 401/403 from the listing may still condemn a key (some providers gate it).
-  assert.match(listPart, /r\.status === 401 \|\| r\.status === 403\) return "rejected"/);
-  // Verified live 2026-09-02: real key -> ok, fake key -> rejected.
+  assert.match(fn, /const \[mine, anon\] = await Promise\.all/, "the listing is asked with and without the key");
+  assert.match(fn, /const gated = anon\.status === 401 \|\| anon\.status === 403;/);
+  const gatedPart = fn.slice(fn.indexOf("if (gated) {"), fn.indexOf("// Public listing"));
+  assert.match(gatedPart, /if \(mine\.status === 200\) return "ok";/, "a gated listing that opens for our key proves it");
+  // A 200 on a PUBLIC listing must never conclude "ok" on its own.
+  const publicPart = fn.slice(fn.indexOf("// Public listing"), fn.indexOf("// 2. Proof of life"));
+  assert.ok(!/return "ok"/.test(publicPart), "a public listing may only supply model names");
+  assert.match(fn, /\/chat\/completions`/, "and the fallback evidence is a completion");
+  assert.match(fn, /max_tokens: 1/, "a cheap one");
+  // gemini declares the LISTING as its base url, so the root is one segment up.
+  assert.ok(fn.includes(String.raw`.replace(/\/models\/?$/, "")`), "a base url that already ends in /models is handled");
+  // 400 is only a refusal when the provider says so in words - calling a good
+  // key invalid is the worst answer this check can give.
+  assert.match(fn, /if \(mine\.status === 400\)/);
+  assert.match(fn, /api\.\?key\|unauthor/);
+  // Verified live 2026-09-03 with a fake key: gemini, mistral, cerebras, groq,
+  // openrouter, zai and chutes all "rejected" in under 1.5 s; cloudflare-ai
+  // stays "unknown" because its API is not OpenAI-shaped at all.
 });
 
 test("adding a provider re-syncs the agent, or the models never show up", () => {

@@ -35,6 +35,7 @@ for (const t of targets) {
   // with a new flow id each time, forever. fetch() gives up at 20 hops and
   // reports a bare "fetch failed", which reads exactly like a dead host.
   let loop = false;
+  let reset = false;
   try {
     const res = await fetch(t.url, {
       method: "GET",
@@ -51,10 +52,21 @@ for (const t of targets) {
       loop = true;
       note = "login redirect loop - the host answered, it just will not settle without cookies";
     }
+    // A connection RESET is not a 404 either. Measured 2026-09-03 on
+    // serper.dev: ECONNRESET from Node on both serper.dev and www.serper.dev,
+    // while google.serper.dev on the same host answers 403. The site is alive
+    // and is refusing a client it does not recognise - some hosts drop the
+    // connection on a TLS fingerprint rather than replying. Reporting that as a
+    // dead link is the same false negative that nearly got Mistral dropped, so
+    // it is a warning: this machine cannot tell, and a browser must decide.
+    if (/ECONNRESET|EPROTO|ECONNREFUSED|socket hang up/i.test(cause + " " + err.message)) {
+      reset = true;
+      note = "connection reset - this host refuses an unrecognised client; check it in a browser";
+    }
   }
   // 403 from a console behind bot protection is not a dead link; 404 and 5xx are.
   const ok = status !== null && status < 400;
-  const tolerated = status === 401 || status === 403 || status === 429 || loop;
+  const tolerated = status === 401 || status === 403 || status === 429 || loop || reset;
   if (!ok && !tolerated) bad++;
   const mark = ok ? "ok  " : tolerated ? "warn" : "FAIL";
   if (loop) status = status ?? "302";
@@ -67,4 +79,4 @@ if (bad) {
   say(`${bad} link(s) did not resolve. Fix config/providers/free.json before shipping.`);
   process.exit(1);
 }
-say("Every signup link resolves (401/403/429 and login redirect loops tolerated - those are consoles behind a login).");
+say("Every signup link resolves (401/403/429, login redirect loops and connection resets tolerated - those are live hosts refusing a scripted client).");

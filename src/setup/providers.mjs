@@ -228,29 +228,61 @@ async function askProviderDirectly(id, apiKey) {
   const entry = mf?.get(id);
   const base = entry?.endpoints?.baseUrl;
   if (!base) return "unknown";
-  const root = base.replace(/\/chat\/completions\/?$/, "");
+  // ⚠️ A provider's declared base URL is not always the completions endpoint.
+  // Measured 2026-09-03: gemini declares
+  // `https://generativelanguage.googleapis.com/v1beta/models` - the listing
+  // itself. Stripping only `/chat/completions` left the root one segment too
+  // deep, every probe 404d, and gemini could never be checked at all.
+  const root = base.replace(/\/chat\/completions\/?$/, "").replace(/\/models\/?$/, "");
   if (!/^https:\/\//i.test(root)) return "unknown";
   const H = authHeaders(entry, apiKey);
 
-  // 1. The listing. A refusal here is decisive for the eight providers that
-  //    gate it; a 200 proves nothing and is used only for model names.
-  let models = [];
-  try {
-    const r = await fetch(`${root}/models`, { headers: H, signal: AbortSignal.timeout(20_000) });
-    if (r.status === 401 || r.status === 403) return "rejected";
-    if (r.ok) {
-      const d = await r.json().catch(() => null);
-      models = (d?.data ?? d?.models ?? [])
-        .map((m) => (typeof m === "string" ? m : m?.id ?? m?.name))
-        .filter((x) => typeof x === "string" && !/:(batch|thinking|extended|online|preview)$/i.test(x));
+  // The listing, asked TWICE: once with the key and once with nothing at all.
+  //
+  // ⭐ The second call is what makes a listing usable as proof. On its own a
+  // 200 means nothing - measured across all 13 key providers, four serve their
+  // catalogue publicly (openrouter, nvidia, requesty, opencode-zen), which is
+  // how `sk-or-v1-` + 48 zeros once came back "ok". But if the SAME request
+  // without a key is refused and with the key succeeds, the key opened a door
+  // that is shut without it. That is real evidence, and it is the only evidence
+  // available for a provider that is not OpenAI-shaped.
+  const get = async (headers) => {
+    try {
+      const r = await fetch(`${root}/models`, { headers, signal: AbortSignal.timeout(20_000) });
+      return { status: r.status, body: r };
+    } catch {
+      return { status: 0, body: null }; // unreachable says nothing about the key
     }
-  } catch {
-    return "unknown"; // unreachable from here says nothing about the key
+  };
+  const [mine, anon] = await Promise.all([get(H), get({ accept: "application/json" })]);
+  if (mine.status === 0) return "unknown";
+  if (mine.status === 401 || mine.status === 403) return "rejected";
+
+  const gated = anon.status === 401 || anon.status === 403;
+  if (gated) {
+    if (mine.status === 200) return "ok";
+    // A gated listing that answers 400 to our key is usually saying the key is
+    // wrong - gemini replies 400 "API key not valid". But 400 also means a
+    // malformed request, and calling a GOOD key invalid is the worst answer
+    // this check can give, so the body has to actually say so.
+    if (mine.status === 400) {
+      const text = await mine.body.text().catch(() => "");
+      if (/api.?key|unauthor|invalid.*(credential|token)|credential/i.test(text)) return "rejected";
+    }
   }
 
-  // 2. Proof of life. Needs the credential, so it cannot be faked by a public
-  //    endpoint. Several models are tried because any one of them may be
-  //    retired, gated, or out of capacity without the key being at fault.
+  // Public listing, or a shape we do not recognise. Model names only.
+  let models = [];
+  if (mine.status === 200) {
+    const d = await mine.body.json().catch(() => null);
+    models = (d?.data ?? d?.models ?? [])
+      .map((m) => (typeof m === "string" ? m : m?.id ?? m?.name))
+      .filter((x) => typeof x === "string" && !/:(batch|thinking|extended|online|preview)$/i.test(x));
+  }
+
+  // 2. Proof of life. Needs the credential, so a public endpoint cannot fake
+  //    it. Several models are tried because any one of them may be retired,
+  //    gated, or out of capacity without the key being at fault.
   for (const model of models.slice(0, 3)) {
     try {
       const r = await fetch(`${root}/chat/completions`, {
@@ -300,8 +332,16 @@ export async function verifyModelProvider(modelIds = [], id = null, apiKey = nul
     return { state: "unknown", reason: "it added no models to try" };
   }
   const client = new GatewayClient();
+  // ⚠️ A wall-clock budget, because six models at 45 s each is four and a half
+  // minutes of a reader watching a spinner. Measured 2026-09-03: adding a key
+  // for cloudflare-ai took 64.8 s to conclude nothing, because every model it
+  // contributed answered 502 and a 502 is inconclusive, so the loop kept going.
+  // The direct probe above settles almost every provider in under 1.5 s; this
+  // is the fallback, and a fallback that runs for a minute is its own defect.
+  const deadline = Date.now() + 30_000;
   let last = null;
   for (const model of candidates) {
+    if (Date.now() > deadline && last) break;
     try {
       await client.chat({
         model,
