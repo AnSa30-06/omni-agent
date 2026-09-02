@@ -48,6 +48,12 @@ export const PATHS = {
   workspace: path.join(os.homedir(), "OmniAgent Workspace"),
   /** Scratch space for downloads made by the browser/scraper tools. */
   downloads: path.join(HOME, "downloads"),
+  /**
+   * Which copy of the app owns this data directory. Holds a port and a pid -
+   * deliberately NOT the UI token, which is a per-launch secret and stays out
+   * of the filesystem (see the note in src/ui/server.mjs).
+   */
+  uiLock: path.join(HOME, "ui.lock"),
 };
 
 export function ensureDirs() {

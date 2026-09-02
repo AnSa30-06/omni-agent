@@ -2011,7 +2011,16 @@ pages.providers = async () => {
       const res = await api("providerAdd", { method: "POST", body: { id: p.id, key: input.value.trim() } });
       add.disabled = false;
       if (res.ok) {
-        toast(res.works === false ? `Saved, but: ${res.problem ?? "it did not answer"}` : `${p.label} connected`, res.works === false ? "bad" : "good");
+        // Three outcomes, and collapsing them is what made a rejected key look
+        // like a working one: it works, it was refused, or the provider was too
+        // busy to tell us. Only the first is "connected".
+        const msg =
+          res.works === true
+            ? `${p.label} connected - ${res.newModels} model${res.newModels === 1 ? "" : "s"} added.`
+            : res.works === false
+              ? `${res.problem} ${res.remedy ?? ""}`.trim()
+              : `${p.label}: key saved, but it could not be checked - ${res.problem ?? "no answer"}.`;
+        toast(msg, res.works === false ? "bad" : res.works === true ? "good" : "");
         openPage("providers");
       } else toast(res.error, "bad");
     };
@@ -2019,8 +2028,52 @@ pages.providers = async () => {
     const how = el("button", "btn", "How?");
     how.onclick = () => showSetup(p.id);
     row.append(how);
+    // A key that turned out to be wrong, or an account that has run out of
+    // credit, has to be removable - otherwise it sits there contributing models
+    // that cannot answer, and the only way out was the gateway's own dashboard.
+    if (p.connected && p.connectionId) {
+      const rm = el("button", "btn danger", "Remove");
+      rm.title = `Disconnect ${p.label} and take its models out of the list`;
+      rm.onclick = async () => {
+        rm.disabled = true;
+        const res = await api("providerRemove", { method: "POST", body: { connectionId: p.connectionId } });
+        toast(res.ok ? `${p.label} removed.` : (res.error ?? "Could not remove it"), res.ok ? "good" : "bad");
+        if (res.ok) openPage("providers");
+        else rm.disabled = false;
+      };
+      row.append(rm);
+    }
     c.append(row);
     inner.append(c);
+  }
+
+  // Connections this product's list does not name, but which are live and
+  // contributing models. Shown so a provider that is failing can at least be
+  // seen and switched off.
+  if (r.others?.length) {
+    section("Also connected");
+    for (const o of r.others) {
+      const c = el("div", "card");
+      const h = el("h3");
+      h.append(document.createTextNode(o.label));
+      h.append(el("span", "tag on", "connected"));
+      c.append(h);
+      c.append(el("p", "muted", "Added outside this list. Its models appear in the model picker."));
+      const row = el("div", "row");
+      row.style.marginTop = "10px";
+      row.append(el("span", "grow"));
+      const rm = el("button", "btn danger", "Remove");
+      rm.onclick = async () => {
+        rm.disabled = true;
+        const res = await api("providerRemove", { method: "POST", body: { connectionId: o.connectionId } });
+        toast(res.ok ? `${o.label} removed.` : (res.error ?? "Could not remove it"), res.ok ? "good" : "bad");
+        if (res.ok) openPage("providers");
+        else rm.disabled = false;
+      };
+      row.append(rm);
+      c.append(row);
+      inner.append(c);
+    }
   }
 
   section("Use a subscription you already pay for");

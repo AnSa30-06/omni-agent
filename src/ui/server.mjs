@@ -43,6 +43,24 @@ const TYPES = {
 let _server = null;
 let _token = null;
 let _port = 0;
+/** What to do when another copy of the app asks this one to show itself. */
+let _onShow = null;
+let _lastShow = 0;
+
+/**
+ * Register how this instance re-opens its own window.
+ *
+ * This is what lets a SECOND copy hand over instead of starting a rival stack:
+ * it asks the copy that already owns the data directory to show itself, and
+ * exits. See the /instance routes below and launchUI's lock.
+ */
+export function onShow(fn) {
+  _onShow = fn;
+}
+
+export function serverPort() {
+  return _port;
+}
 
 export function uiUrl() {
   return _server ? `http://127.0.0.1:${_port}/?t=${_token}` : null;
@@ -163,6 +181,27 @@ async function handle(req, res) {
     if (!authorised(req)) return send(res, 401, { error: "unauthorised" });
   } else if (!loopback(req)) {
     return send(res, 403, { error: "forbidden" });
+  }
+
+  /* Instance handshake. Deliberately NOT token-guarded, and deliberately
+   * useless without one: it says only that Omni Agent owns this port, and asks
+   * it to show its own window. No secret is disclosed and the agent cannot be
+   * driven through it, so a second copy can hand over without the token ever
+   * being written to disk. Loopback is already enforced above. */
+  if (p === "/instance") {
+    return send(res, 200, { omniAgent: true, pid: process.pid });
+  }
+  if (p === "/instance/show") {
+    // Debounced: a local process should not be able to flap the window.
+    if (Date.now() - _lastShow > 3000) {
+      _lastShow = Date.now();
+      try {
+        _onShow?.();
+      } catch (err) {
+        log.warn("could not show the window", { error: err.message });
+      }
+    }
+    return send(res, 200, { shown: true });
   }
 
   if (p.startsWith("/oc/")) {

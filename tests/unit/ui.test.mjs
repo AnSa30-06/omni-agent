@@ -535,8 +535,12 @@ test("adding a provider key reports what it unlocked, not just that it was store
   // "so what can I use now?"
   const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
   const fn = api.slice(api.indexOf("  async providerAdd("), api.indexOf("  async providerSignin("));
-  assert.match(fn, /const before = await modelIds\(\);/);
-  assert.match(fn, /const after = await modelIds\(\);/);
+  // Counted against the gateway rather than OpenCode: the plugin caches its
+  // model list for five minutes, so immediately after adding a key the old
+  // modelIds() diff came back EMPTY while the gateway had gone from 119 models
+  // to 1151 - which also left the key check with nothing to probe.
+  assert.match(fn, /const before = await gatewayIds\(\);/);
+  assert.match(fn, /const after = await gatewayIds\(\);/);
   assert.match(fn, /newModels: fresh\.length/);
 });
 

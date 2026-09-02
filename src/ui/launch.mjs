@@ -15,12 +15,13 @@
 // silently falls back to its own provider, and the user gets "Model
 // x-preview-f-free is not supported" on their first message. Measured
 // 2026-08-27 - so the gateway starts first and the agent server second, always.
+import fs from "node:fs";
 import path from "node:path";
 import { ensureRunning } from "../gateway/supervisor.mjs";
 import { applyConfig } from "../setup/apply-config.mjs";
 import { provisionGatewayToken } from "../gateway/provision.mjs";
 import { start as startAgent, stop as stopAgent } from "./opencode-server.mjs";
-import { startServer, stopServer, uiUrl } from "./server.mjs";
+import { startServer, stopServer, uiUrl, onShow, serverPort } from "./server.mjs";
 import { openWindow } from "./window.mjs";
 import { startArchiver, stopArchiver } from "./transcripts.mjs";
 import { startScheduler, stopScheduler } from "./routines.mjs";
@@ -167,10 +168,86 @@ async function bringUp(say) {
 }
 
 /**
+ * The copy of the app already using this data directory, if there is one.
+ *
+ * Two copies are not merely untidy: they run two agents against one `oc-data`,
+ * and both read-modify-write ui-prefs.json, transcripts/index.json and
+ * routines.json - so preferences are lost and a scheduled routine fires twice
+ * in the same tick. Measured 2026-09-02: two stacks came up together and each
+ * listed the other's conversations.
+ *
+ * The lock holds a port and a pid, never the UI token. Liveness is decided by
+ * asking the port, not by trusting the file: a copy killed from Task Manager
+ * leaves the lock behind, and a stale lock must never wedge the app shut.
+ */
+async function runningInstance() {
+  let lock = null;
+  try {
+    lock = JSON.parse(fs.readFileSync(PATHS.uiLock, "utf8"));
+  } catch {
+    return null; // no lock, or an unreadable one - treat as free
+  }
+  if (!lock?.port) return null;
+  try {
+    const r = await fetch(`http://127.0.0.1:${lock.port}/instance`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    if (!r.ok) return null;
+    const body = await r.json();
+    return body?.omniAgent === true ? { ...lock, ...body } : null;
+  } catch {
+    return null; // nothing answering: the lock is stale
+  }
+}
+
+function writeLock(port) {
+  try {
+    fs.writeFileSync(PATHS.uiLock, JSON.stringify({ port, pid: process.pid, startedAt: Date.now() }));
+  } catch (err) {
+    // A lock we cannot write is not worth failing a launch over; the worst
+    // case is the behaviour this product had all along.
+    log.warn("could not write the instance lock", { error: err.message });
+  }
+}
+
+function clearLock() {
+  try {
+    const lock = JSON.parse(fs.readFileSync(PATHS.uiLock, "utf8"));
+    // Only ever remove OUR lock - a crashed launch must not delete the lock of
+    // the copy that replaced it.
+    if (lock?.pid === process.pid) fs.unlinkSync(PATHS.uiLock);
+  } catch {}
+}
+
+/**
  * @param {{onProgress?:(m:string)=>void, open?:boolean}} [opts]
  */
 export async function launchUI(opts = {}) {
   const say = opts.onProgress ?? (() => {});
+
+  // One copy per data directory. A second double-click used to start a whole
+  // second stack; now it asks the copy that is already running to show itself
+  // and stops. OMNI_AGENT_ALLOW_MULTIPLE=1 is the escape hatch for debugging.
+  if (process.env.OMNI_AGENT_ALLOW_MULTIPLE !== "1") {
+    const other = await runningInstance();
+    if (other) {
+      say(`Omni Agent is already running (pid ${other.pid}).`);
+      if (opts.open === false) {
+        say("  Use that copy's own window. Close it first if you want a fresh one.");
+      } else {
+        say("  Bringing its window to you instead of starting a second copy.");
+        try {
+          await fetch(`http://127.0.0.1:${other.port}/instance/show`, {
+            method: "POST",
+            signal: AbortSignal.timeout(3000),
+          });
+        } catch {
+          say("  It did not answer; open it from the taskbar.");
+        }
+      }
+      return { ok: true, alreadyRunning: true, pid: other.pid };
+    }
+  }
 
   // The window first, so there is something to look at while the slow parts
   // start. The page polls the startup state and boots itself when it is ready.
@@ -179,7 +256,12 @@ export async function launchUI(opts = {}) {
   const ui = await startServer();
   const url = uiUrl();
 
+  writeLock(serverPort());
+  // Re-opening the window is what a second copy asks for when it hands over.
+  onShow(() => openWindow(url));
+
   const shutdown = () => {
+    clearLock();
     stopArchiver();
     stopScheduler();
     stopServer();

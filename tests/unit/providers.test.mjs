@@ -55,3 +55,47 @@ test("a signup link is present for anything that needs an account", () => {
     assert.match(s.signup ?? "", /^https:\/\//, `${s.id} has no signup URL`);
   }
 });
+
+test("a key is proved with a real call, because the gateway says a bad one is fine", () => {
+  // 🔴 The bug this exists for. Measured 2026-09-02: a deliberately invalid
+  // OpenRouter key ("sk-or-v1-000...0") was reported by the gateway's own
+  // /api/providers/{id}/test as {"valid":true,"diagnosis":{"type":"ok"}}, and
+  // adding it put 1032 models into the picker that all answer 401. The app said
+  // "OpenRouter connected" and every model failed - which is exactly what gets
+  // reported as "I added my key and it didn't work".
+  const prov = fs.readFileSync(pkg("src", "setup", "providers.mjs"), "utf8");
+  assert.match(prov, /export async function verifyModelProvider/);
+  // A DIRECT call: complete() would fall back to another provider and report a
+  // broken key as working - the one way this check could fool itself.
+  assert.match(prov, /client\.chat\(\{/, "the probe calls one model directly");
+  assert.ok(!/verifyModelProvider[\s\S]{0,900}complete\(/.test(prov), "the probe must not use the fallback chain");
+  // Three outcomes, never collapsed into two.
+  assert.match(prov, /status === 401 \|\| status === 403[\s\S]*?state: "rejected"/);
+  assert.match(prov, /status === 402[\s\S]*?no credit left/);
+  assert.match(prov, /state: "ok", model/);
+
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  const add = api.slice(api.indexOf("async providerAdd"), api.indexOf("async providerSignin"));
+  // A refused key must leave NOTHING behind, or its models stay in the picker.
+  assert.match(add, /if \(v\.state === "rejected"\)[\s\S]*?removeConnection/);
+  assert.match(add, /works: false,\s*\n\s*newModels: 0,/);
+  // works is a tri-state: null means "could not tell", not "failed".
+  assert.match(add, /works: v\.state === "ok" \? true : null,/);
+  // The before/after diff must come from the GATEWAY, not OpenCode's 5-minute
+  // cache - a stale diff was empty, so there was nothing to probe.
+  assert.match(add, /const before = await gatewayIds\(\)/);
+  assert.match(add, /startsWith\(alias \+ "\/"\)/, "only this provider's own models are probed");
+});
+
+test("a connection that is wrong or out of credit can be removed from the app", () => {
+  // providerRemove existed as a route with no caller, so a bad key could only
+  // be cleaned up from the gateway's own dashboard. And a connection the
+  // curated list does not name - measured: a `deepseek` one with no credit -
+  // was not shown at all while still feeding models into the picker.
+  const prov = fs.readFileSync(pkg("src", "setup", "providers.mjs"), "utf8");
+  assert.match(prov, /connectionId: connectionOf\.get\(p\.id\) \?\? null/, "the page is told which connection to remove");
+  assert.match(prov, /const others = \(conn\.connections \?\? \[\]\)[\s\S]*?!curated\.has\(c\.provider\)/);
+  const app = fs.readFileSync(pkg("src", "ui", "public", "app.js"), "utf8");
+  assert.match(app, /api\("providerRemove", \{ method: "POST", body: \{ connectionId: p\.connectionId \} \}\)/);
+  assert.match(app, /section\("Also connected"\)/);
+});

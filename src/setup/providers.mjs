@@ -19,6 +19,8 @@
 // when OmniRoute changes a provider.
 import fs from "node:fs";
 import { admin } from "../gateway/admin.mjs";
+import { GatewayClient } from "../gateway/client.mjs";
+import { HttpError } from "../util/http.mjs";
 import { pkg } from "../util/paths.mjs";
 import { setSecret, getSecret, listSecretNames } from "../util/secrets.mjs";
 import { gatewayBaseUrl } from "../config.mjs";
@@ -58,21 +60,42 @@ export async function listAll() {
   const cat = catalogue();
   const conn = await connected();
   const have = new Set((conn.connections ?? []).map((c) => c.provider));
+  // Which connection each provider is, so the page can offer to remove one.
+  // Without this a key that turned out to be wrong, or an account that ran out
+  // of credit, could only be cleaned up from the gateway's own dashboard.
+  const connectionOf = new Map((conn.connections ?? []).filter((c) => c.provider).map((c) => [c.provider, c.id]));
   const secrets = new Set(listSecretNames());
   const mf = await manifest();
 
   const models = cat.models.map((p) => ({
     ...p,
     connected: have.has(p.id),
+    connectionId: connectionOf.get(p.id) ?? null,
     known: mf ? mf.has(p.id) : null,
   }));
   const signIn = cat.signIn.map((p) => ({
     ...p,
     connected: have.has(p.id),
+    connectionId: connectionOf.get(p.id) ?? null,
     known: mf ? mf.has(p.id) : null,
   }));
   const search = cat.search.map((p) => ({ ...p, connected: secrets.has(p.secret) }));
-  return { ok: conn.ok, models, signIn, search, gatewayReachable: conn.ok, reason: conn.reason };
+
+  // Anything connected that this product's curated list does not mention.
+  //
+  // The gateway can reach 222 providers and the curated list names fifteen, so
+  // a connection made from the gateway's own dashboard - or one this product
+  // created before the list changed - was invisible here and could not be
+  // removed from the app at all. It still contributes models to the picker, so
+  // leaving it unlisted meant a provider could be failing every request with no
+  // way to see it, let alone turn it off. Measured 2026-09-02: a `deepseek`
+  // connection whose account had run out of credit.
+  const curated = new Set([...cat.models, ...cat.signIn].map((p) => p.id));
+  const others = (conn.connections ?? [])
+    .filter((c) => c.provider && !curated.has(c.provider))
+    .map((c) => ({ id: c.provider, label: c.provider, connectionId: c.id, connected: true }));
+
+  return { ok: conn.ok, models, signIn, search, others, gatewayReachable: conn.ok, reason: conn.reason };
 }
 
 /**
@@ -105,6 +128,71 @@ export async function addModelProvider(id, apiKey) {
 }
 
 /** Ask the gateway to make a real call against a connection. */
+/**
+ * Does this key ACTUALLY work?
+ *
+ * 🔴 The gateway's own `/test` is not an answer. Measured 2026-09-02: a
+ * deliberately invalid OpenRouter key (`sk-or-v1-000...0`) was reported
+ * `{"valid":true,"diagnosis":{"type":"ok"}}`, and adding it put **1032 models**
+ * into the picker that every one of them answers 401 to. So the app said
+ * "OpenRouter connected", the model list filled up, and everything failed -
+ * which is exactly what people report as "I added my key and it didn't work".
+ *
+ * ⚠️ Deliberately a DIRECT call to one of the provider's own models, never
+ * `complete()`. The fallback chain would answer the probe from some OTHER
+ * provider and report a broken key as working - the precise way this check
+ * could fool itself.
+ *
+ * The three outcomes are genuinely different and must not be collapsed:
+ *   ok       the key answered - it works
+ *   rejected the provider refused the credential (401/403) - the key is wrong
+ *   unknown  busy, out of credit, or down (429/5xx/timeout) - NOT the key's fault
+ *
+ * @param {string[]} modelIds catalogue ids this connection just unlocked
+ */
+export async function verifyModelProvider(modelIds = []) {
+  const candidates = modelIds.filter(Boolean).slice(0, 2);
+  if (!candidates.length) {
+    return { state: "unknown", reason: "it added no models to try" };
+  }
+  const client = new GatewayClient();
+  let last = null;
+  for (const model of candidates) {
+    try {
+      await client.chat({
+        model,
+        messages: [{ role: "user", content: "hi" }],
+        maxTokens: 1,
+        timeoutMs: 45_000,
+      });
+      return { state: "ok", model };
+    } catch (err) {
+      last = err;
+      const status = err instanceof HttpError ? err.status : null;
+      if (status === 401 || status === 403) {
+        return {
+          state: "rejected",
+          status,
+          reason: "the provider did not accept that key",
+        };
+      }
+      if (status === 402) {
+        return {
+          state: "unknown",
+          status,
+          reason: "the key works but the account has no credit left",
+        };
+      }
+      // Anything else - busy, rate-limited, upstream down - says nothing about
+      // the key, so try the next model and then give up without blaming it.
+    }
+  }
+  return {
+    state: "unknown",
+    reason: `it could not be checked right now (${String(last?.message ?? "no answer").slice(0, 120)})`,
+  };
+}
+
 export async function testConnection(connectionId) {
   const r = await admin("POST", `/api/providers/${connectionId}/test`);
   if (!r.ok) return { ok: false, reason: r.reason, detail: r.data };

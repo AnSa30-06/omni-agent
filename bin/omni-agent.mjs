@@ -479,6 +479,9 @@ async function main() {
       // opening a window, for anyone who would rather use their own browser.
       const r = await launchUI({ onProgress: say, open: !flags.has("--no-window") });
       if (!r.ok) return process.exit(1);
+      // Another copy owns this data directory; it has been asked to show its
+      // window. Nothing was started here, so this process just ends.
+      if (r.alreadyRunning) return process.exit(0);
       say("");
       if (r.ready === false) say("The start hit a problem. The window says what happened and what to do.");
       say("Omni Agent is open. Close the window when you are done.");

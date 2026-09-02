@@ -9,6 +9,7 @@
 // They are looked up in an explicit table, never built from the request path,
 // so a malformed URL is a 404 rather than a call to something unintended.
 import { admin, dashboardPassword } from "../gateway/admin.mjs";
+import { GatewayClient } from "../gateway/client.mjs";
 import { gatewayBaseUrl, loadConfig, updateConfig, DEFAULTS } from "../config.mjs";
 import { writeOpenCodeConfig } from "../setup/opencode-config.mjs";
 import { applyConfig } from "../setup/apply-config.mjs";
@@ -566,22 +567,74 @@ export const routes = {
     }
     // Counted before and after, because "key added" is not the answer to the
     // question the reader is actually asking, which is "so what can I use now?"
-    const before = await modelIds();
+    //
+    // ⚠️ Counted against the GATEWAY's own catalogue, not OpenCode's. OpenCode
+    // sees models through the OmniRoute plugin, which caches them for five
+    // minutes, so immediately after adding a key its list is still the old one:
+    // measured 2026-09-02, the gateway went from 119 models to 1151 while this
+    // diff came back empty. An empty diff left the check below with nothing to
+    // probe, so a bad key sailed through as "could not be checked".
+    const gw = new GatewayClient();
+    const gatewayIds = async () => {
+      try {
+        return new Set((await gw.listModels()).map((m) => m.id).filter(Boolean));
+      } catch {
+        return new Set();
+      }
+    };
+    const before = await gatewayIds();
     const r = await providers.addModelProvider(body.id, body.key);
     if (!r.ok) return bad(r.reason);
-    const t = r.connectionId ? await providers.testConnection(r.connectionId) : null;
     // Invalidate the routing catalogue and re-resolve the agent's model BEFORE counting,
     // so `newModels` reports what is actually reachable now rather than what the stale
     // cache still remembers.
     const rewire = await providersChanged();
-    const after = await modelIds();
-    const fresh = [...after].filter((id) => !before.has(id));
+    const after = await gatewayIds();
+    const alias = String((await providers.manifest())?.get(body.id)?.alias ?? body.id).toLowerCase();
+    // Only this provider's own models are worth probing: the diff can pick up
+    // unrelated catalogue movement, and probing someone else's model would say
+    // nothing about this key.
+    const fresh = [...after]
+      .filter((id) => !before.has(id))
+      .filter((id) => String(id).toLowerCase().startsWith(alias + "/"));
+
+    // 🔴 "Stored" is not "works" - the same rule the search keys above already
+    // follow, and the model keys did not. The gateway's own /test reports
+    // {"valid":true} for a key that is not (measured 2026-09-02 with an invalid
+    // OpenRouter key, which then added 1032 models that all answer 401). So the
+    // key is proved with a real one-token call to one of the models it just
+    // unlocked.
+    const v = await providers.verifyModelProvider(fresh);
+
+    if (v.state === "rejected") {
+      // Leave nothing behind. A refused key otherwise sits there as a
+      // connection contributing a thousand models that cannot answer, and the
+      // next thing the reader picks fails for a reason they cannot see.
+      if (r.connectionId) await providers.removeConnection(r.connectionId).catch(() => {});
+      await providersChanged();
+      return ok({
+        added: r.id,
+        works: false,
+        newModels: 0,
+        problem: `${body.id} did not accept that key.`,
+        remedy:
+          "Check you copied the whole key, that it is for this provider, and that it is still active. Nothing was saved.",
+      });
+    }
+
     return ok({
       added: r.id,
       connectionId: r.connectionId,
-      works: t ? t.ok : null,
-      problem: (t && !t.ok ? t.error : null) ?? rewire.problem ?? null,
-      remedy: t?.remedy ?? null,
+      // A TRUE TRI-STATE. `null` is "we could not tell", which is not the same
+      // as failure and must never be rendered as one - collapsing them is how
+      // a refused key came to look like a working one in the first place.
+      works: v.state === "ok" ? true : null,
+      verified: v.state,
+      problem: v.state === "ok" ? (rewire.problem ?? null) : (v.reason ?? null),
+      remedy:
+        v.state === "ok"
+          ? null
+          : "The key is saved. This is the provider being busy or out of credit, not the key being wrong.",
       newModels: fresh.length,
       examples: fresh.slice(0, 5),
       agentModel: rewire.model,
