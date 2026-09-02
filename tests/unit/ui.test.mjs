@@ -804,3 +804,44 @@ test("folderCheck answers honestly about a folder", async () => {
   assert.equal((await routes.folderCheck({ query: { path: here } })).exists, false);
   assert.equal((await routes.folderCheck({ query: {} })).exists, false);
 });
+
+test("only one copy of the app owns a data directory", () => {
+  // Two copies ran two agents against one oc-data and both read-modify-wrote
+  // ui-prefs.json, transcripts/index.json and routines.json - so preferences
+  // were lost and a scheduled routine could fire twice in the same tick.
+  // Measured 2026-09-02: two stacks came up together and each listed the
+  // other's conversations.
+  const launch = ui("launch.mjs");
+  assert.match(launch, /async function runningInstance\(\)/);
+  // Liveness is decided by ASKING the port, never by trusting the file: a copy
+  // killed from Task Manager leaves its lock behind, and a stale lock must
+  // never wedge the app shut.
+  assert.match(launch, /fetch\(`http:\/\/127\.0\.0\.1:\$\{lock\.port\}\/instance`/);
+  assert.match(launch, /return null; \/\/ nothing answering: the lock is stale/);
+  assert.match(launch, /OMNI_AGENT_ALLOW_MULTIPLE/, "there is a documented escape hatch");
+  assert.match(launch, /alreadyRunning: true/);
+  // Only ever remove OUR lock, or a crashed launch deletes the lock of the
+  // copy that replaced it.
+  assert.match(launch, /if \(lock\?\.pid === process\.pid\) fs\.unlinkSync/);
+
+  // The lock must NOT carry the UI token: it is a per-launch secret and
+  // src/ui/server.mjs states it is never written to disk. That is why the
+  // handover goes through /instance instead of handing over a URL.
+  assert.match(launch, /JSON\.stringify\(\{ port, pid: process\.pid, startedAt: Date\.now\(\) \}\)/);
+  assert.ok(!/uiUrl\(\)[^\n]*writeFileSync/.test(launch), "the token is never written to the lock");
+
+  const server = ui("server.mjs");
+  assert.match(server, /if \(p === "\/instance"\)/);
+  assert.match(server, /if \(p === "\/instance\/show"\)/);
+  // The handshake reveals nothing and cannot drive the agent.
+  // Anchored AFTER the instance block starts: `p.startsWith("/oc/")` also
+  // appears in the auth guard near the top of the file, so a plain indexOf
+  // ends the slice before it begins.
+  const instStart = server.indexOf('p === "/instance"');
+  const inst = server.slice(instStart, server.indexOf('p.startsWith("/oc/")', instStart));
+  assert.ok(!/_token/.test(inst), "the instance handshake never touches the token");
+  assert.match(inst, /Date\.now\(\) - _lastShow > 3000/, "showing the window is debounced");
+
+  const bin = fs.readFileSync(pkg("bin", "omni-agent.mjs"), "utf8");
+  assert.match(bin, /if \(r\.alreadyRunning\) return process\.exit\(0\);/, "a second copy exits cleanly");
+});
