@@ -1243,8 +1243,28 @@ function postMessage(id, text, extra) {
   // Deliberately not awaited for rendering: this route only returns once the
   // whole reply is finished, and the transcript should fill in as it arrives.
   ocall("POST", `/session/${id}/message`, body)
-    .then((r) => {
-      if (!r.ok) toast(r.data?.message ?? `The agent could not answer (${r.status})`, "bad");
+    .then(async (r) => {
+      if (!r.ok) {
+        // The agent reports a deleted working folder as a bare 500 with
+        // "Unexpected server error" - it cannot resolve its own directory, and
+        // every later message fails the same way. Name the folder instead.
+        // Checked only on failure, so the happy path pays nothing.
+        const folder = state.sessionFolder;
+        if (r.status === 500 && folder) {
+          const chk = await api("folderCheck", { query: { path: folder } });
+          if (chk?.exists === false) {
+            toast(
+              `The folder this conversation works in is gone: ${folder}. Start a new conversation in another folder.`,
+              "bad",
+            );
+            endTurn();
+            return;
+          }
+        }
+        // The real text sits at data.data.message on this route; data.message
+        // is undefined and rendered as a bare status code.
+        toast(r.data?.data?.message ?? r.data?.message ?? `The agent could not answer (${r.status})`, "bad");
+      }
       // `session.idle` normally settles the turn well before this resolves.
       // This is the backstop for a model that streamed nothing at all.
       endTurn();
@@ -2177,7 +2197,17 @@ pages.transcripts = async () => {
       const b = el("button", "btn primary", "Bring it back");
       b.onclick = async () => {
         const res = await api("transcriptRestore", { method: "POST", body: { id: t.id } });
-        toast(res.ok ? "Restored." : res.error ?? res.reason, res.ok ? "good" : "bad");
+        // Where it went matters: a restored project used to be moved to the
+        // default workspace without a word, and the next thing built landed
+        // somewhere the reader had never chosen.
+        toast(
+          res.ok
+            ? res.movedFrom
+              ? `Restored into your default folder, because ${res.movedFrom} no longer exists.`
+              : `Restored, working in ${baseName(res.directory)}.`
+            : (res.error ?? res.reason),
+          res.ok ? "good" : "bad",
+        );
         loadSessions();
         openPage("transcripts");
       };

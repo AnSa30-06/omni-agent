@@ -46,7 +46,7 @@ function writeIndex(idx) {
 }
 
 /** Run an opencode subcommand and collect stdout. */
-function run(args, { timeoutMs = 60_000 } = {}) {
+function run(args, { timeoutMs = 60_000, cwd = PATHS.workspace } = {}) {
   return new Promise((resolve) => {
     const exe = locateOpenCode();
     if (!exe) return resolve({ ok: false, reason: "OpenCode is not installed" });
@@ -56,7 +56,7 @@ function run(args, { timeoutMs = 60_000 } = {}) {
       stdio: ["ignore", "pipe", "pipe"],
       shell: isCmd,
       windowsHide: true,
-      cwd: PATHS.workspace,
+      cwd,
     });
     let out = "";
     let err = "";
@@ -205,10 +205,30 @@ export async function list() {
 export async function restore(id) {
   const file = path.join(archiveDir(), `${id}.json`);
   if (!fs.existsSync(file)) return { ok: false, reason: `nothing archived for "${id}"` };
-  const r = await run(["import", file], { timeoutMs: 120_000 });
+
+  // Put it back in the folder it was working in.
+  //
+  // `opencode import` roots the restored session at the PROCESS CWD and
+  // ignores the directory recorded inside the file. With the cwd pinned to the
+  // default workspace, every restored project silently moved there - measured
+  // 2026-09-02 - so the next thing the reader asked for was built next to
+  // nothing they recognised, in a folder they never chose.
+  let recorded = null;
+  try {
+    recorded = JSON.parse(fs.readFileSync(file, "utf8"))?.info?.directory ?? null;
+  } catch {
+    /* a damaged archive still restores, just into the default workspace */
+  }
+  // A folder that has since been deleted or unplugged cannot be restored into,
+  // and failing outright would strand the conversation. Fall back, and say so -
+  // a silent move is the thing being fixed here.
+  const missing = !!recorded && !fs.existsSync(recorded);
+  const cwd = recorded && !missing ? recorded : PATHS.workspace;
+
+  const r = await run(["import", file], { timeoutMs: 120_000, cwd });
   if (!r.ok) return { ok: false, reason: r.reason, detail: r.detail };
-  log.info("restored transcript", { id });
-  return { ok: true, id };
+  log.info("restored transcript", { id, cwd, missing });
+  return { ok: true, id, directory: cwd, movedFrom: missing ? recorded : null };
 }
 
 /**

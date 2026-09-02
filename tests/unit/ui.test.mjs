@@ -761,3 +761,42 @@ test("a failure stops counting against a model after half an hour", () => {
   assert.match(app, /const failedAt = m\.info\?\.time\?\.completed \?\? m\.info\?\.time\?\.created \?\? Date\.now\(\);/);
   assert.match(app, /if \(key && \(state\.unhealthy\[key\]\?\.when \?\? 0\) < failedAt\)/);
 });
+
+test("a restored project comes back in its own folder, not the default one", () => {
+  // `opencode import` roots the session at the PROCESS CWD and ignores the
+  // directory recorded in the file, so with the cwd pinned to the workspace
+  // every restored project silently moved there and the next thing the reader
+  // asked for was built somewhere they never chose. Verified live 2026-09-02.
+  const tr = ui("transcripts.mjs");
+  assert.match(tr, /function run\(args, \{ timeoutMs = 60_000, cwd = PATHS\.workspace \} = \{\}\)/, "run takes a cwd");
+  assert.ok(!/cwd: PATHS\.workspace,/.test(tr), "the cwd is no longer hard-wired to the workspace");
+  assert.match(tr, /\?\.info\?\.directory/, "restore reads the folder recorded in the archive");
+  assert.match(tr, /const missing = !!recorded && !fs\.existsSync\(recorded\)/, "a folder that is gone is detected");
+  assert.match(tr, /const cwd = recorded && !missing \? recorded : PATHS\.workspace;/, "it restores into that folder, else falls back");
+  assert.match(tr, /movedFrom: missing \? recorded : null/, "a fallback is reported, never silent");
+  // And the page says where it went.
+  const app = ui("public", "app.js");
+  assert.match(app, /Restored into your default folder, because \$\{res\.movedFrom\} no longer exists\./);
+  assert.match(app, /Restored, working in \$\{baseName\(res\.directory\)\}\./);
+});
+
+test("a conversation whose folder is gone says so instead of a bare 500", () => {
+  // The agent cannot resolve a deleted working directory and answers HTTP 500
+  // "Unexpected server error" for every message forever. The real text also
+  // sits at data.data.message, not data.message.
+  const app = ui("public", "app.js");
+  assert.match(app, /if \(r\.status === 500 && folder\)/, "a 500 is checked against the folder");
+  assert.match(app, /api\("folderCheck", \{ query: \{ path: folder \} \}\)/);
+  assert.match(app, /The folder this conversation works in is gone: \$\{folder\}/);
+  assert.match(app, /r\.data\?\.data\?\.message \?\? r\.data\?\.message/, "the real error text is read from where it actually is");
+  assert.ok(Object.hasOwn(routes, "folderCheck"));
+});
+
+test("folderCheck answers honestly about a folder", async () => {
+  const here = path.join(os.tmpdir(), "omni-agent-folder-check-" + Date.now());
+  fs.mkdirSync(here, { recursive: true });
+  assert.equal((await routes.folderCheck({ query: { path: here } })).exists, true);
+  fs.rmSync(here, { recursive: true, force: true });
+  assert.equal((await routes.folderCheck({ query: { path: here } })).exists, false);
+  assert.equal((await routes.folderCheck({ query: {} })).exists, false);
+});

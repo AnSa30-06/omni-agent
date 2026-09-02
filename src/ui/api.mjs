@@ -702,6 +702,20 @@ export const routes = {
    * nonexistent `directory` without complaint and the failure only shows up
    * later, as an agent that cannot find any of the user's files.
    */
+  /**
+   * Is this folder still there?
+   *
+   * Asked only when a message has already failed, so it costs nothing on the
+   * happy path. A conversation whose folder has been deleted answers HTTP 500
+   * with "Unexpected server error" for every message forever, because the
+   * agent cannot resolve its own working directory - this is what turns that
+   * into a sentence naming the folder.
+   */
+  async folderCheck({ query }) {
+    const p = typeof query.path === "string" ? query.path : "";
+    return ok({ path: p, exists: !!p && fs.existsSync(p) });
+  },
+
   async folderSet({ body }) {
     const p = typeof body?.path === "string" ? body.path.trim() : "";
     if (!p) return bad("no folder given");
