@@ -16,9 +16,9 @@ faster — but that is an upgrade, not a requirement.
 
 ## Download
 
-**[⬇ Download OmniAgentSetup-1.1.5.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.1.5/OmniAgentSetup-1.1.5.exe)** — 74.5 MB, Windows 10/11 (64-bit)
+**[⬇ Download OmniAgentSetup-1.1.6.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.1.6/OmniAgentSetup-1.1.6.exe)** — 74.6 MB, Windows 10/11 (64-bit)
 
-That link always gives you version 1.1.5. The
+That link always gives you version 1.1.6. The
 [Releases page](https://github.com/AnSa30-06/omni-agent/releases/latest) has the newest
 version and the release notes.
 
@@ -42,13 +42,13 @@ If you would rather check the file is exactly the one that was published, run th
 PowerShell in your Downloads folder before opening it:
 
 ```powershell
-Get-FileHash .\OmniAgentSetup-1.1.5.exe -Algorithm SHA256
+Get-FileHash .\OmniAgentSetup-1.1.6.exe -Algorithm SHA256
 ```
 
 It should print:
 
 ```
-85E8B124C50042ECFAFFB273E3E1E2C5C2716CF8F85D014FEC14F31003BE8F6D
+17A93B1C59749745CF73DD9F4B1E7C14C528CE68B8A700B4DAF7794D061B26E1
 ```
 
 If it prints anything else, delete the file and download it again.
@@ -77,13 +77,13 @@ That's it. Ask it something.
 
 ### If you would rather not use an installer
 
-**[⬇ Download OmniAgent-Portable-1.1.5.zip](https://github.com/AnSa30-06/omni-agent/releases/download/v1.1.5/OmniAgent-Portable-1.1.5.zip)** — 123.3 MB
+**[⬇ Download OmniAgent-Portable-1.1.6.zip](https://github.com/AnSa30-06/omni-agent/releases/download/v1.1.6/OmniAgent-Portable-1.1.6.zip)** — 123.3 MB
 
 Extract it anywhere, run `setup.bat` once, then `app.bat` to open the app (or `start.bat`
 for the terminal interface). Nothing is written outside the folder and your own data
 directory, and nothing is added to the registry or the Start Menu.
 
-Its SHA-256 is `ca5c432a592c2785199fe8f3c3ab013c33051cb783bd5917dcb6ea4340456a27`.
+Its SHA-256 is `df5524c7564ec8980d5a1b80456163b6768a3a3208ad28d1487ab25d0ac261ee`.
 
 ---
 

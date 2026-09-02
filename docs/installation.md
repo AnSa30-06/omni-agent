@@ -47,7 +47,7 @@ a file exists.
 
 ### Total footprint
 
-About **6 GB** once fully set up. The installer is 74.5 MB and puts about 380 MB on disk
+About **6 GB** once fully set up. The installer is 74.6 MB and puts about 380 MB on disk
 (the application, a private Node.js runtime and `OmniAgent.exe`); the rest is downloaded on
 first run.
 
@@ -116,7 +116,7 @@ Credentials can also come from environment variables — see
 The installer itself supports Inno Setup's standard switches:
 
 ```
-OmniAgentSetup-1.1.5.exe /VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Apps\OmniAgent"
+OmniAgentSetup-1.1.6.exe /VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Apps\OmniAgent"
 ```
 
 ---
@@ -126,7 +126,7 @@ OmniAgentSetup-1.1.5.exe /VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART /
 Each release publishes a SHA-256 for both artefacts.
 
 ```powershell
-Get-FileHash .\OmniAgentSetup-1.1.5.exe -Algorithm SHA256
+Get-FileHash .\OmniAgentSetup-1.1.6.exe -Algorithm SHA256
 ```
 
 The installer is **not code-signed** — Windows SmartScreen will warn on first run. Choose
