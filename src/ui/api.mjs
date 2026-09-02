@@ -21,7 +21,7 @@ import { TIERS, getSaving, setSaving, measure, ALWAYS_PRESERVED } from "../routi
 import * as providers from "../setup/providers.mjs";
 import { availableProviders } from "../tools/search.mjs";
 import { listSecretNames } from "../util/secrets.mjs";
-import { oc, credentials } from "./opencode-server.mjs";
+import { oc, credentials, running as agentRunning, restart as restartAgent } from "./opencode-server.mjs";
 import * as transcripts from "./transcripts.mjs";
 import * as routines from "./routines.mjs";
 import { readPrefs, writePrefs } from "./prefs.mjs";
@@ -130,7 +130,18 @@ async function providersChanged() {
   clearCatalogueCache();
   try {
     const applied = await applyConfig();
-    return { rewired: true, model: applied.model };
+    // 🔴 And restart the agent, or the models never appear. OpenCode only
+    // learns this product's models when the OmniRoute plugin boots; nothing
+    // short of a restart makes a newly added provider visible in the picker.
+    // Without this the add reported "995 models added" and the list the reader
+    // was looking at did not change - measured 2026-09-02.
+    let agentRestarted = false;
+    if (agentRunning()) {
+      const r = await restartAgent();
+      agentRestarted = r?.ok === true;
+      if (!agentRestarted) apiLog.warn("could not restart the agent after a provider change", { reason: r?.reason });
+    }
+    return { rewired: true, model: applied.model, agentRestarted };
   } catch (err) {
     // A failure here is not a reason to report the key as unsaved - it IS saved. Say what
     // did and did not happen instead of collapsing both into one verdict.
@@ -606,7 +617,7 @@ export const routes = {
     // OpenRouter key, which then added 1032 models that all answer 401). So the
     // key is proved with a real one-token call to one of the models it just
     // unlocked.
-    const v = await providers.verifyModelProvider(fresh);
+    const v = await providers.verifyModelProvider(fresh, body.id, body.key);
 
     if (v.state === "rejected") {
       // Leave nothing behind. A refused key otherwise sits there as a
@@ -641,6 +652,9 @@ export const routes = {
       examples: fresh.slice(0, 5),
       agentModel: rewire.model,
       rewired: rewire.rewired,
+      // The page reloads its model list when this is true, so the new models
+      // are pickable straight away rather than after a restart nobody mentioned.
+      agentRestarted: rewire.agentRestarted === true,
     });
   },
 
@@ -658,7 +672,12 @@ export const routes = {
     const r = await providers.removeConnection(body.connectionId);
     if (!r.ok) return bad(r.reason);
     const rewire = await providersChanged();
-    return ok({ removed: body.connectionId, agentModel: rewire.model, rewired: rewire.rewired });
+    return ok({
+      removed: body.connectionId,
+      agentModel: rewire.model,
+      rewired: rewire.rewired,
+      agentRestarted: rewire.agentRestarted === true,
+    });
   },
 
   // --- search tools --------------------------------------------------------

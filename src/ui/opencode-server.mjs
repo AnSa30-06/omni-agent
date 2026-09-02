@@ -162,6 +162,29 @@ export async function start(opts = {}) {
   return { ok: true, baseUrl };
 }
 
+/**
+ * Stop the agent and start it again.
+ *
+ * 🔴 The reason adding an API key appeared to do nothing. OpenCode learns this
+ * product's models from the OmniRoute plugin, and that plugin force-syncs them
+ * only when it BOOTS. Its five-minute auto-sync does not notice a new provider:
+ * measured 2026-09-02, an app that had been running 21 minutes after a key was
+ * added still offered the 119 models it had cached before it, so the picker's
+ * "From your keys" was empty while the gateway was holding 995 of them. The
+ * key worked; the list the reader was looking at was simply old.
+ *
+ * ⚠️ stop() only ASKS the process to go. The exit handler is what clears
+ * `_state`, and start() returns `{reused:true}` while `_state` is still set -
+ * so starting immediately after stopping is a no-op. Hence the wait.
+ */
+export async function restart(opts = {}) {
+  if (!_state) return start(opts);
+  const workspace = _state.workspace;
+  stop();
+  for (let i = 0; i < 100 && _state; i++) await new Promise((r) => setTimeout(r, 100));
+  return start({ workspace, ...opts });
+}
+
 export function stop() {
   if (!_state) return;
   // Deliberate: the exit handler must NOT treat this as a crash and restart.

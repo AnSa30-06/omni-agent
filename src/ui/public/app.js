@@ -2021,6 +2021,9 @@ pages.providers = async () => {
               ? `${res.problem} ${res.remedy ?? ""}`.trim()
               : `${p.label}: key saved, but it could not be checked - ${res.problem ?? "no answer"}.`;
         toast(msg, res.works === false ? "bad" : res.works === true ? "good" : "");
+        // The agent was restarted so it would pick the new models up; reload
+        // the list here or the picker keeps showing the one from before.
+        await loadModels();
         openPage("providers");
       } else toast(res.error, "bad");
     };
@@ -2038,7 +2041,10 @@ pages.providers = async () => {
         rm.disabled = true;
         const res = await api("providerRemove", { method: "POST", body: { connectionId: p.connectionId } });
         toast(res.ok ? `${p.label} removed.` : (res.error ?? "Could not remove it"), res.ok ? "good" : "bad");
-        if (res.ok) openPage("providers");
+        if (res.ok) {
+          await loadModels();
+          openPage("providers");
+        }
         else rm.disabled = false;
       };
       row.append(rm);
@@ -2067,7 +2073,10 @@ pages.providers = async () => {
         rm.disabled = true;
         const res = await api("providerRemove", { method: "POST", body: { connectionId: o.connectionId } });
         toast(res.ok ? `${o.label} removed.` : (res.error ?? "Could not remove it"), res.ok ? "good" : "bad");
-        if (res.ok) openPage("providers");
+        if (res.ok) {
+          await loadModels();
+          openPage("providers");
+        }
         else rm.disabled = false;
       };
       row.append(rm);

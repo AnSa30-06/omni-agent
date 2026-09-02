@@ -150,8 +150,98 @@ export async function addModelProvider(id, apiKey) {
  *
  * @param {string[]} modelIds catalogue ids this connection just unlocked
  */
-export async function verifyModelProvider(modelIds = []) {
-  const candidates = modelIds.filter(Boolean).slice(0, 2);
+/**
+ * Ask the PROVIDER whether the key is good, without going through the gateway.
+ *
+ * ⭐ Why not through the gateway: measured 2026-09-02 with a key that was
+ * provably working, probing through it answered 404 "only available through the
+ * Batch API" and then 502, because some catalogue ids are batch-only serving
+ * modes and the gateway caches ONE upstream failure and replays it for other
+ * models for up to ~90 s. A perfect key reported "could not be checked".
+ *
+ * 🔴 AND WHY THIS IS A COMPLETION, NOT A MODEL LIST. The obvious shortcut -
+ * `GET {base}/models` with the key - is WRONG and I shipped it for ten minutes
+ * before the fake-key test caught it: OpenRouter serves that endpoint
+ * PUBLICLY, so `sk-or-v1-` + 48 zeros came back 200 "ok". A check that passes
+ * a garbage key is worse than no check, and is the exact defect 1.1.6 existed
+ * to remove. The model list is used only to CHOOSE a model; the proof is a
+ * one-token completion, which cannot succeed without a valid credential.
+ *
+ * @returns {"ok"|"rejected"|"unknown"}
+ */
+async function askProviderDirectly(id, apiKey) {
+  if (!apiKey) return "unknown";
+  const mf = await manifest();
+  const base = mf?.get(id)?.endpoints?.baseUrl;
+  if (!base) return "unknown";
+  const root = base.replace(/\/chat\/completions\/?$/, "");
+  if (!/^https:\/\//i.test(root)) return "unknown";
+  const H = { authorization: `Bearer ${apiKey}`, "content-type": "application/json" };
+
+  // Pick a model to speak to. This listing may be public - that is fine, it is
+  // not the evidence, only the shortlist.
+  let models = [];
+  try {
+    const r = await fetch(`${root}/models`, { headers: H, signal: AbortSignal.timeout(20_000) });
+    if (r.status === 401 || r.status === 403) return "rejected"; // some providers do gate it
+    if (r.ok) {
+      const d = await r.json();
+      models = (d?.data ?? d?.models ?? [])
+        .map((m) => m?.id)
+        .filter((x) => typeof x === "string" && !/:(batch|thinking|extended|online|preview)$/i.test(x));
+    }
+  } catch {
+    return "unknown";
+  }
+  if (!models.length) return "unknown";
+
+  // The actual proof: a one-token completion, which needs the credential.
+  for (const model of models.slice(0, 3)) {
+    try {
+      const r = await fetch(`${root}/chat/completions`, {
+        method: "POST",
+        headers: H,
+        body: JSON.stringify({ model, messages: [{ role: "user", content: "hi" }], max_tokens: 1 }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (r.ok) return "ok";
+      if (r.status === 401 || r.status === 403) return "rejected";
+      // 402 (no credit), 404 (this model is not servable), 429 (busy) all say
+      // nothing conclusive about the key - try another model.
+    } catch {
+      return "unknown";
+    }
+  }
+  return "unknown";
+}
+
+export async function verifyModelProvider(modelIds = [], id = null, apiKey = null) {
+  // The provider's own answer first: it is faster, cheaper and not subject to
+  // the gateway's routing or its backoff.
+  if (id) {
+    const direct = await askProviderDirectly(id, apiKey);
+    if (direct === "ok") return { state: "ok", how: "the provider accepted the key" };
+    if (direct === "rejected") return { state: "rejected", reason: "the provider did not accept that key" };
+  }
+
+  // WHICH models to try on, and it decides whether a good key is believed.
+  //
+  // Measured 2026-09-02 with a working OpenRouter key: the first two ids in
+  // catalogue order were batch-only models, which answer
+  // "[404]: This model is only available through the Batch API", so the check
+  // gave up and reported "could not be checked" for a key that was perfect.
+  // Worse, the gateway caches one upstream failure and replays it for OTHER
+  // models for up to ~90 s, so consecutive tries can all inherit one bad
+  // answer. Both problems are fixed the same way: prefer ordinary chat models,
+  // and try enough of them to get past a poisoned one.
+  const plain = (id) => !/:(batch|thinking|extended|online|preview)$/i.test(id);
+  const ranked = modelIds.filter(Boolean).sort((a, b) => {
+    // A plain `vendor/model` id with no suffix is the likeliest ordinary chat
+    // model; a suffixed variant is likeliest to be a special serving mode.
+    const score = (x) => (plain(x) ? 0 : 1) + (/:free$/i.test(x) ? 0 : 0);
+    return score(a) - score(b);
+  });
+  const candidates = ranked.slice(0, 6);
   if (!candidates.length) {
     return { state: "unknown", reason: "it added no models to try" };
   }
@@ -183,8 +273,9 @@ export async function verifyModelProvider(modelIds = []) {
           reason: "the key works but the account has no credit left",
         };
       }
-      // Anything else - busy, rate-limited, upstream down - says nothing about
-      // the key, so try the next model and then give up without blaming it.
+      // Anything else - busy, rate-limited, upstream down, a model that is not
+      // servable this way - says nothing about the key. Try the next model and
+      // then give up without blaming it.
     }
   }
   return {

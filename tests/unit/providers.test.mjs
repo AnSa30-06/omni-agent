@@ -121,3 +121,42 @@ test("in the app, the instructions point at the box on the page, not a terminal"
   const signin = setupSteps("claude", { context: "app" });
   assert.match(signin.steps.join(" | "), /Press Sign in on this page/);
 });
+
+test("a key is proved by a completion, never by a public model list", () => {
+  // 🔴 The trap this guards, caught by testing a FAKE key against my own fix:
+  // `GET {base}/models` looks like an auth check and is served PUBLICLY by
+  // OpenRouter, so sk-or-v1- + 48 zeros came back 200 "ok". A check that passes
+  // a garbage key is worse than no check - it is the exact defect 1.1.6 removed.
+  // The listing may only choose a model; the proof must be a completion.
+  const prov = fs.readFileSync(pkg("src", "setup", "providers.mjs"), "utf8");
+  const fn = prov.slice(prov.indexOf("async function askProviderDirectly"), prov.indexOf("export async function verifyModelProvider"));
+  assert.ok(fn.length > 200, "askProviderDirectly exists");
+  assert.match(fn, /\/chat\/completions`/, "the evidence is a completion");
+  assert.match(fn, /max_tokens: 1/, "and a cheap one");
+  // The model list must never on its own return ok.
+  const listPart = fn.slice(fn.indexOf("`${root}/models`"), fn.indexOf("The actual proof"));
+  assert.ok(!/return "ok"/.test(listPart), 'the model list must never conclude "ok" by itself');
+  // 401/403 from the listing may still condemn a key (some providers gate it).
+  assert.match(listPart, /r\.status === 401 \|\| r\.status === 403\) return "rejected"/);
+  // Verified live 2026-09-02: real key -> ok, fake key -> rejected.
+});
+
+test("adding a provider re-syncs the agent, or the models never show up", () => {
+  // Measured 2026-09-02: the gateway held 995 new models while the picker still
+  // offered the 119 it had cached before the key was added, because OpenCode
+  // learns models from the OmniRoute plugin only when that plugin BOOTS - its
+  // five-minute auto-sync does not notice a new provider. An app left running
+  // 21 minutes after the add still showed the old list.
+  const oc = fs.readFileSync(pkg("src", "ui", "opencode-server.mjs"), "utf8");
+  assert.match(oc, /export async function restart\(/);
+  // stop() only asks; start() returns {reused:true} while _state is still set,
+  // so a restart that does not wait is a silent no-op.
+  assert.match(oc, /for \(let i = 0; i < 100 && _state; i\+\+\)/, "restart waits for the process to actually go");
+
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  assert.match(api, /if \(agentRunning\(\)\) \{\s*\n\s*const r = await restartAgent\(\);/);
+  assert.match(api, /agentRestarted: rewire\.agentRestarted === true/);
+
+  const app = fs.readFileSync(pkg("src", "ui", "public", "app.js"), "utf8");
+  assert.ok((app.match(/await loadModels\(\);/g) ?? []).length >= 3, "the picker reloads after add and after remove");
+});
