@@ -15,7 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { PATHS } from "../util/paths.mjs";
-import { postJson } from "../util/http.mjs";
+import { getJson, postJson, HttpError } from "../util/http.mjs";
 import { gatewayBaseUrl } from "../config.mjs";
 import { setSecret, getSecret } from "../util/secrets.mjs";
 import { locateOmniRoute } from "./locate.mjs";
@@ -76,10 +76,45 @@ function resetGatewayPassword(password) {
  * Mint (or reuse) a gateway token and store it in the credential store.
  * @param {{force?:boolean}} [opts]
  */
+/**
+ * Does the token we already hold still work?
+ *
+ * 🔴 The check this function existed without, and the whole reason a valid API
+ * key could be reported as "unauthorized". The gateway's admin password and the
+ * database that validates it can get out of step - the comment on
+ * resetGatewayPassword below describes exactly how - and when they do, the
+ * stored token is refused by every /api/* call forever. Adding a provider key
+ * IS an /api/* call, so pasting a perfectly good OpenRouter key answered
+ * "unauthorized" and nothing anywhere said the gateway, not the key, was the
+ * problem. Measured 2026-09-02 on a real install.
+ *
+ * The repair path underneath - reset the password with OmniRoute's own tool,
+ * restart, re-mint - already existed and was simply unreachable, because a
+ * stored token short-circuited the function before any of it ran.
+ */
+async function tokenStillWorks() {
+  try {
+    const r = await getJson(`${gatewayBaseUrl()}/api/providers`, {
+      timeoutMs: 8000,
+      headers: { authorization: `Bearer ${getSecret("omniroute.managementKey") ?? getSecret("omniroute.apiKey")}` },
+    });
+    return r != null;
+  } catch (err) {
+    // Only an auth refusal condemns the token. A gateway that is down, busy or
+    // rate-limiting says nothing about whether the credential is good, and
+    // re-minting on a 429 would burn the very endpoint that is complaining.
+    if (err instanceof HttpError && (err.status === 401 || err.status === 403)) return false;
+    return true;
+  }
+}
+
 export async function provisionGatewayToken(opts = {}) {
   if (!opts.force) {
     const existing = getSecret("omniroute.apiKey");
-    if (existing) return { ok: true, reused: true };
+    // A token that exists is not a token that works. Reuse it only once the
+    // gateway has actually accepted it.
+    if (existing && (await tokenStillWorks())) return { ok: true, reused: true };
+    if (existing) log.warn("the stored gateway token is no longer accepted; re-provisioning", {});
   }
 
   const pw = adminPassword();
@@ -106,6 +141,20 @@ export async function provisionGatewayToken(opts = {}) {
   try {
     body = await connect();
   } catch (err) {
+    // A lockout, not a broken credential. Repeated refused logins trip the
+    // gateway's own rate limit, and telling someone to delete their data
+    // directory over it would be catastrophic advice for a problem that clears
+    // itself. Measured 2026-09-02: five attempts a minute apart all answered
+    // 429, and a gateway restart cleared it immediately.
+    if (/\b429\b/.test(err.message)) {
+      return {
+        ok: false,
+        reason: "the gateway is rate-limiting sign-in attempts",
+        remedy:
+          "Too many failed attempts in a row. Close Omni Agent, reopen it, and try again - " +
+          "restarting the gateway clears this. Nothing is wrong with your key or your settings.",
+      };
+    }
     // A 401 here means the .env password and the database disagree. Nothing the
     // user did wrong, and nothing they can fix by re-running setup - the
     // regenerated password is exactly what the database is rejecting.

@@ -228,3 +228,33 @@ test("the health check reports each result as it happens, and its window stays o
     "the shortcut runs the .cmd, not node.exe directly",
   );
 });
+
+test("a stored gateway token is verified before it is trusted", () => {
+  // 🔴 Why a VALID OpenRouter key answered "unauthorized". The gateway's admin
+  // password and the database that validates it can get out of step, and when
+  // they do the stored token is refused by every /api/* call - including the
+  // one that adds a provider key. provisionGatewayToken returned
+  // {ok:true, reused:true} the moment a token existed, so the repair path right
+  // below it (reset the password with OmniRoute's own tool, restart, re-mint)
+  // was unreachable and the install stayed broken forever.
+  // Measured 2026-09-02 on a real install; verified self-healing after the fix.
+  const prov = fs.readFileSync(pkg("src", "gateway", "provision.mjs"), "utf8");
+  assert.match(prov, /async function tokenStillWorks\(\)/);
+  assert.match(
+    prov,
+    /if \(existing && \(await tokenStillWorks\(\)\)\) return \{ ok: true, reused: true \}/,
+    "a token is reused only after the gateway has accepted it",
+  );
+  assert.match(prov, /the stored gateway token is no longer accepted; re-provisioning/);
+  // Only an auth refusal condemns the token - a gateway that is down or
+  // rate-limiting says nothing about the credential.
+  assert.match(
+    prov,
+    /err instanceof HttpError && \(err\.status === 401 \|\| err\.status === 403\)\) return false/,
+    "only an auth refusal condemns the token",
+  );
+  assert.match(prov, /return true;\s*\n\s*\}\s*\n\}/, "any other error leaves the token alone");
+  // And a lockout is explained rather than reported as a raw status code.
+  assert.match(prov, /the gateway is rate-limiting sign-in attempts/);
+  assert.ok(!/429[\s\S]{0,200}delete/i.test(prov), "a rate limit must never advise deleting the data directory");
+});
