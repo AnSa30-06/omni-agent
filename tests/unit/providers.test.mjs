@@ -261,3 +261,24 @@ test("a paid model wearing a free-looking prefix is filed under the key that pay
   assert.match(app, /from your \$\{m\.keyVendor\} key/, "the row must name the key, not the prefix");
   assert.ok(!/from your \$\{m\.vendor\} key/.test(app), "the first segment would read 'from your no-think key'");
 });
+
+test("the doctor reads keys from the gateway too, and its advice matches the measurement", () => {
+  // 🔴 Measured 2026-09-03 on a machine with a working OpenRouter key: the
+  // doctor printed "Provider keys: none configured" while the picker showed
+  // 1046 models from that key. configuredProviders() reads this app's own
+  // config, and a key added through the Providers page lives in the GATEWAY's
+  // connection list. Same lie as "not connected", different window.
+  const doc = fs.readFileSync(pkg("src", "setup", "doctor.mjs"), "utf8");
+  assert.match(doc, /const conn = await providers\.connected\(\);/);
+  assert.match(doc, /const all = \[\.\.\.new Set\(\[\.\.\.provs, \.\.\.\(gatewayKeys \?\? \[\]\)\]\)\];/);
+  // An unreachable gateway is a third state here as well, never "no keys".
+  assert.match(doc, /could not be checked - the model gateway did not answer/);
+  assert.match(doc, /This does NOT mean you have no keys/);
+  // And the old advice was measurably false: 8 of 9 keyless providers are dead.
+  // Comments stripped: the retracted wording is quoted in the comment that
+  // explains why it went, and a test that cannot tell those apart would fail
+  // for recording the reason.
+  const code = doc.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/the gateway serves free models/.test(code), "a key is not optional in the way this claimed");
+  assert.match(doc, /eight of the nine providers that need no key answer/);
+});

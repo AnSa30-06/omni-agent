@@ -13,6 +13,7 @@ import { locateOmniRoute, locateOpenCode } from "../gateway/locate.mjs";
 import { chromiumInstalled } from "../tools/browser.mjs";
 import { availableProviders } from "../tools/search.mjs";
 import { configuredProviders } from "../providers/usage-adapters.mjs";
+import * as providers from "./providers.mjs";
 import { ocConfigDir } from "./opencode-config.mjs";
 
 const OK = "ok";
@@ -179,11 +180,41 @@ export async function runDoctor(opts = {}) {
   }
 
   // --- Providers -----------------------------------------------------------
+  // 🔴 Two separate lies were being told here, both measured 2026-09-03 on a
+  // machine with a working OpenRouter key.
+  //
+  // "none configured" was FALSE: configuredProviders() reads keys held in this
+  // app's own config, and a key added through the app's Providers page lives in
+  // the GATEWAY's connection list instead. So the doctor said no keys while the
+  // picker showed 1046 models from one. That is the same defect as the app
+  // saying "not connected" beside a working key, in a different window.
+  //
+  // And "the gateway serves free models" was FALSE as advice: of the nine
+  // keyless providers on offer, EIGHT answer nothing at all - 71 of the 77
+  // keyless models cannot reply. Telling a reader a key is optional sends them
+  // to a pool of six working models without saying so.
   const provs = configuredProviders();
+  const conn = await providers.connected();
+  const gatewayKeys = conn.ok ? (conn.connections ?? []).map((c) => c.provider).filter(Boolean) : null;
+  const all = [...new Set([...provs, ...(gatewayKeys ?? [])])];
   add(
-    provs.length
-      ? row("Provider keys", OK, provs.join(", "))
-      : row("Provider keys", WARN, "none configured", "Not required - the gateway serves free models. Add keys for speed and higher limits.")
+    all.length
+      ? row("Provider keys", OK, all.join(", "))
+      : gatewayKeys === null
+        ? row(
+            "Provider keys",
+            WARN,
+            "could not be checked - the model gateway did not answer",
+            "This does NOT mean you have no keys. Start the gateway with `omni-agent gateway start` and run this again."
+          )
+        : row(
+            "Provider keys",
+            WARN,
+            "none added",
+            "Worth adding one. Measured 2026-09-03: eight of the nine providers that need no key answer " +
+              "nothing at all, leaving six working models. Open the app's Providers page, or run " +
+              "`omni-agent provider list` to see the free tiers."
+          )
   );
 
   // --- Search --------------------------------------------------------------

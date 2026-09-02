@@ -120,8 +120,14 @@ export async function runSetup(opts = {}) {
     say("  This sets up an AI agent that can write code, browse the web, do");
     say("  research, fill in web forms and work with your documents.");
     say();
-    say("  It works straight away with free models, so you do not need an");
-    say("  API key. You can add one later for more speed.");
+    // 🔴 This used to say "you do not need an API key". Measured 2026-09-03
+    // against the real upstreams: of the nine providers that need no key,
+    // EIGHT answer nothing at all, leaving six working models. Telling a
+    // first-time reader a key is optional is how they end up with an app that
+    // seems broken. It is the first thing they read, so it has to be true.
+    say("  It runs without an API key, but only a handful of free models still");
+    say("  answer - most of the keyless ones have stopped. Adding one free key");
+    say("  is the difference between a few models and over a thousand.");
     say();
     if (interactive) {
       await ask("  Press Enter to continue... ");
@@ -142,9 +148,9 @@ export async function runSetup(opts = {}) {
       say("  STEP 1 of 6   Your AI models");
       rule();
       say();
-      say("  The agent already works with no key at all. Everything below is an");
-      say("  upgrade: more models, more speed, higher limits - and every one of");
-      say("  these has a genuinely free tier that needs no card.");
+      say("  Without a key the agent has about six working models. Everything");
+      say("  below opens up hundreds more, and every one of these has a");
+      say("  genuinely free tier that needs no card.");
       say();
       say("  Skip all of it now and run `omni-agent provider` whenever you like.");
       say();
@@ -184,7 +190,10 @@ export async function runSetup(opts = {}) {
       say("  If you already PAY for Claude, ChatGPT, Copilot, Cursor or Gemini,");
       say("  you can sign in and use that subscription instead - nothing is");
       say("  charged twice. Run `omni-agent provider signin <name>` when ready.");
-      if (!enabled.length) say("\n  Nothing added. The free models will be used.");
+      if (!enabled.length) {
+        say("\n  Nothing added. The few keyless models that still answer will be used;");
+        say("  run `omni-agent provider` whenever you want the rest.");
+      }
     }
     updateConfig({ providers: { enabled } });
 

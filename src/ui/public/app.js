@@ -1727,10 +1727,14 @@ function popover(anchor, node) {
 /**
  * Every model, searchable.
  *
- * The whole list is offered - not a curated slice - because the point of the
- * gateway is breadth: 180-odd free models across a dozen providers, and the
- * user is entitled to pick any of them. That only works with a filter box, so
- * there is one, and it is focused the moment the picker opens.
+ * Nearly the whole list is offered, because the point of the gateway is
+ * breadth and the reader is entitled to pick any of it. The one exception is
+ * a vendor MEASURED not to answer - see keylessHealth() - and even those are
+ * one click away rather than gone.
+ *
+ * ⚠️ This comment used to claim "180-odd free models across a dozen
+ * providers". Measured 2026-09-03: 77 keyless models across nine vendors, of
+ * which SIX answer. The breadth is real, but it comes from keys.
  */
 function openModelPicker(e) {
   const box = el("div", "pop-search-wrap");
