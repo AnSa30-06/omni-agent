@@ -893,18 +893,43 @@ export const routes = {
     }
 
     await stop().catch(() => {});
-    const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15);
+    // ⚠️ `.slice(0, 15)` on an ISO string lands on the millisecond separator, so
+    // the old name ended in a dot - `corrupt-20260904180324.` - which is not a
+    // legal Windows directory name. Build it from the parts instead.
+    const d = new Date();
+    const p2 = (n) => String(n).padStart(2, "0");
+    const stamp =
+      `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
     const quarantine = path.join(PATHS.gatewayData, `corrupt-${stamp}`);
     fs.mkdirSync(quarantine, { recursive: true });
+    // 🔴 These moves used to be wrapped in a bare `catch {}`. Measured
+    // 2026-09-04: on Windows the file was still locked, every rename failed,
+    // the files stayed exactly where they were - and this route reported the
+    // database as moved aside. A cleanup that cannot fail cannot be trusted, so
+    // a failure is now reported and the WAL is never left without its database.
+    const failed = [];
     for (const suffix of ["", "-wal", "-shm"]) {
       const from = dbPath + suffix;
-      if (fs.existsSync(from)) {
-        try {
-          fs.renameSync(from, path.join(quarantine, `storage.sqlite${suffix}`));
-        } catch {}
+      if (!fs.existsSync(from)) continue;
+      try {
+        fs.renameSync(from, path.join(quarantine, `storage.sqlite${suffix}`));
+      } catch (err) {
+        failed.push(`storage.sqlite${suffix} (${err.code ?? err.message})`);
       }
     }
-    const up = await ensureRunning();
+    if (failed.length) {
+      await ensureRunning().catch(() => {});
+      return bad(
+        `The damaged database could not be moved aside: ${failed.join(", ")}. ` +
+          "Something still has the file open - close Omni Agent everywhere, then try again."
+      );
+    }
+    // A rebuilt database runs every migration from scratch, which takes far
+    // longer than an ordinary start. Measured 2026-09-04: the normal window
+    // expired and this reported a failure while the gateway was still coming up
+    // perfectly well.
+    let up = await ensureRunning();
+    if (up.ok === false) up = await ensureRunning({ startTimeoutMs: 180_000 }).catch(() => up);
     if (up.ok === false) return bad(`The database was moved aside but the gateway would not start: ${up.reason}`);
     // A fresh database has no credential, and no connections.
     const { provisionGatewayToken } = await import("../gateway/provision.mjs");

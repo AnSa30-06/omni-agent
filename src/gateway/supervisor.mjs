@@ -112,7 +112,14 @@ function alive(pid) {
 }
 
 /** Start the gateway if it is not already answering. Idempotent. */
-export async function ensureRunning({ onProgress = () => {} } = {}) {
+/**
+ * @param {{onProgress?: (msg: string) => void, startTimeoutMs?: number}} [opts]
+ *   `startTimeoutMs` overrides the configured window. Needed after the database
+ *   has been rebuilt: a fresh file runs every migration from scratch and takes
+ *   far longer than an ordinary start, and the normal window expiring made the
+ *   repair report a failure while the gateway was coming up perfectly well.
+ */
+export async function ensureRunning({ onProgress = () => {}, startTimeoutMs = null } = {}) {
   const cfg = loadConfig();
   const baseUrl = gatewayBaseUrl(cfg);
   const client = new GatewayClient({ baseUrl });
@@ -181,7 +188,7 @@ export async function ensureRunning({ onProgress = () => {} } = {}) {
   // pid is resolved from the listening port once the gateway answers.
   log.info("spawned gateway", { port: cfg.gateway.port, version: found.version });
 
-  const deadline = Date.now() + cfg.gateway.startTimeoutMs;
+  const deadline = Date.now() + (startTimeoutMs ?? cfg.gateway.startTimeoutMs);
   let lastNote = 0;
   while (Date.now() < deadline) {
     if (await client.isUp(2_000)) {

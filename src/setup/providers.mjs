@@ -203,6 +203,32 @@ function authHeaders(entry, apiKey) {
 }
 
 /**
+ * Does this refusal blame the CREDENTIAL, or the model?
+ *
+ * 🔴 The bug this exists for, and it condemned a perfectly good key. Measured
+ * 2026-09-04: the first two models in OpenRouter's own catalogue are
+ * `meta/muse-spark-1.3-contributor` and `meta/muse-spark-1.3`, and both answer
+ * HTTP 403 - *"This model requires you to complete the following before use:
+ * 18+ age confirmation"*. The third, `google/gemini-3.8-flash`, answers 200 on
+ * the SAME key. Treating any 403 as "the key is bad" stopped at the first one,
+ * so a working key was reported as refused because of the order of somebody
+ * else's list.
+ *
+ * 401 is unambiguous: it is always the credential. 403 means "you may not do
+ * this", which covers a bad key AND a model you have not unlocked, a region
+ * block, a moderation gate. So a 403 only condemns the key when the provider
+ * says so in words.
+ */
+export function blamesTheKey(status, body) {
+  if (status === 401) return true;
+  if (status !== 403) return false;
+  const text = String(body ?? "");
+  if (/\bmodel\b[^.]{0,80}\b(requires|restricted|not available|unavailable|access)/i.test(text)) return false;
+  if (/age confirmation|moderation|region|country|privacy policy|data policy/i.test(text)) return false;
+  return /api.?key|unauthor|invalid.*(credential|token)|no auth|credential|forbidden/i.test(text);
+}
+
+/**
  * Ask the PROVIDER whether the key is good, without going through the gateway.
  *
  * ⭐ Why not through the gateway: measured 2026-09-02 with a key that was
@@ -256,7 +282,10 @@ async function askProviderDirectly(id, apiKey) {
   };
   const [mine, anon] = await Promise.all([get(H), get({ accept: "application/json" })]);
   if (mine.status === 0) return "unknown";
-  if (mine.status === 401 || mine.status === 403) return "rejected";
+  if (mine.status === 401) return "rejected";
+  // A 403 on the LISTING is far more likely to be about the key than a 403 on
+  // one model, but it can still be a region block, so it is read the same way.
+  if (mine.status === 403 && blamesTheKey(403, await mine.body.text().catch(() => ""))) return "rejected";
 
   const gated = anon.status === 401 || anon.status === 403;
   if (gated) {
@@ -282,8 +311,10 @@ async function askProviderDirectly(id, apiKey) {
 
   // 2. Proof of life. Needs the credential, so a public endpoint cannot fake
   //    it. Several models are tried because any one of them may be retired,
-  //    gated, or out of capacity without the key being at fault.
-  for (const model of models.slice(0, 3)) {
+  //    gated, out of capacity, or age-restricted without the key being at
+  //    fault - and FIVE rather than three, because OpenRouter's list opens with
+  //    two age-gated models and three tries only just reached a usable one.
+  for (const model of models.slice(0, 5)) {
     try {
       const r = await fetch(`${root}/chat/completions`, {
         method: "POST",
@@ -292,7 +323,12 @@ async function askProviderDirectly(id, apiKey) {
         signal: AbortSignal.timeout(45_000),
       });
       if (r.ok) return "ok";
-      if (r.status === 401 || r.status === 403) return "rejected";
+      if (r.status === 401 || r.status === 403) {
+        // Only a refusal that names the CREDENTIAL ends this. One that blames
+        // the model means try another model - see blamesTheKey().
+        const body = await r.text().catch(() => "");
+        if (blamesTheKey(r.status, body)) return "rejected";
+      }
       // 402 no credit, 404 model not servable, 429 busy: inconclusive, next.
     } catch {
       return "unknown";

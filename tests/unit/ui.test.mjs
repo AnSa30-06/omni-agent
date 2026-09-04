@@ -903,3 +903,36 @@ test("a damaged gateway database is detected and repaired, not shown as 'not con
   // And the answer admits what was lost.
   assert.match(fn, /provider keys will need adding again/);
 });
+
+test("the gateway repair cannot silently fail to move the damaged file", () => {
+  // 🔴 All three found by RUNNING the repair on a really-corrupt database,
+  // 2026-09-04, not by reading it.
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  const fn = api.slice(api.indexOf("async gatewayRepair()"), api.indexOf("async folderCheck("));
+
+  // 1. A bare `catch {}` around renameSync meant every move could fail - the
+  //    files were locked by a still-running gateway - while the route reported
+  //    the database as moved aside. A cleanup that cannot fail cannot be
+  //    trusted, and it left a WAL with no database behind it.
+  // Comments stripped: the retracted code is quoted in the comment explaining
+  // why it went, and a test that cannot tell those apart fails for recording
+  // the reason. This is the second time that trap has been hit today.
+  const code = fn.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/catch \{\}/.test(code), "a rename failure must never be swallowed");
+  assert.match(fn, /failed\.push\(/);
+  assert.match(fn, /could not be moved aside/);
+
+  // 2. slice(0,15) on an ISO string lands on the millisecond separator, so the
+  //    directory was named `corrupt-20260904180324.` - a trailing dot, which is
+  //    not a legal Windows directory name.
+  assert.ok(!/toISOString\(\)[\s\S]{0,80}slice\(0, 15\)/.test(code), "the stamp must not end in a dot");
+  assert.match(fn, /getFullYear\(\)/);
+
+  // 3. A rebuilt database runs every migration from scratch and does not answer
+  //    inside the ordinary start window, so the repair reported a failure while
+  //    the gateway was coming up perfectly well.
+  assert.match(fn, /startTimeoutMs: 180_000/);
+  const sup = fs.readFileSync(pkg("src", "gateway", "supervisor.mjs"), "utf8");
+  assert.match(sup, /startTimeoutMs = null/);
+  assert.match(sup, /startTimeoutMs \?\? cfg\.gateway\.startTimeoutMs/);
+});

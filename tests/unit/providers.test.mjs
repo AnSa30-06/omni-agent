@@ -329,3 +329,43 @@ test("every model carries a plain-English strength, and the yardstick is not com
   assert.match(app, /if \(m\.like\) bits\.push\(m\.like\);/);
   assert.match(app, /rough guide, not a test score/, "the page says once that this is an estimate");
 });
+
+test("a 403 about the MODEL never condemns the key", async () => {
+  // 🔴 This shipped in 1.1.11, 1.1.12 and 1.1.13, and it rejected a key that
+  // was provably working. Measured 2026-09-04: OpenRouter's catalogue OPENS
+  // with meta/muse-spark-1.3-contributor and meta/muse-spark-1.3, both of which
+  // answer 403 "This model requires you to complete the following before use:
+  // 18+ age confirmation". The third model answers 200 on the SAME key. The
+  // checker returned on the first 403, so a good key was refused because of the
+  // order of somebody else's list.
+  //
+  // 401 is unambiguous - it is always the credential. 403 is not: it also
+  // covers a model you have not unlocked, a region block, a moderation gate.
+  const { blamesTheKey } = await import("../../src/setup/providers.mjs");
+  if (blamesTheKey) {
+    assert.equal(blamesTheKey(401, "anything at all"), true, "401 is always the credential");
+    assert.equal(
+      blamesTheKey(403, "This model requires you to complete the following before use: 18+ age confirmation"),
+      false,
+      "the exact body that caused the bug"
+    );
+    assert.equal(blamesTheKey(403, "No auth credentials found"), true);
+    assert.equal(blamesTheKey(403, "Invalid API key provided"), true);
+    assert.equal(blamesTheKey(403, "This model is not available in your region"), false);
+    assert.equal(blamesTheKey(429, "Invalid API key"), false, "only 401/403 may condemn");
+  }
+
+  const prov = fs.readFileSync(pkg("src", "setup", "providers.mjs"), "utf8");
+  assert.match(prov, /function blamesTheKey\(status, body\)/);
+  const fn = prov.slice(prov.indexOf("async function askProviderDirectly"), prov.indexOf("export async function verifyModelProvider"));
+  // The completion loop must consult the body, never return on the bare status.
+  assert.match(fn, /if \(blamesTheKey\(r\.status, body\)\) return "rejected";/);
+  assert.ok(
+    !/if \(r\.status === 401 \|\| r\.status === 403\) return "rejected";/.test(fn),
+    "a bare status must not end the completion loop"
+  );
+  // Five models, not three: three only just reached past the two age-gated ones.
+  assert.match(fn, /models\.slice\(0, 5\)/);
+  // Verified live 2026-09-04: the real key -> ok, a fake key -> rejected, and
+  // mistral/cerebras/gemini/groq still reject a fake key.
+});
