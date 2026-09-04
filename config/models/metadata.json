@@ -4,44 +4,364 @@
   "updated": "2026-08-27",
   "disclaimer": "capability_tier is a LOCAL EDITORIAL ESTIMATE maintained in this file. It is NOT a benchmark score and this product must never present it as one. speed_tier is likewise editorial and is superseded at runtime by measured tokens/sec whenever this installation has observed enough calls (see src/usage/telemetry.mjs). Cost figures are never stored here - they come from the gateway's pricing API or are reported as unknown.",
   "tiers": {
-    "capability": ["fast-basic", "medium", "strong", "very-strong", "elite"],
-    "speed": ["slow", "medium", "fast", "very-fast"]
+    "capability": [
+      "fast-basic",
+      "medium",
+      "strong",
+      "very-strong",
+      "elite"
+    ],
+    "speed": [
+      "slow",
+      "medium",
+      "fast",
+      "very-fast"
+    ]
   },
   "$patternNotes": "Matched case-insensitively against the model id, most specific first. Deliberately keyed on model FAMILY rather than exact version, so a new point release inherits sensible defaults instead of falling off the table.",
   "patterns": [
-    { "match": "opus", "capability_tier": "elite", "speed_tier": "medium", "recommended_tasks": ["planning", "hard-reasoning", "synthesis", "coding"] },
-    { "match": "gpt-5|o[34]-pro|o[34]\\b", "capability_tier": "elite", "speed_tier": "medium", "recommended_tasks": ["planning", "hard-reasoning", "coding"] },
-    { "match": "sonnet", "capability_tier": "very-strong", "speed_tier": "fast", "recommended_tasks": ["coding", "agentic", "synthesis", "browser-planning"] },
-    { "match": "gemini.*pro", "capability_tier": "very-strong", "speed_tier": "fast", "recommended_tasks": ["long-context", "synthesis", "vision"] },
-    { "match": "deepseek.*(r1|reason)", "capability_tier": "very-strong", "speed_tier": "medium", "recommended_tasks": ["hard-reasoning", "maths"] },
-    { "match": "grok", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["chat", "reasoning"] },
-    { "match": "deepseek", "capability_tier": "strong", "speed_tier": "very-fast", "recommended_tasks": ["coding", "extraction", "cheap-bulk"] },
-    { "match": "kimi|moonshot", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["long-context", "coding", "agentic"] },
-    { "match": "qwen.*(max|plus|235|72b)", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["coding", "multilingual"] },
-    { "match": "glm|zai", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["coding", "agentic"] },
-    { "match": "mistral.*large|mixtral", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["chat", "extraction"] },
-    { "match": "llama.*(405|70)b", "capability_tier": "strong", "speed_tier": "fast", "recommended_tasks": ["chat", "extraction"] },
-    { "match": "haiku", "capability_tier": "medium", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles", "simple-extraction"] },
-    { "match": "gemini.*flash|flash-lite", "capability_tier": "medium", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles", "simple-extraction", "bulk-summarise"] },
-    { "match": "gpt-.*(mini|nano)", "capability_tier": "medium", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles", "simple-extraction"] },
-    { "match": "minimax|mimo|gemma|phi|small|lite|tiny|8b|7b|4b|3b", "capability_tier": "fast-basic", "speed_tier": "very-fast", "recommended_tasks": ["classification", "titles"] }
+    {
+      "match": "opus",
+      "capability_tier": "elite",
+      "speed_tier": "medium",
+      "recommended_tasks": [
+        "planning",
+        "hard-reasoning",
+        "synthesis",
+        "coding"
+      ]
+    },
+    {
+      "match": "gpt-5|o[34]-pro|o[34]\\b",
+      "capability_tier": "elite",
+      "speed_tier": "medium",
+      "recommended_tasks": [
+        "planning",
+        "hard-reasoning",
+        "coding"
+      ]
+    },
+    {
+      "match": "sonnet",
+      "capability_tier": "very-strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "coding",
+        "agentic",
+        "synthesis",
+        "browser-planning"
+      ]
+    },
+    {
+      "match": "gemini.*pro",
+      "capability_tier": "very-strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "long-context",
+        "synthesis",
+        "vision"
+      ]
+    },
+    {
+      "match": "deepseek.*(r1|reason)",
+      "capability_tier": "very-strong",
+      "speed_tier": "medium",
+      "recommended_tasks": [
+        "hard-reasoning",
+        "maths"
+      ]
+    },
+    {
+      "match": "grok",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "chat",
+        "reasoning"
+      ]
+    },
+    {
+      "match": "deepseek",
+      "capability_tier": "strong",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "coding",
+        "extraction",
+        "cheap-bulk"
+      ]
+    },
+    {
+      "match": "kimi|moonshot",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "long-context",
+        "coding",
+        "agentic"
+      ]
+    },
+    {
+      "match": "qwen.*(max|plus|235|72b)",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "coding",
+        "multilingual"
+      ]
+    },
+    {
+      "match": "glm|zai",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "coding",
+        "agentic"
+      ]
+    },
+    {
+      "match": "magistral",
+      "capability_tier": "very-strong",
+      "speed_tier": "medium",
+      "recommended_tasks": [
+        "hard-reasoning",
+        "planning",
+        "synthesis"
+      ]
+    },
+    {
+      "match": "mistral-medium-3[.-]5",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "coding",
+        "agentic",
+        "synthesis",
+        "planning"
+      ]
+    },
+    {
+      "match": "mistral-large-2[5-9]|mistral-large-latest",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "coding",
+        "synthesis",
+        "planning"
+      ]
+    },
+    {
+      "match": "devstral",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "coding",
+        "agentic"
+      ]
+    },
+    {
+      "match": "codestral",
+      "capability_tier": "strong",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "coding"
+      ]
+    },
+    {
+      "match": "mistral-medium",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "coding",
+        "synthesis"
+      ]
+    },
+    {
+      "match": "pixtral",
+      "capability_tier": "medium",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "vision",
+        "extraction"
+      ]
+    },
+    {
+      "match": "mistral.*large|mixtral",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "chat",
+        "extraction"
+      ]
+    },
+    {
+      "match": "mistral-small",
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "chat",
+        "extraction",
+        "classify"
+      ]
+    },
+    {
+      "match": "mistral-saba",
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "chat",
+        "extraction"
+      ]
+    },
+    {
+      "match": "voxtral",
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "audio",
+        "extraction"
+      ]
+    },
+    {
+      "match": "ministral-14b",
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "chat",
+        "classify"
+      ]
+    },
+    {
+      "match": "ministral|mistral-nemo",
+      "capability_tier": "fast-basic",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "classify",
+        "title",
+        "extraction"
+      ]
+    },
+    {
+      "match": "llama.*(405|70)b",
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "recommended_tasks": [
+        "chat",
+        "extraction"
+      ]
+    },
+    {
+      "match": "haiku",
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "classification",
+        "titles",
+        "simple-extraction"
+      ]
+    },
+    {
+      "match": "gemini.*flash|flash-lite",
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "classification",
+        "titles",
+        "simple-extraction",
+        "bulk-summarise"
+      ]
+    },
+    {
+      "match": "gpt-.*(mini|nano)",
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "classification",
+        "titles",
+        "simple-extraction"
+      ]
+    },
+    {
+      "match": "minimax|mimo|gemma|phi|small|lite|tiny|8b|7b|4b|3b",
+      "capability_tier": "fast-basic",
+      "speed_tier": "very-fast",
+      "recommended_tasks": [
+        "classification",
+        "titles"
+      ]
+    }
   ],
   "$comboNotes": "OmniRoute's auto/* combos already perform routing, fallback and quota-awareness upstream. We treat them as first-class routing targets and prefer them over naming a vendor model, because the combo knows about credential state and rate limits that this client cannot see.",
   "combos": {
-    "auto/best-coding": { "capability_tier": "elite", "speed_tier": "medium", "intent": "coding" },
-    "auto/best-reasoning": { "capability_tier": "elite", "speed_tier": "medium", "intent": "hard-reasoning" },
-    "auto/pro-coding": { "capability_tier": "very-strong", "speed_tier": "fast", "intent": "coding" },
-    "auto/pro-reasoning": { "capability_tier": "very-strong", "speed_tier": "medium", "intent": "hard-reasoning" },
-    "auto/smart": { "capability_tier": "very-strong", "speed_tier": "medium", "intent": "general" },
-    "auto/coding": { "capability_tier": "strong", "speed_tier": "fast", "intent": "coding" },
-    "auto/reasoning": { "capability_tier": "strong", "speed_tier": "medium", "intent": "reasoning" },
-    "auto/chat": { "capability_tier": "strong", "speed_tier": "fast", "intent": "chat" },
-    "auto/best-fast": { "capability_tier": "strong", "speed_tier": "very-fast", "intent": "fast" },
-    "auto/fast": { "capability_tier": "medium", "speed_tier": "very-fast", "intent": "fast" },
-    "auto/cheap": { "capability_tier": "medium", "speed_tier": "very-fast", "intent": "cheap" },
-    "auto/best-free": { "capability_tier": "medium", "speed_tier": "medium", "intent": "free" },
-    "auto/vision": { "capability_tier": "strong", "speed_tier": "fast", "intent": "vision" },
-    "auto/best-vision": { "capability_tier": "very-strong", "speed_tier": "medium", "intent": "vision" }
+    "auto/best-coding": {
+      "capability_tier": "elite",
+      "speed_tier": "medium",
+      "intent": "coding"
+    },
+    "auto/best-reasoning": {
+      "capability_tier": "elite",
+      "speed_tier": "medium",
+      "intent": "hard-reasoning"
+    },
+    "auto/pro-coding": {
+      "capability_tier": "very-strong",
+      "speed_tier": "fast",
+      "intent": "coding"
+    },
+    "auto/pro-reasoning": {
+      "capability_tier": "very-strong",
+      "speed_tier": "medium",
+      "intent": "hard-reasoning"
+    },
+    "auto/smart": {
+      "capability_tier": "very-strong",
+      "speed_tier": "medium",
+      "intent": "general"
+    },
+    "auto/coding": {
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "intent": "coding"
+    },
+    "auto/reasoning": {
+      "capability_tier": "strong",
+      "speed_tier": "medium",
+      "intent": "reasoning"
+    },
+    "auto/chat": {
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "intent": "chat"
+    },
+    "auto/best-fast": {
+      "capability_tier": "strong",
+      "speed_tier": "very-fast",
+      "intent": "fast"
+    },
+    "auto/fast": {
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "intent": "fast"
+    },
+    "auto/cheap": {
+      "capability_tier": "medium",
+      "speed_tier": "very-fast",
+      "intent": "cheap"
+    },
+    "auto/best-free": {
+      "capability_tier": "medium",
+      "speed_tier": "medium",
+      "intent": "free"
+    },
+    "auto/vision": {
+      "capability_tier": "strong",
+      "speed_tier": "fast",
+      "intent": "vision"
+    },
+    "auto/best-vision": {
+      "capability_tier": "very-strong",
+      "speed_tier": "medium",
+      "intent": "vision"
+    }
   },
   "$taskNotes": "Which routing intent each internal task should ask for. Cheap tasks must not reach an elite model - that is the single biggest waste of budget in an agent loop.",
   "tasks": {
@@ -56,5 +376,19 @@
     "browser-plan": "smart",
     "synthesise": "smart",
     "chat": "balanced"
+  },
+  "$mistralNotes": "Mistral tiers added 2026-09-03 from the live OpenRouter catalogue (20 models, real prices, context and release dates), NOT from a benchmark and NOT from memory. Before this the whole lineup had one rule - `mistral.*large|mixtral` -> strong - so mistral-medium and codestral matched nothing and every mistral-small and ministral was filed fast-basic by the word 'small'. Anchor, same source same day, output $/M: Opus 5 = 25, Sonnet 4.6 = 15, Sonnet 5 = 10, Haiku 4.5 = 5; Mistral's flagship mistral-medium-3-5 = 7.5, mistral-large-2512 = 1.5, codestral = 0.9, mistral-small-2603 = 0.6, ministral-8b = 0.15, mistral-nemo = 0.03. TWO TRAPS worth keeping. (1) The naming ladder LIES about recency: mistral-large-2512 is newer AND five times cheaper than mistral-medium-3-5, so 'large' is not their top model any more - match on the dated id, never on the word large. (2) `magistral` and `pixtral` were NOT in the catalogue on 2026-09-03; their rules are placeholders by family naming and are unverified - they cost nothing while nothing matches them, but do not quote them as measured.",
+  "$comparisonNotes": "The one line a reader who does not follow model releases can actually use. A tier name like 'very-strong' means nothing to them; 'Sonnet 5 level' does, because that is the ladder everyone has heard of. Anthropic's names are the yardstick ONLY because they are the best known - nothing here is a claim about Anthropic. ⚠️ These are EDITORIAL ESTIMATES OF POSITIONING, not benchmark results, and the wording has to keep saying so: 'about', 'roughly', never 'equals' and never a score. See `disclaimer`. `comparisonSelf` names the family each tier is measured against, so the yardstick is never compared to itself - claude-opus-5 reading 'roughly Opus 5 level' is noise, not information.",
+  "comparisons": {
+    "elite": "roughly Opus 5 level",
+    "very-strong": "roughly Sonnet 5 level",
+    "strong": "between Haiku and Sonnet",
+    "medium": "roughly Haiku 4.5 level",
+    "fast-basic": "simpler than Haiku - quick jobs"
+  },
+  "comparisonSelf": {
+    "elite": "opus",
+    "very-strong": "sonnet",
+    "medium": "haiku"
   }
 }

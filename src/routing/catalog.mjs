@@ -195,6 +195,31 @@ function findPrice(pricing, id) {
   };
 }
 
+/**
+ * The one line about a model that a non-specialist can actually act on.
+ *
+ * A tier name like "very-strong" is meaningless to someone who does not follow
+ * model releases; "roughly Sonnet 5 level" is not, because that is the ladder
+ * everyone has heard of. Anthropic's names are the yardstick only because they
+ * are the best known - this is not a claim about Anthropic.
+ *
+ * ⚠️ It is an ESTIMATE OF POSITIONING, never a benchmark result, so the strings
+ * live beside the disclaimer in metadata.json and all say "roughly".
+ *
+ * @returns {string|null} null when the tier is unknown, so the UI shows nothing
+ *   rather than guessing.
+ */
+export function comparisonFor(tier, id = null) {
+  if (!tier) return null;
+  const md = metadata();
+  // Never compare the yardstick to itself: "claude-opus-5 - roughly Opus 5
+  // level" is noise, and it makes the whole label look automated rather than
+  // useful.
+  const self = md.comparisonSelf?.[tier];
+  if (self && id && new RegExp(self, "i").test(String(id))) return null;
+  return md.comparisons?.[tier] ?? null;
+}
+
 export function capabilityScore(tier) {
   return CAPABILITY_SCORE[tier] ?? 0.4;
 }

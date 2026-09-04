@@ -1786,6 +1786,10 @@ function openModelPicker(e) {
     const q = search.value.trim().toLowerCase();
     results.replaceChildren();
     lensRow.replaceChildren(lensBtn("all", "All"), lensBtn("free", "Free"), lensBtn("keys", "From your keys"));
+    // Said once, at the top, rather than hedging every single row.
+    results.append(
+      el("div", "pop-note prose", "Strength is compared to Claude's models because those names are the best known. It is a rough guide, not a test score."),
+    );
     if (!state.models.length) {
       // Almost always the gateway still warming up rather than a machine with
       // no models, and saying "none" invites the reader to go looking for a
@@ -1829,6 +1833,10 @@ function openModelPicker(e) {
         b.append(document.createTextNode(m.name));
         const bits = [];
         const bad = state.unhealthy[`${p.id}/${m.id}`];
+        // First, because it is the only thing most readers can judge a model
+        // by. "mistral-medium-3-5" tells them nothing; "between Haiku and
+        // Sonnet" tells them what they are choosing.
+        if (m.like) bits.push(m.like);
         if (m.broken) bits.push(m.broken);
         if (bad) bits.push("failed here before");
         if (m.id.startsWith("auto/")) bits.push("picks for you");

@@ -19,6 +19,7 @@ import { status as gatewayStatus } from "../gateway/supervisor.mjs";
 import { PAGES, dashboardUrl, openInBrowser } from "../gateway/dashboard.mjs";
 import { TIERS, getSaving, setSaving, measure, ALWAYS_PRESERVED } from "../routing/compression.mjs";
 import * as providers from "../setup/providers.mjs";
+import { estimateTiers, comparisonFor } from "../routing/catalog.mjs";
 import { availableProviders } from "../tools/search.mjs";
 import { listSecretNames } from "../util/secrets.mjs";
 import { oc, credentials, running as agentRunning, restart as restartAgent } from "./opencode-server.mjs";
@@ -372,6 +373,13 @@ export const routes = {
     // say WHY rather than letting the reader find out one failed message at a
     // time - see keylessHealth() for what was measured and when.
     const brokenBy = providers.keylessHealth();
+    // estimateTiers walks a regex table, and this runs over 1100+ models on
+    // every call, so each id is resolved once.
+    const tierCache = new Map();
+    const tierOf = (id) => {
+      if (!tierCache.has(id)) tierCache.set(id, estimateTiers(id)?.capability_tier ?? null);
+      return tierCache.get(id);
+    };
 
     const groups = (Array.isArray(all) ? all : []).map((p) => ({
       id: p.id,
@@ -425,6 +433,13 @@ export const routes = {
             // null for everything that works. A string is the measured reason,
             // shown to the reader verbatim.
             broken: (vendor && brokenBy.get(vendor.toLowerCase())?.reason) || null,
+            // How strong this model is, in the only terms a non-specialist can
+            // use: the ladder they have heard of. `tier` is the internal name,
+            // `like` is the sentence. Both are ESTIMATES OF POSITIONING - see
+            // the disclaimer in config/models/metadata.json - so the UI says
+            // "roughly", never a number.
+            tier: tierOf(id),
+            like: comparisonFor(tierOf(id), id),
           };
         })
         .filter((m) => m.textOut),

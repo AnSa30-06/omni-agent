@@ -282,3 +282,50 @@ test("the doctor reads keys from the gateway too, and its advice matches the mea
   assert.ok(!/the gateway serves free models/.test(code), "a key is not optional in the way this claimed");
   assert.match(doc, /eight of the nine providers that need no key answer/);
 });
+
+test("every model carries a plain-English strength, and the yardstick is not compared to itself", async () => {
+  // The reader's problem, in their words: "a lot of people don't know what
+  // models mistral provides, how good they are". A model id is not an answer.
+  // The picker now shows a line anyone can act on - "between Haiku and Sonnet".
+  const { estimateTiers, comparisonFor } = await import("../../src/routing/catalog.mjs");
+
+  // Mistral had exactly ONE rule before this - `mistral.*large|mixtral` - so
+  // mistral-medium and codestral matched nothing, and every mistral-small and
+  // ministral was filed fast-basic by the word "small".
+  const expected = {
+    "mistralai/mistral-medium-3-5": "strong",
+    "mistralai/mistral-large-2512": "strong",
+    "mistralai/devstral-2512": "strong",
+    "mistralai/codestral-2508": "strong",
+    "mistralai/mistral-small-2603": "medium",
+    "mistralai/ministral-14b-2512": "medium",
+    "mistralai/ministral-8b-2512": "fast-basic",
+    "mistralai/mistral-nemo": "fast-basic",
+  };
+  for (const [id, tier] of Object.entries(expected)) {
+    assert.equal(estimateTiers(id).capability_tier, tier, `${id} should be ${tier}`);
+  }
+
+  // The label is prose, and it must keep hedging - it is a positioning
+  // estimate, never a benchmark. See the disclaimer in metadata.json.
+  assert.match(comparisonFor("strong", "mistralai/mistral-medium-3-5"), /between Haiku and Sonnet/);
+  assert.match(comparisonFor("very-strong", "mistralai/magistral"), /roughly Sonnet 5 level/);
+  assert.ok(!/\d/.test(comparisonFor("strong", "x") ?? ""), "no score may appear in the label");
+
+  // 🔴 The yardstick is never measured against itself: "claude-opus-5 - roughly
+  // Opus 5 level" is noise and makes the whole feature look automated.
+  assert.equal(comparisonFor("elite", "anthropic/claude-opus-5"), null);
+  assert.equal(comparisonFor("very-strong", "anthropic/claude-sonnet-5"), null);
+  assert.equal(comparisonFor("medium", "anthropic/claude-haiku-4.5"), null);
+  // An unknown tier shows nothing rather than guessing.
+  assert.equal(comparisonFor(null, "whatever"), null);
+
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  assert.match(api, /like: comparisonFor\(tierOf\(id\), id\),/);
+  // Resolved once per id: this runs over 1100+ models on every models() call.
+  assert.match(api, /const tierCache = new Map\(\);/);
+
+  const app = fs.readFileSync(pkg("src", "ui", "public", "app.js"), "utf8");
+  assert.match(app, /if \(m\.like\) bits\.push\(m\.like\);/);
+  assert.match(app, /rough guide, not a test score/, "the page says once that this is an estimate");
+});
