@@ -181,6 +181,21 @@ h3 { line-height: 1.35; }
 .meter-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
 .meter.hot .meter-bar i { background: var(--bad); }
 
+/* Compact: offered in the header only once the conversation is actually
+   filling up, so it is not one more control to ignore on day one. */
+.btn.tiny { padding: 3px 9px; font-size: 11.5px; border-radius: 6px; }
+
+/* The handover brief carried into a fresh conversation. It is shown rather
+   than hidden: it is the only record of what the old conversation was about,
+   and a summary the reader cannot check is a summary they cannot trust. */
+.carry-over { margin-bottom: 14px; }
+.carry-text {
+  margin: 8px 0 0; padding: 9px 11px; max-height: 260px; overflow: auto;
+  background: var(--bg-soft, rgba(127,127,127,.08)); border-radius: 7px;
+  font: inherit; font-size: 12.5px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink-soft);
+}
+
 .view { display: none; flex: 1; min-height: 0; flex-direction: column; }
 .view.active { display: flex; }
 

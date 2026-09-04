@@ -434,11 +434,20 @@ test("attachments reach the model, and a retry sends the same ones", () => {
   assert.match(fn, /type: "file"/, "an inlinable file goes as a file part");
   assert.match(fn, /"file:\/\/" \+ f\.path\.replace/, "the url must be a file:// URL");
   assert.match(fn, /Use these files, reading them yourself/, "a non-inlinable file has to be named in words");
-  // The retry ladder re-sends the message; it must re-send the files with it.
-  assert.match(app, /inFlight = \{ id, text, extra,/);
+  // The retry ladder re-sends the message; it must re-send the files with it,
+  // and the exact TEXT that went the first time. `outgoing` rather than `text`
+  // because a compacted conversation carries its handover brief in that first
+  // message - a retry that re-derived the text would drop it.
+  assert.match(app, /inFlight = \{ id, text: outgoing, extra,/);
   assert.match(app, /postMessage\(inFlight\.id, inFlight\.text, inFlight\.extra\)/);
-  // And the chips must clear, or the next message re-sends them.
-  assert.match(app, /attachments = \[\];\s*\n\s*paintAttachments\(\);\s*\n\s*inFlight/);
+  // And the chips must clear BEFORE the message is built, or the next message
+  // re-sends them. Order, not adjacency: the handover brief for a compacted
+  // conversation is assembled between these two points.
+  const sendFn = app.slice(app.indexOf("async function send(text)"), app.indexOf("function autosize()"));
+  const iClear = sendFn.indexOf("attachments = [];");
+  const iPaint = sendFn.indexOf("paintAttachments();");
+  const iFlight = sendFn.indexOf("inFlight = {");
+  assert.ok(iClear > 0 && iPaint > iClear && iFlight > iPaint, "chips clear before the message is constructed");
 });
 
 test("OpenCode's own expansion of an attachment is not shown as the reader's words", () => {
@@ -935,4 +944,66 @@ test("the gateway repair cannot silently fail to move the damaged file", () => {
   const sup = fs.readFileSync(pkg("src", "gateway", "supervisor.mjs"), "utf8");
   assert.match(sup, /startTimeoutMs = null/);
   assert.match(sup, /startTimeoutMs \?\? cfg\.gateway\.startTimeoutMs/);
+});
+
+test("/compact is built here, because OpenCode declares the route and does not implement it", () => {
+  // 🔴 The obvious implementation is one line: forward to OpenCode's own
+  // `POST /api/session/{id}/compact`, which it PUBLISHES in its OpenAPI
+  // document. Measured 2026-09-05 against a real session driven the way this
+  // app drives one, it answers
+  //   503 {"_tag":"ServiceUnavailableError","message":"Session compact is not
+  //        available yet","service":"session.compact"}
+  // Declared is not implemented, and forwarding would have shipped a button
+  // that always fails.
+  const api = fs.readFileSync(pkg("src", "ui", "api.mjs"), "utf8");
+  const fn = api.slice(api.indexOf("async sessionCompact("), api.indexOf("async folderCheck("));
+  assert.ok(fn.length > 200, "the route exists");
+  const code = fn.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/\/compact/.test(code), "it must not forward to the route that 503s");
+  assert.match(fn, /task: "summarise"/, "it uses the routing table, not a hardcoded model");
+
+  // ⚠️ Without this the summariser writes ORDERS. Measured: a conversation in
+  // which nothing had been built came back with "Your job is to build the
+  // website now" - nobody said that, and the fresh agent would have acted on it.
+  assert.match(fn, /REPORT ONLY/);
+  assert.match(fn, /never invent a task nobody asked for/);
+
+  // Guards, both verified live.
+  assert.match(fn, /which conversation\?/);
+  assert.match(fn, /not enough here to summarise yet/);
+});
+
+test("compacting never destroys the conversation it summarises", () => {
+  const app = fs.readFileSync(pkg("src", "ui", "public", "app.js"), "utf8");
+  const fn = app.slice(app.indexOf("async function runCompact()"), app.indexOf("function paintCarryOver()"));
+  assert.ok(fn.length > 100, "runCompact exists");
+  // "Make this shorter" must not mean "lose my work". A fresh conversation is
+  // opened and the old one is left in the sidebar, untouched.
+  assert.ok(!/DELETE/.test(fn), "the old conversation is never deleted");
+  assert.match(fn, /await newSession\(\);/);
+  assert.match(fn, /state\.carryOver = \{ session: state\.sessionID, summary: r\.summary, from \};/);
+  // It survives closing the app between compacting and typing - otherwise the
+  // only record of the old conversation is silently thrown away.
+  assert.match(app, /savePrefs\(\{ carryOver: state\.carryOver \}\)/);
+  assert.match(app, /state\.carryOver = prefs\.carryOver \?\? null;/);
+
+  // Only an EXACT command is intercepted: a message that merely starts with "/"
+  // is a path or a question, and swallowing it would be worse than no commands.
+  assert.match(app, /if \(text\.trim\(\)\.toLowerCase\(\) === "\/compact"\)/);
+
+  // 🔴 The brief goes on inFlight.text, not inside postMessage, so a RETRY
+  // sends the same thing. A retry that dropped it would lose the whole history.
+  assert.match(app, /inFlight = \{ id, text: outgoing, extra/);
+  assert.match(app, /postMessage\(id, outgoing, extra\);/);
+
+  // The reader can see what was kept - a summary they cannot check is one they
+  // cannot trust - and the button appears when the context is actually filling.
+  assert.match(app, /function paintCarryOver\(\)/);
+  assert.match(app, /\$\("btn-compact"\)\.onclick = \(\) => runCompact\(\);/);
+  assert.match(app, /\$\("btn-compact"\)\.hidden = r\.context\.percent < 70;/);
+
+  const html = fs.readFileSync(pkg("src", "ui", "public", "index.html"), "utf8");
+  assert.match(html, /id="btn-compact"/);
+  const css = fs.readFileSync(pkg("src", "ui", "public", "app.css"), "utf8");
+  assert.match(css, /\.carry-text/);
 });

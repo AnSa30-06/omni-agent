@@ -943,6 +943,99 @@ export const routes = {
     });
   },
 
+  /**
+   * Summarise a conversation so it can be carried into a fresh one.
+   *
+   * 🔴 Why this is written here rather than forwarded to OpenCode. It PUBLISHES
+   * `POST /api/session/{id}/compact` in its own OpenAPI document, so the
+   * obvious implementation is one line. Measured 2026-09-05 against a real
+   * session driven the way this app drives one: it answers
+   *   503 {"_tag":"ServiceUnavailableError","message":"Session compact is not
+   *        available yet","service":"session.compact"}
+   * The route is declared and not implemented. Forwarding to it would have
+   * shipped a button that always fails.
+   *
+   * What compacting is FOR, in the reader's terms: a long conversation gets
+   * slower and more expensive, because every reply re-sends the whole history.
+   * This turns that history into a short brief. Nothing is deleted - the old
+   * conversation stays in the sidebar - and the summary is handed to a NEW
+   * conversation, which is what actually makes it short again.
+   */
+  async sessionCompact({ body }) {
+    const id = body?.session;
+    if (!id) return bad("which conversation?");
+    const r = await oc("GET", `/session/${id}/message`);
+    if (!r.ok) return bad(r.reason);
+    const list = r.data?.data ?? r.data ?? [];
+    if (!Array.isArray(list) || list.length < 2) {
+      return bad("There is not enough here to summarise yet.");
+    }
+
+    // Only the words. Tool calls and their output are the bulk of a coding
+    // transcript and the least useful thing to carry forward - what matters is
+    // what was decided and what is left, not every command that ran.
+    const turns = [];
+    for (const m of list) {
+      const role = m?.info?.role ?? m?.role;
+      if (role !== "user" && role !== "assistant") continue;
+      const text = (m?.parts ?? [])
+        .filter((p) => p?.type === "text" && typeof p.text === "string")
+        .map((p) => p.text)
+        .join("\n")
+        .trim();
+      if (text) turns.push(`${role === "user" ? "Them" : "You"}: ${text}`);
+    }
+    if (!turns.length) return bad("There is nothing written down in this conversation to summarise.");
+
+    // The tail, not the head: recent turns decide what happens next. The cap is
+    // characters rather than tokens because it only has to stop a runaway
+    // transcript from blowing the summariser's own context.
+    let transcript = turns.join("\n\n");
+    if (transcript.length > 60_000) transcript = "[earlier turns left out]\n\n" + transcript.slice(-60_000);
+
+    const { complete } = await import("../routing/execute.mjs");
+    let out;
+    try {
+      out = await complete({
+        task: "summarise",
+        maxTokens: 900,
+        messages: [
+          {
+            role: "system",
+            content:
+              // 🔴 The second paragraph is not padding. Measured 2026-09-05 on a
+              // three-turn conversation in which nothing had been built yet, the brief
+              // came back giving ORDERS - "Your job is to build the website now", "Do
+              // not ask the user extra questions" - neither of which anybody had said.
+              // A brief that invents a task makes the fresh agent act unprompted, and
+              // for the reader this product is for that is a surprise they cannot undo.
+              "You write handover notes. Given a conversation between a person and a coding agent, write the " +
+              "brief the agent would need to carry on in a fresh conversation with no memory of it. Cover: what " +
+              "they are trying to do, decisions already made and why, files and folders touched, what is " +
+              "finished, and what is still open. Keep exact names, paths, commands and numbers verbatim - a " +
+              "path they cannot copy is worse than a word they cannot read. Plain English, short sentences, no " +
+              "preamble, under 400 words. Write nothing but the brief.\n\n" +
+              "REPORT ONLY. Describe what happened and what was said. Never give instructions, never tell the " +
+              "agent what to do next, and never invent a task nobody asked for. If something was asked for but " +
+              "not done, write that it is outstanding - do not turn it into a command. Call the person \"they\", " +
+              "and never address the agent as \"you\".",
+          },
+          { role: "user", content: transcript },
+        ],
+      });
+    } catch (err) {
+      return bad(`The summary could not be written: ${err.message}`);
+    }
+    const summary = String(out?.content ?? "").trim();
+    if (!summary) return bad("The model returned an empty summary, so nothing was changed.");
+
+    return ok({
+      summary,
+      turns: turns.length,
+      model: out.servedBy ?? out.requested ?? null,
+    });
+  },
+
   async folderCheck({ query }) {
     const p = typeof query.path === "string" ? query.path : "";
     return ok({ path: p, exists: !!p && fs.existsSync(p) });

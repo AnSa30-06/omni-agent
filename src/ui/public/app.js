@@ -125,6 +125,12 @@ const state = {
   // this to tell the two apart and not blame the reader for a model's silence.
   // In memory only - it describes one page's session, not a stored preference.
   noAnswer: new Set(),
+  // The handover brief from a compacted conversation, waiting to be attached to
+  // the FIRST message of its replacement. Kept in prefs so closing the app
+  // between compacting and typing does not lose it - that would silently throw
+  // away the only record of what the old conversation was about.
+  // { session, summary, from }
+  carryOver: null,
 };
 
 /**
@@ -283,6 +289,7 @@ async function openSession(id) {
   state.sessionFolder = d.data?.directory ?? null;
   paintFolder();
   await refreshMessages();
+  paintCarryOver();
   subscribe(id, state.sessionFolder);
   refreshUsage();
 }
@@ -1311,8 +1318,68 @@ function retryOnAnotherModel() {
   return true;
 }
 
+/**
+ * Shorten a long conversation without losing the thread.
+ *
+ * 🔴 Written here rather than forwarded to OpenCode, which PUBLISHES
+ * `POST /api/session/{id}/compact` in its own API document and then answers
+ * 503 "Session compact is not available yet" (measured 2026-09-05 on a real
+ * session). Declared is not implemented.
+ *
+ * What it does: writes a handover brief, opens a NEW conversation, and hands
+ * the brief to it. ⚠️ The old conversation is NEVER deleted - it stays in the
+ * sidebar - because "make this shorter" must not mean "lose my work".
+ */
+async function runCompact() {
+  if (!state.sessionID) return toast("Open a conversation first", "bad");
+  if (state.busy) return toast("Wait for the current answer to finish", "bad");
+
+  const from = state.sessions.find((x) => x.id === state.sessionID)?.title || "the last conversation";
+  toast("Summarising this conversation\u2026");
+  setBusy("sending");
+  const r = await api("sessionCompact", { method: "POST", body: { session: state.sessionID } });
+  setBusy(false);
+  if (!r?.ok) return toast(r?.error ?? "Could not summarise this conversation", "bad");
+
+  await newSession();
+  if (!state.sessionID) return;
+  state.carryOver = { session: state.sessionID, summary: r.summary, from };
+  savePrefs({ carryOver: state.carryOver });
+  paintCarryOver();
+  toast(`Summarised ${r.turns} messages. Carry on here - the notes go with your next message.`, "good");
+}
+
+/** Show the brief at the top of the fresh conversation, so it is not a secret. */
+function paintCarryOver() {
+  if (!state.carryOver || state.carryOver.session !== state.sessionID) return;
+  const box = $("messages");
+  if (!box || box.querySelector(".carry-over")) return;
+  const card = el("div", "card carry-over");
+  card.append(el("h3", null, `Carried over from "${state.carryOver.from}"`));
+  card.append(
+    el(
+      "p",
+      null,
+      "That conversation is still in the sidebar, untouched. These notes go with your next message so the " +
+        "agent knows where you got to.",
+    ),
+  );
+  const pre = el("pre", "carry-text", state.carryOver.summary);
+  card.append(pre);
+  box.prepend(card);
+}
+
 async function send(text) {
   if (!text.trim()) return;
+  // Only an EXACT known command is intercepted. Anything else that starts with
+  // "/" is a normal message - a path, or a question about a command - and
+  // swallowing those would be worse than having no commands at all.
+  if (text.trim().toLowerCase() === "/compact") {
+    $("prompt").value = "";
+    autosize();
+    await runCompact();
+    return;
+  }
   const fresh = !state.sessionID;
   if (!state.sessionID) await newSession();
   const id = state.sessionID;
@@ -1329,8 +1396,23 @@ async function send(text) {
   const extra = attachmentParts();
   attachments = [];
   paintAttachments();
-  inFlight = { id, text, extra, tries: 0, tried: [], error: null };
-  postMessage(id, text, extra);
+  // The handover brief rides with the first message and then goes. It is put on
+  // `inFlight.text` rather than added inside postMessage so that a RETRY sends
+  // exactly the same thing - a retry that dropped the brief would quietly lose
+  // the conversation's whole history.
+  let outgoing = text;
+  if (state.carryOver && state.carryOver.session === id) {
+    outgoing =
+      "Notes from an earlier conversation, for background. Do not reply to them:\n\n" +
+      state.carryOver.summary +
+      "\n\n---\n\n" +
+      text;
+    state.carryOver = null;
+    savePrefs({ carryOver: null });
+    document.querySelector(".carry-over")?.remove();
+  }
+  inFlight = { id, text: outgoing, extra, tries: 0, tried: [], error: null };
+  postMessage(id, outgoing, extra);
 
   // The title is generated after the first exchange, so pick it up shortly.
   setTimeout(loadSessions, 6000);
@@ -1352,12 +1434,18 @@ async function refreshUsage() {
     $("context-fill").style.width = r.context.percent + "%";
     $("context-text").textContent = `${r.context.percent}% of context`;
     meter.classList.toggle("hot", r.context.percent >= 85);
+    // ⭐ The command alone is no good to the reader this product is for: they
+    // will never discover `/compact` by typing it. When the conversation is
+    // actually getting full, the way out appears next to the thing that says
+    // so.
+    $("btn-compact").hidden = r.context.percent < 70;
   } else if (r?.context) {
     meter.hidden = false;
     $("context-fill").style.width = "0%";
     $("context-text").textContent = `${fmtNum(r.context.used)} tokens`;
   } else {
     meter.hidden = true;
+    $("btn-compact").hidden = true;
   }
 
   const pill = $("usage-pill");
@@ -2833,6 +2921,7 @@ function wire() {
   $("model-btn").onclick = openModelPicker;
   $("folder-btn").onclick = openFolderPicker;
   $("mode-btn").onclick = openModePicker;
+  $("btn-compact").onclick = () => runCompact();
   $("btn-stop").onclick = async () => {
     if (!state.sessionID) return;
     // The route that actually stops a turn started on the legacy message
@@ -2892,6 +2981,7 @@ async function boot() {
   state.mode = MODES[prefs.mode] ? prefs.mode : "auto";
   state.model = prefs.model ?? null;
   state.unhealthy = prefs.unhealthy ?? {};
+  state.carryOver = prefs.carryOver ?? null;
   state.verifiedModel = prefs.verifiedModel ?? null;
   state.showReasoning = prefs.showReasoning === true;
   setSurface(prefs.surface === "code" ? "code" : "chat");
