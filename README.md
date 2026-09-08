@@ -99,6 +99,7 @@ Its SHA-256 is `b59c59c9261317b3cc70219b06bc7ea522674c876ba44fd317af2cdd2743af76
 | **Data analysis** | Profiles a spreadsheet — types, missing values, statistics — without spending tokens on it. |
 | **Git and GitHub** | Branches, commits, pull requests, issues. |
 | **Choose its own model** | Picks a cheap fast model for simple work and a strong one for hard work. |
+| **Turn customer data into decisions** | **Decisions**: reads your customer spreadsheets, finds the accounts where several things changed at once, and gives you a short list of things to act on — with the evidence. [Read more](docs/decisions/). |
 
 ### It stops before doing anything irreversible
 
@@ -313,6 +314,9 @@ to waste a budget.
 ```bash
 omni-agent ui              # open the desktop app (same as OmniAgent.exe)
 omni-agent ui --no-window  # ...and use your own browser instead
+omni-agent decisions       # open Decisions: customer data -> decisions
+omni-agent decisions seed demo    # load a demo company to try it on
+omni-agent decisions run          # run the analysis without opening a window
 omni-agent                 # start the agent in the terminal instead
 omni-agent routine list    # scheduled routines
 omni-agent routine run ID  # run one now
@@ -371,10 +375,51 @@ browser — navigate, snapshot, click, type, select, upload, tabs, extract, scre
 download, wait — is *one* tool with an `action` argument, not eighteen tools. Eight tools
 total.
 
+---
+
+## Decisions
+
+A second thing in the same window, for anyone who has customers rather than a
+codebase.
+
+You give it a folder of spreadsheets — accounts, daily usage, contacts, support
+tickets, invoices. It works out what changed for every customer, finds the ones
+where **several** things moved together, and asks an AI to explain what it means
+and what to do. You get a short list. Each item carries its evidence and the
+money at stake.
+
+Then it remembers. A decision stays until you close it, tells you when it is
+overdue, and asks what actually happened.
+
+```bash
+omni-agent decisions              # open it
+omni-agent decisions seed demo    # 48 made-up customers to try it on
+omni-agent decisions run          # analyse, from a terminal
+```
+
+Two rules it does not break:
+
+- **Every number was computed from your data, not written by an AI.** The
+  software does the arithmetic; the model only reads sentences the software wrote
+  and writes the explanation. An answer containing a figure that is not in your
+  data is thrown away and asked for again.
+- **One thing changing is never a decision.** It takes a combination. That rule
+  is in code, so it holds even when the model is unavailable — and when it is,
+  the decision is still raised, from the rules, and says so.
+
+Nothing is sent anywhere. There is no code in it that can send an email, and the
+only thing that leaves your machine is a short, name-free fact sheet about one
+customer, and only when you run an analysis.
+[Privacy](docs/decisions/privacy.md) shows exactly what that is.
+
+**Start with [Getting started](docs/decisions/getting-started.md)**, and read
+[Limitations](docs/decisions/limitations.md) before relying on it.
+
 ### Documentation
 
 | | |
 |---|---|
+| [Decisions](docs/decisions/) | Turning customer data into decisions: setup, the screens, privacy and limits |
 | [The desktop app](docs/desktop-app.md) | The window: Chat and Code, the working folder, routines, transcripts, models |
 | [Installation](docs/installation.md) | Every install path, and what each one does |
 | [Architecture](docs/architecture.md) | How the pieces fit, and the decisions behind them |

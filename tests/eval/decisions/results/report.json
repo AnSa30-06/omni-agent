@@ -1,0 +1,209 @@
+{
+  "at": "2026-09-08T23:45:23.118Z",
+  "mode": "recorded",
+  "runs": 1,
+  "targets": {
+    "recall": 0.85,
+    "falsePositivesPerDataset": 1,
+    "evidenceHitRate": 0.9,
+    "ungroundedNumbers": 0,
+    "certaintyLanguage": 0,
+    "acceptableActionRate": 0.8,
+    "cohortDecisions": 1,
+    "cohortChurnOnHealthy": 0
+  },
+  "results": [
+    {
+      "dataset": "demo",
+      "accounts": 48,
+      "detection": {
+        "planted": 14,
+        "detected": 14,
+        "recall": 1,
+        "falsePositives": 0,
+        "misses": [],
+        "falsePositiveDetail": []
+      },
+      "evidence": {
+        "checked": 13,
+        "strongestCited": 13,
+        "hitRate": 1
+      },
+      "grounding": {
+        "ungroundedNumbers": 0,
+        "certaintyLanguage": 0,
+        "externalCauseClaims": 0
+      },
+      "recommendations": {
+        "checked": 13,
+        "inCatalogue": 13,
+        "rate": 1
+      },
+      "cohort": {
+        "decisions": 0,
+        "churnOnHealthyMembers": 0
+      },
+      "cost": {
+        "modelCalls": 16,
+        "firstAttemptValidRate": 0.857,
+        "ruleOnlyDecisions": 0,
+        "inputTokens": 11200,
+        "outputTokens": 3160,
+        "wallMs": 79,
+        "model": "recorded/model"
+      },
+      "summary": {
+        "accounts": 48,
+        "signals": 65,
+        "candidates": 14,
+        "reasoned": 14,
+        "cached": 0,
+        "created": 13,
+        "updated": 0,
+        "notActionable": 0,
+        "eased": 0,
+        "llmCalls": 16,
+        "llmFailures": 0,
+        "inputTokens": 11200,
+        "outputTokens": 3160,
+        "model": "recorded/model",
+        "cohort": null,
+        "asOf": "2026-09-09"
+      }
+    },
+    {
+      "dataset": "demo-cohort",
+      "accounts": 48,
+      "detection": {
+        "planted": 14,
+        "detected": 12,
+        "recall": 0.857,
+        "falsePositives": 0,
+        "misses": [
+          {
+            "account": "ACC-033",
+            "scenario": "churn_subtle",
+            "wanted": "churn_risk",
+            "got": []
+          },
+          {
+            "account": "ACC-034",
+            "scenario": "churn_subtle",
+            "wanted": "churn_risk",
+            "got": []
+          }
+        ],
+        "falsePositiveDetail": []
+      },
+      "evidence": {
+        "checked": 11,
+        "strongestCited": 11,
+        "hitRate": 1
+      },
+      "grounding": {
+        "ungroundedNumbers": 0,
+        "certaintyLanguage": 0,
+        "externalCauseClaims": 0
+      },
+      "recommendations": {
+        "checked": 12,
+        "inCatalogue": 12,
+        "rate": 1
+      },
+      "cohort": {
+        "decisions": 1,
+        "churnOnHealthyMembers": 0
+      },
+      "cost": {
+        "modelCalls": 15,
+        "firstAttemptValidRate": 0.75,
+        "ruleOnlyDecisions": 1,
+        "inputTokens": 10500,
+        "outputTokens": 2960,
+        "wallMs": 41,
+        "model": "recorded/model"
+      },
+      "summary": {
+        "accounts": 48,
+        "signals": 88,
+        "candidates": 12,
+        "reasoned": 12,
+        "cached": 0,
+        "created": 12,
+        "updated": 0,
+        "notActionable": 0,
+        "eased": 0,
+        "llmCalls": 15,
+        "llmFailures": 1,
+        "inputTokens": 10500,
+        "outputTokens": 2960,
+        "model": "recorded/model",
+        "cohort": {
+          "direction": "down",
+          "share": 46
+        },
+        "asOf": "2026-09-09"
+      }
+    },
+    {
+      "dataset": "edge",
+      "accounts": 20,
+      "detection": {
+        "planted": 4,
+        "detected": 4,
+        "recall": 1,
+        "falsePositives": 0,
+        "misses": [],
+        "falsePositiveDetail": []
+      },
+      "evidence": {
+        "checked": 4,
+        "strongestCited": 4,
+        "hitRate": 1
+      },
+      "grounding": {
+        "ungroundedNumbers": 0,
+        "certaintyLanguage": 0,
+        "externalCauseClaims": 0
+      },
+      "recommendations": {
+        "checked": 4,
+        "inCatalogue": 4,
+        "rate": 1
+      },
+      "cohort": {
+        "decisions": 0,
+        "churnOnHealthyMembers": 0
+      },
+      "cost": {
+        "modelCalls": 5,
+        "firstAttemptValidRate": 0.75,
+        "ruleOnlyDecisions": 0,
+        "inputTokens": 3500,
+        "outputTokens": 980,
+        "wallMs": 14,
+        "model": "recorded/model"
+      },
+      "summary": {
+        "accounts": 20,
+        "signals": 23,
+        "candidates": 4,
+        "reasoned": 4,
+        "cached": 0,
+        "created": 4,
+        "updated": 0,
+        "notActionable": 0,
+        "eased": 0,
+        "llmCalls": 5,
+        "llmFailures": 0,
+        "inputTokens": 3500,
+        "outputTokens": 980,
+        "model": "recorded/model",
+        "cohort": null,
+        "asOf": "2026-09-09"
+      }
+    }
+  ],
+  "failures": [],
+  "passed": true
+}

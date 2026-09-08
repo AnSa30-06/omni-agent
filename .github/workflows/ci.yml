@@ -30,6 +30,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Scores the Decisions engine against demo data whose right answers are
+      # known. Hermetic: a recorded model, no network. It is the only check that
+      # would catch the detection quietly getting worse.
+      - name: Decision quality evaluation
+        run: npm run test:eval
+
       - name: Secret scan
         run: npm run scan:secrets
 

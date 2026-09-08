@@ -79,7 +79,7 @@ const DIALOG_OWNER = [
   "$null = $owner.Handle",
 ];
 
-const FOLDER_DIALOG = [
+export const FOLDER_DIALOG = [
   ...DIALOG_OWNER,
   "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
   "$d.Description = 'Choose the folder Omni Agent should work in'",
@@ -154,7 +154,7 @@ async function providersChanged() {
 /** One dialog at a time, across every kind. See the note above. */
 let dialogOpen = false;
 
-async function showDialog(script) {
+export async function showDialog(script) {
   if (process.platform !== "win32") return bad("the picker is Windows-only; type a path instead");
   if (dialogOpen) return bad("a picker is already open - finish or cancel it first");
   dialogOpen = true;

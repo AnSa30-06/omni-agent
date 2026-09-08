@@ -14,6 +14,7 @@ and it exposes the parts of the system the terminal never showed.
 | | |
 |---|---|
 | **Chat** | Conversation. Runs the `plan` agent, which reads, searches the web and explains, and **never edits your files**. |
+| **Decisions** | A second product surface: customer data in, a short list of decisions out. Its own page at `/decisions/`, served by the same server with the same token, with its own database per workspace. See [docs/decisions](decisions/). |
 | **Code** | Agentic work: writing code, running commands, using the browser. Runs `build`. |
 | **Auto / Plan / Ask first** | How much the agent does before checking with you. Code only. |
 | **Model picker** | Every model the gateway can serve — 160-odd on a keyless install — with a search box. |

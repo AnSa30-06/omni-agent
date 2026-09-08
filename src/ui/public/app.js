@@ -2061,6 +2061,15 @@ async function openPage(name) {
   }
 }
 
+/* Decisions ------------------------------------------------------------- */
+// A second product surface, served from /decisions/ by the same server with the
+// same token. It is a separate page rather than a section of this one because
+// it has its own information architecture - a decision queue, not a chat - and
+// because this file is already 3,000 lines.
+pages.decisions = async () => {
+  location.href = "/decisions/?t=" + encodeURIComponent(TOKEN);
+};
+
 /* Token saving ---------------------------------------------------------- */
 pages.saving = async () => {
   const r = await api("savingList");

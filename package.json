@@ -13,15 +13,15 @@
   },
   "main": "src/index.mjs",
   "files": [
-    "bin/",
-    "src/",
-    "plugin/",
-    "config/",
-    "skills/",
-    "scripts/",
-    "docs/",
+    "LICENSE",
     "README.md",
-    "LICENSE"
+    "bin/",
+    "config/",
+    "docs/",
+    "plugin/",
+    "scripts/",
+    "skills/",
+    "src/"
   ],
   "scripts": {
     "start": "node bin/omni-agent.mjs",
@@ -37,7 +37,8 @@
     "build:installer": "node scripts/build-installer.mjs",
     "build:portable": "node scripts/build-portable.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
-    "test:all": "node --test tests/unit/*.test.mjs tests/integration/*.test.mjs"
+    "test:all": "node --test tests/unit/*.test.mjs tests/integration/*.test.mjs",
+    "test:eval": "node tests/eval/decisions/run-eval.mjs"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
@@ -47,7 +48,8 @@
     "mammoth": "^1.12.0",
     "pdfjs-dist": "^4.10.38",
     "playwright-core": "^1.58.0",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "zod": "^4.1.8"
   },
   "repository": {
     "type": "git",

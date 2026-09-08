@@ -25,6 +25,7 @@ import { startServer, stopServer, uiUrl, onShow, serverPort } from "./server.mjs
 import { openWindow } from "./window.mjs";
 import { startArchiver, stopArchiver } from "./transcripts.mjs";
 import { startScheduler, stopScheduler } from "./routines.mjs";
+import { startFollowup, stopFollowup } from "../decisions/followup.mjs";
 import { loadConfig } from "../config.mjs";
 import { PATHS } from "../util/paths.mjs";
 import { logger } from "../util/log.mjs";
@@ -162,6 +163,9 @@ async function bringUp(say) {
 
   startArchiver();
   startScheduler();
+  // Decisions: expire snoozes, and notice what is overdue. In-app only, like
+  // the routine scheduler above - nothing here runs while the app is closed.
+  startFollowup();
   agentCrashes = 0;
   startupReady();
   return { ok: true };
@@ -254,7 +258,9 @@ export async function launchUI(opts = {}) {
   say("Starting the interface...");
   startupBegin(STEPS);
   const ui = await startServer();
-  const url = uiUrl();
+  // `page` lets `omni-agent decisions` open straight onto that surface rather
+  // than the chat shell with an extra click.
+  const url = uiUrl(opts.page === "decisions" ? "/decisions/" : "/");
 
   writeLock(serverPort());
   // Re-opening the window is what a second copy asks for when it hands over.
@@ -264,6 +270,7 @@ export async function launchUI(opts = {}) {
     clearLock();
     stopArchiver();
     stopScheduler();
+    stopFollowup();
     stopServer();
     stopAgent();
   };

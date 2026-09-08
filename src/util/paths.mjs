@@ -46,6 +46,8 @@ export const PATHS = {
   opencode: path.join(HOME, "opencode"),
   /** Default workspace opened when the user launches with no directory. */
   workspace: path.join(os.homedir(), "OmniAgent Workspace"),
+  /** Decisions workspaces: one SQLite file and its import copies per company. */
+  decisions: path.join(HOME, "decisions"),
   /** Scratch space for downloads made by the browser/scraper tools. */
   downloads: path.join(HOME, "downloads"),
   /**
@@ -57,7 +59,7 @@ export const PATHS = {
 };
 
 export function ensureDirs() {
-  for (const key of ["home", "gatewayData", "browsers", "telemetry", "logs", "opencode", "downloads"]) {
+  for (const key of ["home", "gatewayData", "browsers", "telemetry", "logs", "opencode", "downloads", "decisions"]) {
     fs.mkdirSync(PATHS[key], { recursive: true });
   }
   return PATHS;

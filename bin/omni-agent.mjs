@@ -53,6 +53,11 @@ Omni Agent ${VERSION}
   omni-agent routine list      Scheduled routines
   omni-agent routine run <id>  Run one now
 
+  omni-agent decisions         Open Decisions: turn customer data into decisions
+  omni-agent decisions run     Run the analysis now, without opening a window
+  omni-agent decisions seed [demo|demo-cohort|edge]   Load a demo company
+  omni-agent decisions list    Show the open decisions
+
   omni-agent gateway start|stop|status
   omni-agent config mode <fast|balanced|smart|quality|cheap>
   omni-agent config key <provider> <api-key>
@@ -521,6 +526,124 @@ async function main() {
         return process.exit(r.ok ? 0 : 1);
       }
       say("Usage: omni-agent routine [list|run <id>]");
+      return process.exit(1);
+    }
+
+    case "decisions": {
+      const sub = args[0] ?? "open";
+      const ws = await import("../src/decisions/workspace.mjs");
+
+      if (sub === "open") {
+        // The window, straight onto the Decisions surface.
+        const { launchUI } = await import("../src/ui/launch.mjs");
+        const r = await launchUI({ onProgress: say, open: !flags.has("--no-window"), page: "decisions" });
+        if (!r.ok) return process.exit(1);
+        if (r.alreadyRunning) return process.exit(0);
+        say("");
+        say("Omni Agent is open on Decisions. Close the window when you are done.");
+        return;
+      }
+
+      // Everything below is headless: no window, no agent, only the gateway
+      // (and only when a model is actually needed).
+      const { workspaces, selected } = ws.list();
+      if (!selected && sub !== "seed") {
+        say("There is no workspace yet. Run `omni-agent decisions seed` to load the demo company,");
+        say("or open the app with `omni-agent decisions` and import your own data.");
+        return process.exit(1);
+      }
+
+      if (sub === "seed") {
+        const variantName = args[1] ?? "demo";
+        let id = selected;
+        if (!id) {
+          const made = ws.create("Demo Company");
+          if (!made.ok) {
+            say(made.error);
+            return process.exit(1);
+          }
+          id = made.workspace.id;
+        }
+        const { decisionRoutes } = await import("../src/decisions/routes.mjs");
+        const r = await decisionRoutes.decisionsSeedDemo({ body: { variant: variantName } });
+        if (!r.ok) {
+          say(`Could not load the demo data: ${r.error}`);
+          return process.exit(1);
+        }
+        say(`Loaded the "${variantName}" demo company: ${r.accounts} customers.`);
+        say("Now run:  omni-agent decisions run");
+        return;
+      }
+
+      if (sub === "run") {
+        // --no-model runs the rules only, and the rules need no gateway. Starting
+        // a 2.7 GB model gateway to compute percentages would be absurd.
+        if (!flags.has("--no-model")) await ensureReady({ quiet: true });
+        const { runAnalysis } = await import("../src/decisions/run.mjs");
+        const db = ws.openWorkspace(selected);
+        try {
+          say("Analysing...");
+          const r = await runAnalysis({
+            db,
+            noModel: flags.has("--no-model"),
+            onProgress: (p) => {
+              if (p.phase === "reasoning" && p.reasoned) process.stdout.write(`
+  reasoning ${p.reasoned} of ${p.of}...   `);
+            },
+          });
+          say("");
+          if (!r.ok) {
+            say(`The analysis failed: ${r.error}`);
+            return process.exit(1);
+          }
+          const s2 = r.summary;
+          say("");
+          say(`  Customers checked      ${s2.accounts}`);
+          say(`  Signals computed       ${s2.signals}`);
+          say(`  Situations found       ${s2.candidates}`);
+          say(`  Sent to a model        ${s2.reasoned}${s2.cached ? ` (${s2.cached} unchanged, so not sent)` : ""}`);
+          say(`  Decisions created      ${s2.created}`);
+          say(`  Decisions updated      ${s2.updated}`);
+          if (s2.llmFailures) say(`  Model failures         ${s2.llmFailures} (those decisions were raised from the rules alone)`);
+          say(`  Tokens                 ${s2.inputTokens + s2.outputTokens}${s2.model ? ` on ${s2.model}` : ""}`);
+          if (s2.cohort) say(`  Company-wide change    usage ${s2.cohort.direction} for ${s2.cohort.share}% of customers`);
+          say("");
+          ws.touchRun(selected);
+          return;
+        } finally {
+          db.close();
+        }
+      }
+
+      if (sub === "list") {
+        const db = ws.openWorkspace(selected);
+        try {
+          const rows = db
+            .prepare("SELECT * FROM decision WHERE status NOT IN ('resolved','dismissed') ORDER BY severity, updated_at DESC")
+            .all();
+          if (!rows.length) {
+            say("Nothing is waiting for a decision.");
+            return;
+          }
+          say("");
+          for (const d of rows) {
+            say(`  [${String(d.severity).toUpperCase().padEnd(8)}] ${d.title}`);
+            say(`             ${d.status}${d.owner ? ` · ${d.owner}` : ""}${d.due_at ? ` · due ${d.due_at}` : ""}`);
+          }
+          say("");
+          return;
+        } finally {
+          db.close();
+        }
+      }
+
+      if (sub === "eval") {
+        const { main } = await import("../tests/eval/decisions/run-eval.mjs");
+        const code = await main(rest);
+        return process.exit(code);
+      }
+
+      say("Usage: omni-agent decisions [open|run|seed|list|eval]");
       return process.exit(1);
     }
 

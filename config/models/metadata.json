@@ -375,10 +375,12 @@
     "code": "coding",
     "browser-plan": "smart",
     "synthesise": "smart",
-    "chat": "balanced"
+    "chat": "balanced",
+    "decision-brief": "smart",
+    "decision-draft": "fast"
   },
   "$mistralNotes": "Mistral tiers added 2026-09-03 from the live OpenRouter catalogue (20 models, real prices, context and release dates), NOT from a benchmark and NOT from memory. Before this the whole lineup had one rule - `mistral.*large|mixtral` -> strong - so mistral-medium and codestral matched nothing and every mistral-small and ministral was filed fast-basic by the word 'small'. Anchor, same source same day, output $/M: Opus 5 = 25, Sonnet 4.6 = 15, Sonnet 5 = 10, Haiku 4.5 = 5; Mistral's flagship mistral-medium-3-5 = 7.5, mistral-large-2512 = 1.5, codestral = 0.9, mistral-small-2603 = 0.6, ministral-8b = 0.15, mistral-nemo = 0.03. TWO TRAPS worth keeping. (1) The naming ladder LIES about recency: mistral-large-2512 is newer AND five times cheaper than mistral-medium-3-5, so 'large' is not their top model any more - match on the dated id, never on the word large. (2) `magistral` and `pixtral` were NOT in the catalogue on 2026-09-03; their rules are placeholders by family naming and are unverified - they cost nothing while nothing matches them, but do not quote them as measured.",
-  "$comparisonNotes": "The one line a reader who does not follow model releases can actually use. A tier name like 'very-strong' means nothing to them; 'Sonnet 5 level' does, because that is the ladder everyone has heard of. Anthropic's names are the yardstick ONLY because they are the best known - nothing here is a claim about Anthropic. ⚠️ These are EDITORIAL ESTIMATES OF POSITIONING, not benchmark results, and the wording has to keep saying so: 'about', 'roughly', never 'equals' and never a score. See `disclaimer`. `comparisonSelf` names the family each tier is measured against, so the yardstick is never compared to itself - claude-opus-5 reading 'roughly Opus 5 level' is noise, not information.",
+  "$comparisonNotes": "The one line a reader who does not follow model releases can actually use. A tier name like 'very-strong' means nothing to them; 'Sonnet 5 level' does, because that is the ladder everyone has heard of. Anthropic's names are the yardstick ONLY because they are the best known - nothing here is a claim about Anthropic. \u26a0\ufe0f These are EDITORIAL ESTIMATES OF POSITIONING, not benchmark results, and the wording has to keep saying so: 'about', 'roughly', never 'equals' and never a score. See `disclaimer`. `comparisonSelf` names the family each tier is measured against, so the yardstick is never compared to itself - claude-opus-5 reading 'roughly Opus 5 level' is noise, not information.",
   "comparisons": {
     "elite": "roughly Opus 5 level",
     "very-strong": "roughly Sonnet 5 level",
