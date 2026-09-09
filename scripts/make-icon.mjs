@@ -1,4 +1,4 @@
-// Generate installer/assets/omni-agent.ico.
+// Generate installer/assets/vireo.ico.
 //
 // Hand-rolled rather than adding an image dependency: an ICO is a 6-byte header
 // plus one 16-byte directory entry per image, and Windows Vista and later accept
@@ -139,6 +139,6 @@ function ico(pngBuf) {
 
 fs.mkdirSync(OUT, { recursive: true });
 const p = png();
-fs.writeFileSync(path.join(OUT, "omni-agent.png"), p);
-fs.writeFileSync(path.join(OUT, "omni-agent.ico"), ico(p));
-console.log(`wrote ${path.join(OUT, "omni-agent.ico")} (${(ico(p).length / 1024).toFixed(1)} KB)`);
+fs.writeFileSync(path.join(OUT, "vireo.png"), p);
+fs.writeFileSync(path.join(OUT, "vireo.ico"), ico(p));
+console.log(`wrote ${path.join(OUT, "vireo.ico")} (${(ico(p).length / 1024).toFixed(1)} KB)`);

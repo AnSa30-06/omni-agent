@@ -5,7 +5,7 @@
 ```
                               You
                                |
-                    bin/omni-agent.mjs
+                    bin/vireo.mjs
          launcher · setup wizard · health check · usage dashboard
                                |
                           OpenCode 1.18
@@ -14,7 +14,7 @@
         +----------------------+---------------------------+
         |                                                  |
   Built-in tools                              plugin/index.mjs
-  read write edit bash                      the Omni Agent tool layer
+  read write edit bash                      the Vireo tool layer
   glob grep list task                                      |
                           +---------+---------+---------+--+------+
                           |         |         |         |         |
@@ -51,10 +51,10 @@ uninstalling it must not take their setup with it. Three mechanisms:
 
 | Thing | Default location | Ours |
 |---|---|---|
-| Gateway data | `~/.omniroute` | `%LOCALAPPDATA%\OmniAgent\gateway` (via `DATA_DIR`) |
+| Gateway data | `~/.omniroute` | `%LOCALAPPDATA%\Vireo\gateway` (via `DATA_DIR`) |
 | Gateway port | 20128 | 20129 |
-| OpenCode config | `~/.config/opencode` | `%LOCALAPPDATA%\OmniAgent\opencode` (via `XDG_CONFIG_HOME`) |
-| OpenCode data | `~/.local/share/opencode` | `%LOCALAPPDATA%\OmniAgent\oc-data\opencode` (via `XDG_DATA_HOME` **and** `OPENCODE_DATA_DIR`) |
+| OpenCode config | `~/.config/opencode` | `%LOCALAPPDATA%\Vireo\opencode` (via `XDG_CONFIG_HOME`) |
+| OpenCode data | `~/.local/share/opencode` | `%LOCALAPPDATA%\Vireo\oc-data\opencode` (via `XDG_DATA_HOME` **and** `OPENCODE_DATA_DIR`) |
 | npm packages | global npm root | `<app>/runtime/node_modules` |
 
 Two of these were found the hard way and are worth stating:
@@ -224,7 +224,7 @@ fewer than two observations keeps its editorial tier and the UI says "not measur
 ## Data layout
 
 ```
-%LOCALAPPDATA%\OmniAgent\
+%LOCALAPPDATA%\Vireo\
   config.json          settings, no secrets
   credentials.dat      DPAPI-encrypted keys
   quota-cache.json     last known provider figures, with timestamps

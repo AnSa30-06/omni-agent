@@ -7,9 +7,9 @@
 //
 // TWO WAYS TO RUN, and the difference is the whole honesty of the feature:
 //
-//   in-app    the scheduler below fires while the OmniAgent window is open.
+//   in-app    the scheduler below fires while the Vireo window is open.
 //             Nothing to install, and it does nothing while the app is closed.
-//   always    a Windows Scheduled Task runs `omni-agent routine run <id>`
+//   always    a Windows Scheduled Task runs `vireo routine run <id>`
 //             whether the app is open or not.
 //
 // The UI states which one a routine is using, because a routine that silently
@@ -167,7 +167,7 @@ export async function run(id) {
 // --- Windows Scheduled Tasks ------------------------------------------------
 
 function taskName(r) {
-  return `OmniAgent Routine ${r.id}`;
+  return `Vireo Routine ${r.id}`;
 }
 
 /** schtasks arguments for this routine's schedule, or null if it cannot map. */
@@ -200,7 +200,7 @@ export async function registerTask(r) {
   const sched = schtasksSchedule(r);
   if (!sched) return { ok: false, reason: "that schedule cannot be mapped to a Windows task" };
   const node = nodeExe() ?? process.execPath;
-  const entry = path.join(APP_ROOT, "bin", "omni-agent.mjs");
+  const entry = path.join(APP_ROOT, "bin", "vireo.mjs");
   const cmd = `"${node}" "${entry}" routine run ${r.id}`;
   const res = await schtasks(["/create", "/f", "/tn", taskName(r), "/tr", cmd, ...sched]);
   if (!res.ok) log.warn("could not register scheduled task", { id: r.id, output: res.output });

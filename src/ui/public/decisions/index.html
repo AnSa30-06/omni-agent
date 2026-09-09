@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Decisions — Vireo</title>
+    <link rel="icon" href="../favicon.ico" sizes="any" />
+    <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+    <!-- The app's own design system first, then only what this surface adds. -->
+    <link rel="stylesheet" href="../app.css" />
+    <link rel="stylesheet" href="decisions.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <div class="brand">
+          <img class="brand-mark" src="../logo.svg" alt="" width="24" height="24" />
+          <span class="brand-name">Decisions</span>
+        </div>
+
+        <button class="ws-pill" id="ws-btn" title="Workspace">
+          <span id="ws-name">—</span> <span class="caret">▾</span>
+        </button>
+
+        <nav class="nav" id="nav">
+          <button class="nav-item" data-view="today"><span class="ico">◉</span> Today</button>
+          <button class="nav-item" data-view="decisions"><span class="ico">▤</span> Decisions</button>
+          <button class="nav-item" data-view="customers"><span class="ico">◈</span> Customers</button>
+          <button class="nav-item" data-view="activity"><span class="ico">◷</span> Activity</button>
+          <button class="nav-item" data-view="settings"><span class="ico">⋮</span> Settings</button>
+        </nav>
+
+        <div class="side-scroll"></div>
+
+        <div class="side-foot">
+          <div class="run-box">
+            <div class="muted" id="last-run">No analysis yet</div>
+            <button class="btn primary block" id="run-btn">Run analysis</button>
+          </div>
+          <a class="linkish back" href="../">← Back to Vireo</a>
+        </div>
+      </aside>
+
+      <main id="main">
+        <header id="topbar">
+          <h1 id="title">Today</h1>
+          <span class="chip" id="asof-chip" hidden></span>
+          <div class="grow"></div>
+          <div id="topbar-actions"></div>
+        </header>
+        <section id="view" class="page"></section>
+      </main>
+    </div>
+
+    <div class="modal-back" id="modal-back" hidden><div class="modal" id="modal"></div></div>
+    <div class="popover" id="pop" hidden></div>
+    <div class="toasts" id="toasts"></div>
+
+    <script src="decisions.js" type="module"></script>
+  </body>
+</html>

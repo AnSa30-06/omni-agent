@@ -4,7 +4,7 @@
 // Kept separate from opencode-config.mjs because resolving the model needs the
 // live catalogue, and opencode-config.mjs must stay usable (and synchronous)
 // when the gateway is down - a user whose gateway will not start still needs a
-// config file written so `omni-agent doctor` can tell them why.
+// config file written so `vireo doctor` can tell them why.
 import { writeOpenCodeConfig, writeOpenCodeAuth } from "./opencode-config.mjs";
 import { getSecret } from "../util/secrets.mjs";
 import { GatewayClient } from "../gateway/client.mjs";

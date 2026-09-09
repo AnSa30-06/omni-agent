@@ -135,7 +135,7 @@ export function summariseGateway(calls) {
  * Calls since the gateway started.
  *
  * "Since this CLI process started" would be the obvious reading and is useless:
- * for a one-shot `omni-agent usage` it is always zero. The gateway's uptime is
+ * for a one-shot `vireo usage` it is always zero. The gateway's uptime is
  * what a user actually means by "this session" - they launched the app, the
  * gateway came up, and they have been working since.
  *

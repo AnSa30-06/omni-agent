@@ -1,0 +1,136 @@
+{
+  "$comment": "Thresholds are DATA, not code, so they can be shown in Settings and changed without a release. Every band boundary here is a CHOICE, not a measurement: no real churn data has been used to calibrate them. See docs/decisions/how-it-works.md. The unit of `band` is 0 (not present) to 3 (severe).",
+  "version": 1,
+  "signals": {
+    "usage_drop_30d": {
+      "label": "Usage down",
+      "metric": "active_users",
+      "window": 30,
+      "baselineWindow": 30,
+      "minDays": 20,
+      "direction": "down",
+      "bands": [-25, -40, -60],
+      "template": "Average daily active users fell {absChangePct}% over the last 30 days ({current} vs {baseline})."
+    },
+    "usage_rise_30d": {
+      "label": "Usage up",
+      "metric": "active_users",
+      "window": 30,
+      "baselineWindow": 30,
+      "minDays": 20,
+      "direction": "up",
+      "bands": [30, 60, 100],
+      "template": "Average daily active users rose {changePct}% over the last 30 days ({current} vs {baseline})."
+    },
+    "usage_drop_7d": {
+      "label": "Usage down this week",
+      "metric": "active_users",
+      "window": 7,
+      "baselineWindow": 28,
+      "minDays": 5,
+      "direction": "down",
+      "bands": [-40, -60, null],
+      "template": "Active users this week are {absChangePct}% below the previous four weeks ({current} vs {baseline})."
+    },
+    "renewal_near": {
+      "label": "Renewal approaching",
+      "bands": [90, 45, 21],
+      "template": "Renewal is in {days} days ({date})."
+    },
+    "tickets_up_30d": {
+      "label": "Support tickets up",
+      "window": 30,
+      "bands": [50, 100, null],
+      "minCurrent": [3, 5, null],
+      "template": "Support tickets rose from {baseline} to {current} in the last 30 days{urgentClause}."
+    },
+    "seat_util_low": {
+      "label": "Seats under-used",
+      "window": 7,
+      "bands": [50, 30, null],
+      "template": "{used} of {purchased} seats were used in the last 7 days ({pct}%)."
+    },
+    "seat_util_high": {
+      "label": "Seats nearly full",
+      "window": 7,
+      "bands": [90, 100, null],
+      "template": "{used} of {purchased} seats are in use ({pct}%)."
+    },
+    "payment_failed": {
+      "label": "Payment failed",
+      "window": 30,
+      "bands": [1, 2, 3],
+      "arrShareForTopBand": 0.1,
+      "template": "A payment of {amount} due {date} has failed {attempts} time(s)."
+    },
+    "champion_inactive": {
+      "label": "Champion inactive",
+      "bands": [14, 30, null],
+      "template": "The champion ({role}) has not been active for {days} days."
+    },
+    "pricing_interest": {
+      "label": "Pricing interest",
+      "window": 14,
+      "bands": [1, 3, null],
+      "template": "The pricing page was viewed {n} time(s) in the last 14 days."
+    },
+    "data_stale": {
+      "label": "Data is stale",
+      "bands": [7, 21, null],
+      "template": "Usage data ends on {lastDay}, {days} days before today."
+    }
+  },
+  "situations": {
+    "churn_risk": {
+      "label": "churn risk",
+      "requiresAll": ["usage_drop_30d"],
+      "requiresAny": ["renewal_near", "tickets_up_30d", "champion_inactive", "seat_util_low"],
+      "minScore": 3,
+      "actions": ["exec_outreach", "technical_review", "renewal_prep", "monitor"]
+    },
+    "expansion": {
+      "label": "expansion opportunity",
+      "requiresAll": ["usage_rise_30d"],
+      "requiresAny": ["seat_util_high", "pricing_interest"],
+      "minScore": 2,
+      "actions": ["expansion_call", "renewal_prep", "monitor"]
+    },
+    "payment_risk": {
+      "label": "payment problem",
+      "requiresAll": ["payment_failed"],
+      "requiresAny": ["usage_drop_30d", "champion_inactive"],
+      "minBandForAlone": 2,
+      "minScore": 2,
+      "actions": ["billing_contact", "exec_outreach", "monitor"]
+    },
+    "cohort_shift": {
+      "label": "company-wide change",
+      "minShare": 0.4,
+      "minAccounts": 5,
+      "highShare": 0.6,
+      "actions": ["monitor", "exec_outreach"]
+    }
+  },
+  "severity": {
+    "$comment": "Score is the sum of the bands of the signals a rule matched. Severity is derived from it deterministically; the model's own severity is recorded but never overrides this.",
+    "critical": 8,
+    "high": 6,
+    "medium": 4
+  },
+  "actionCatalogue": {
+    "exec_outreach": "Executive outreach call",
+    "technical_review": "Technical health review with the customer",
+    "renewal_prep": "Start the renewal conversation early",
+    "billing_contact": "Contact the billing owner about the failed payment",
+    "expansion_call": "Contact the account owner about adding seats",
+    "monitor": "Keep watching; no action yet"
+  },
+  "limits": {
+    "maxReasonedPerRun": 10,
+    "maxLlmFailuresPerRun": 5,
+    "waitingNudgeDays": 7,
+    "dismissedSuppressDays": 14,
+    "outreachCooldownDays": 14,
+    "businessContextMaxChars": 1000
+  }
+}

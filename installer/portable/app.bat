@@ -1,15 +1,15 @@
 @echo off
-rem Omni Agent - open the desktop app (portable).
+rem Vireo - open the desktop app (portable).
 rem
 rem Same as start.bat but opens the window instead of the terminal interface.
 rem
-rem OmniAgent.exe next to this file is the real application and needs no console
+rem Vireo.exe next to this file is the real application and needs no console
 rem at all, so prefer it. This script stays as the visible-console fallback for
 rem a zip that predates the exe, or for reading an error the exe swallows.
 setlocal
 set "HERE=%~dp0"
-if exist "%HERE%OmniAgent.exe" (
-  start "" "%HERE%OmniAgent.exe"
+if exist "%HERE%Vireo.exe" (
+  start "" "%HERE%Vireo.exe"
   exit /b 0
 )
 if not exist "%HERE%node\node.exe" (
@@ -19,7 +19,7 @@ if not exist "%HERE%node\node.exe" (
   exit /b 1
 )
 set "PATH=%HERE%node;%PATH%"
-title Omni Agent - keep this window open
-"%HERE%node\node.exe" "%HERE%app\bin\omni-agent.mjs" ui
+title Vireo - keep this window open
+"%HERE%node\node.exe" "%HERE%app\bin\vireo.mjs" ui
 if errorlevel 1 pause
 endlocal

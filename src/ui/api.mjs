@@ -79,10 +79,10 @@ const DIALOG_OWNER = [
   "$null = $owner.Handle",
 ];
 
-const FOLDER_DIALOG = [
+export const FOLDER_DIALOG = [
   ...DIALOG_OWNER,
   "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
-  "$d.Description = 'Choose the folder Omni Agent should work in'",
+  "$d.Description = 'Choose the folder Vireo should work in'",
   "$d.ShowNewFolderButton = $true",
   "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.SelectedPath }",
   "$owner.Dispose()",
@@ -154,7 +154,7 @@ async function providersChanged() {
 /** One dialog at a time, across every kind. See the note above. */
 let dialogOpen = false;
 
-async function showDialog(script) {
+export async function showDialog(script) {
   if (process.platform !== "win32") return bad("the picker is Windows-only; type a path instead");
   if (dialogOpen) return bad("a picker is already open - finish or cancel it first");
   dialogOpen = true;
@@ -306,17 +306,17 @@ export const routes = {
   /**
    * "Finish setup" on the startup screen.
    *
-   * The installed layout puts OmniAgentSetup.cmd beside OmniAgent.exe, one
+   * The installed layout puts VireoSetup.cmd beside Vireo.exe, one
    * directory above the app. It opens its own console - the same thing the
    * installer's "Finish setup now" runs - so a person who unticked that box
    * gets exactly the flow they skipped, from the button in front of them.
    */
   async setupRun() {
-    const script = path.join(APP_ROOT, "..", "OmniAgentSetup.cmd");
+    const script = path.join(APP_ROOT, "..", "VireoSetup.cmd");
     if (!fs.existsSync(script)) {
       return bad(
-        'Open the Start Menu and run "Set up Omni Agent". ' +
-          "(A source checkout has no setup script: run node scripts/bootstrap.mjs, then node bin/omni-agent.mjs setup.)",
+        'Open the Start Menu and run "Set up Vireo". ' +
+          "(A source checkout has no setup script: run node scripts/bootstrap.mjs, then node bin/vireo.mjs setup.)",
       );
     }
     const { spawn } = await import("node:child_process");
@@ -921,7 +921,7 @@ export const routes = {
       await ensureRunning().catch(() => {});
       return bad(
         `The damaged database could not be moved aside: ${failed.join(", ")}. ` +
-          "Something still has the file open - close Omni Agent everywhere, then try again."
+          "Something still has the file open - close Vireo everywhere, then try again."
       );
     }
     // A rebuilt database runs every migration from scratch, which takes far
@@ -1034,6 +1034,69 @@ export const routes = {
       turns: turns.length,
       model: out.servedBy ?? out.requested ?? null,
     });
+  },
+
+  /**
+   * Is there a newer version, and could it be installed by copying files?
+   *
+   * Answers both in one call because they are one question to the reader: an
+   * update they cannot take is not an update, it is a download link.
+   */
+  async updateCheck() {
+    const up = await import("../update/updater.mjs");
+    const chk = await up.checkForUpdate();
+    if (!chk.ok) return ok({ available: false, unreachable: true, reason: chk.reason });
+    if (!chk.updateAvailable) {
+      return ok({ available: false, current: chk.current, latest: chk.latest });
+    }
+    const plan = await up.planUpdate({ to: chk.latest });
+    return ok({
+      available: true,
+      current: chk.current,
+      latest: chk.latest,
+      url: chk.url,
+      publishedAt: chk.publishedAt,
+      notes: chk.notes,
+      files: plan.ok ? (plan.files?.length ?? 0) : 0,
+      // `blocked` is not a failure. It means this particular release changes
+      // the shape of the install, so it has to come from the full installer.
+      blocked: plan.ok ? plan.blocked === true : true,
+      reasons: plan.ok ? (plan.reasons ?? []) : [plan.reason],
+    });
+  },
+
+  /**
+   * Take the update, then start the app again.
+   *
+   * ⚠️ The restart is scheduled AFTER this answer has been written. Restarting
+   * inside the handler kills the process holding the socket, so the page would
+   * see a dropped connection and could not tell success from failure.
+   */
+  async updateApply() {
+    const up = await import("../update/updater.mjs");
+    const chk = await up.checkForUpdate();
+    if (!chk.ok) return bad(chk.reason);
+    if (!chk.updateAvailable) return bad("this copy is already up to date");
+    const plan = await up.planUpdate({ to: chk.latest });
+    if (!plan.ok) return bad(plan.reason);
+    if (plan.blocked) {
+      return ok({
+        applied: false,
+        needsInstaller: true,
+        latest: chk.latest,
+        url: chk.url,
+        reasons: plan.reasons,
+      });
+    }
+    const res = await up.applyUpdate(plan);
+    if (!res.ok) return bad(res.reason);
+    setTimeout(() => {
+      up.restartApp().catch(() => {});
+      // The replacement is already starting; this copy has to let go of the
+      // port and the data directory or the new one refuses to boot.
+      setTimeout(() => process.exit(0), 1500);
+    }, 700);
+    return ok({ applied: true, from: res.from, to: res.to, files: res.files, restarting: true });
   },
 
   async folderCheck({ query }) {

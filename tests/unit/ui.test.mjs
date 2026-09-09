@@ -167,11 +167,11 @@ test("conversations are named from the first thing asked", () => {
   assert.match(app, /PATCH", `\/session\/\$\{id\}`/, "renaming uses the legacy PATCH route");
 });
 
-test("the app is branded as Omni Agent, with no borrowed marks", () => {
+test("the app is branded as Vireo, with no borrowed marks", () => {
   const html = ui("public", "index.html");
   const app = ui("public", "app.js");
-  assert.match(html, /<title>Omni Agent<\/title>/);
-  assert.match(html, /class="brand-name">Omni Agent</);
+  assert.match(html, /<title>Vireo<\/title>/);
+  assert.match(html, /class="brand-name">Vireo</);
   assert.match(html, /logo\.svg/);
   // The empty state used an asterisk glyph borrowed from another product.
   assert.ok(!html.includes("✳") && !app.includes("✳"), "the borrowed asterisk mark must be gone");
@@ -575,7 +575,7 @@ test("the window opens before the slow parts start, and the page waits on a star
   const app = ui("public", "app.js");
   assert.match(app, /await waitForReady\(\)/, "boot must wait for the stack before loading models and sessions");
   assert.ok(
-    !/restart Omni Agent/.test(app),
+    !/restart Vireo/.test(app),
     "the old 'agent server is not running - restart' toast fired at someone who had just started it",
   );
   const html = ui("public", "index.html");
@@ -607,7 +607,7 @@ test("the startup state reports each step, then a problem with an action, then r
   assert.equal(snap.steps[0].note, "still starting...");
   assert.equal(snap.steps[1].status, "pending");
   s.startupStep("gateway", "failed", "omniroute-not-installed");
-  s.startupProblem({ title: "Omni Agent has not finished setting itself up", action: "setup", actionLabel: "Finish setup" });
+  s.startupProblem({ title: "Vireo has not finished setting itself up", action: "setup", actionLabel: "Finish setup" });
   snap = s.startupSnapshot();
   assert.equal(snap.problem.action, "setup");
   assert.equal(snap.problem.actionLabel, "Finish setup");
@@ -647,7 +647,7 @@ test("a turn ends with what it changed and that it finished", () => {
 });
 
 test("opening a folder refuses anything that is not there", async () => {
-  const r = await routes.openFolder({ body: { path: path.join(os.tmpdir(), "omni-agent-no-such-dir-" + Date.now()) } });
+  const r = await routes.openFolder({ body: { path: path.join(os.tmpdir(), "vireo-no-such-dir-" + Date.now()) } });
   assert.equal(r.ok, false);
   assert.match(r.error, /does not exist/);
   const r2 = await routes.openFolder({ body: {} });
@@ -811,7 +811,7 @@ test("a conversation whose folder is gone says so instead of a bare 500", () => 
 });
 
 test("folderCheck answers honestly about a folder", async () => {
-  const here = path.join(os.tmpdir(), "omni-agent-folder-check-" + Date.now());
+  const here = path.join(os.tmpdir(), "vireo-folder-check-" + Date.now());
   fs.mkdirSync(here, { recursive: true });
   assert.equal((await routes.folderCheck({ query: { path: here } })).exists, true);
   fs.rmSync(here, { recursive: true, force: true });
@@ -832,7 +832,7 @@ test("only one copy of the app owns a data directory", () => {
   // never wedge the app shut.
   assert.match(launch, /fetch\(`http:\/\/127\.0\.0\.1:\$\{lock\.port\}\/instance`/);
   assert.match(launch, /return null; \/\/ nothing answering: the lock is stale/);
-  assert.match(launch, /OMNI_AGENT_ALLOW_MULTIPLE/, "there is a documented escape hatch");
+  assert.match(launch, /VIREO_ALLOW_MULTIPLE/, "there is a documented escape hatch");
   assert.match(launch, /alreadyRunning: true/);
   // Only ever remove OUR lock, or a crashed launch deletes the lock of the
   // copy that replaced it.
@@ -856,7 +856,7 @@ test("only one copy of the app owns a data directory", () => {
   assert.ok(!/_token/.test(inst), "the instance handshake never touches the token");
   assert.match(inst, /Date\.now\(\) - _lastShow > 3000/, "showing the window is debounced");
 
-  const bin = fs.readFileSync(pkg("bin", "omni-agent.mjs"), "utf8");
+  const bin = fs.readFileSync(pkg("bin", "vireo.mjs"), "utf8");
   assert.match(bin, /if \(r\.alreadyRunning\) return process\.exit\(0\);/, "a second copy exits cleanly");
 });
 

@@ -2,22 +2,22 @@
 
 ## The EXE (recommended)
 
-Download `OmniAgentSetup-<version>.exe` and run it.
+Download `VireoSetup-<version>.exe` and run it.
 
-It is a **per-user** install into `%LOCALAPPDATA%\Programs\OmniAgent`, so it does **not**
+It is a **per-user** install into `%LOCALAPPDATA%\Programs\Vireo`, so it does **not**
 ask for an administrator password. It:
 
 - checks the architecture (x64) and warns if free disk is under 6 GB
 - installs the application and a **private Node.js runtime**, so the machine needs nothing
   preinstalled
-- installs **`OmniAgent.exe`**, the application itself
-- creates Start Menu entries (*Omni Agent*, *Omni Agent in a terminal*, *Set up Omni Agent*,
-  *Check Omni Agent health*) and, optionally, a desktop shortcut
+- installs **`Vireo.exe`**, the application itself
+- creates Start Menu entries (*Vireo*, *Vireo in a terminal*, *Set up Vireo*,
+  *Check Vireo health*) and, optionally, a desktop shortcut
 - offers to run first-time setup immediately
 
 ### What happens on first run
 
-`Set up Omni Agent` runs two stages.
+`Set up Vireo` runs two stages.
 
 **Stage 1 — `scripts/bootstrap.mjs`** downloads the components too large to ship:
 
@@ -31,7 +31,7 @@ have your own global `omniroute` or `opencode`, it is untouched and keeps its ow
 
 Versions are pinned so a surprise upstream release cannot break a fresh install.
 
-**Stage 2 — `omni-agent setup`** is the wizard:
+**Stage 2 — `vireo setup`** is the wizard:
 
 1. **Your AI models.** Paste any API keys you have. **Leave every one blank if you like** —
    the gateway serves free models and the agent works either way.
@@ -48,7 +48,7 @@ a file exists.
 ### Total footprint
 
 About **6 GB** once fully set up. The installer is 74.6 MB and puts about 380 MB on disk
-(the application, a private Node.js runtime and `OmniAgent.exe`); the rest is downloaded on
+(the application, a private Node.js runtime and `Vireo.exe`); the rest is downloaded on
 first run.
 
 ---
@@ -58,13 +58,13 @@ first run.
 For users who would rather not run an installer, and for debugging.
 
 ```
-1. Extract OmniAgent-Portable-<version>.zip anywhere
+1. Extract Vireo-Portable-<version>.zip anywhere
 2. Run setup.bat   (once)
 3. Run start.bat
 ```
 
 Same application, same bundled Node runtime, no registry entries and no shortcuts. Data
-still goes to `%LOCALAPPDATA%\OmniAgent` unless you set `OMNI_AGENT_HOME`.
+still goes to `%LOCALAPPDATA%\Vireo` unless you set `VIREO_HOME`.
 
 `install.ps1` is the scriptable equivalent:
 
@@ -81,11 +81,11 @@ Requires Node 22 or newer.
 
 ```bash
 git clone https://github.com/AnSa30-06/omni-agent.git
-cd omni-agent
+cd vireo
 npm install
 node scripts/bootstrap.mjs      # gateway + harness into ./runtime
-node bin/omni-agent.mjs setup
-node bin/omni-agent.mjs
+node bin/vireo.mjs setup
+node bin/vireo.mjs
 ```
 
 `install.ps1` from `installer/portable/` also works on a source checkout — it detects the
@@ -98,16 +98,16 @@ This is the path that works on macOS and Linux. Only the Windows installer is bu
 ## Unattended / CI
 
 ```bash
-node bin/omni-agent.mjs setup --non-interactive
+node bin/vireo.mjs setup --non-interactive
 ```
 
 Skips all prompts and keeps the defaults (balanced routing, standard permissions, no
 provider keys). Configure afterwards:
 
 ```bash
-node bin/omni-agent.mjs config key deepseek "$DEEPSEEK_API_KEY"
-node bin/omni-agent.mjs config mode cheap
-node bin/omni-agent.mjs doctor --quick   # skips the slow live probes
+node bin/vireo.mjs config key deepseek "$DEEPSEEK_API_KEY"
+node bin/vireo.mjs config mode cheap
+node bin/vireo.mjs doctor --quick   # skips the slow live probes
 ```
 
 Credentials can also come from environment variables — see
@@ -116,7 +116,7 @@ Credentials can also come from environment variables — see
 The installer itself supports Inno Setup's standard switches:
 
 ```
-OmniAgentSetup-1.1.9.exe /VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Apps\OmniAgent"
+VireoSetup-1.1.9.exe /VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Apps\Vireo"
 ```
 
 ---
@@ -126,7 +126,7 @@ OmniAgentSetup-1.1.9.exe /VERYSILENT /CURRENTUSER /SUPPRESSMSGBOXES /NORESTART /
 Each release publishes a SHA-256 for both artefacts.
 
 ```powershell
-Get-FileHash .\OmniAgentSetup-1.1.9.exe -Algorithm SHA256
+Get-FileHash .\VireoSetup-1.1.9.exe -Algorithm SHA256
 ```
 
 The installer is **not code-signed** — Windows SmartScreen will warn on first run. Choose
@@ -137,10 +137,10 @@ project does not have.
 
 ## Uninstalling
 
-*Settings → Apps → Omni Agent*, or the Start Menu uninstaller.
+*Settings → Apps → Vireo*, or the Start Menu uninstaller.
 
 It removes the program files and asks separately whether to delete
-`%LOCALAPPDATA%\OmniAgent` — your settings, saved keys, logs and downloaded browser. Choose
+`%LOCALAPPDATA%\Vireo` — your settings, saved keys, logs and downloaded browser. Choose
 *No* to keep them for a reinstall.
 
 Your global `opencode` and `omniroute` installs, if any, are never touched.
@@ -150,9 +150,9 @@ Your global `opencode` and `omniroute` installs, if any, are never touched.
 ## Upgrading
 
 Run the new installer over the old one. Settings and credentials in
-`%LOCALAPPDATA%\OmniAgent` are preserved; the program files are replaced.
+`%LOCALAPPDATA%\Vireo` are preserved; the program files are replaced.
 
-`omni-agent setup` is safe to re-run at any time — it detects what is already installed and
+`vireo setup` is safe to re-run at any time — it detects what is already installed and
 skips it.
 
 To move the pinned component versions, edit `COMPONENTS` in

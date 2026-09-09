@@ -1,4 +1,4 @@
-// Filesystem layout for the Omni Agent distribution.
+// Filesystem layout for the Vireo distribution.
 //
 // Everything the app owns lives under one root so an uninstall is a single
 // directory removal, and so the bundled OmniRoute never collides with a
@@ -14,14 +14,14 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = path.resolve(HERE, "..", "..");
 
 function baseDir() {
-  if (process.env.OMNI_AGENT_HOME) return path.resolve(process.env.OMNI_AGENT_HOME);
+  if (process.env.VIREO_HOME) return path.resolve(process.env.VIREO_HOME);
   if (process.platform === "win32") {
     const local = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-    return path.join(local, "OmniAgent");
+    return path.join(local, "Vireo");
   }
   const xdg = process.env.XDG_DATA_HOME;
-  if (xdg) return path.join(xdg, "omni-agent");
-  return path.join(os.homedir(), ".omni-agent");
+  if (xdg) return path.join(xdg, "vireo");
+  return path.join(os.homedir(), ".vireo");
 }
 
 export const HOME = baseDir();
@@ -45,7 +45,9 @@ export const PATHS = {
   /** Where OpenCode config for this distribution is written. */
   opencode: path.join(HOME, "opencode"),
   /** Default workspace opened when the user launches with no directory. */
-  workspace: path.join(os.homedir(), "OmniAgent Workspace"),
+  workspace: path.join(os.homedir(), "Vireo Workspace"),
+  /** Decisions workspaces: one SQLite file and its import copies per company. */
+  decisions: path.join(HOME, "decisions"),
   /** Scratch space for downloads made by the browser/scraper tools. */
   downloads: path.join(HOME, "downloads"),
   /**
@@ -57,7 +59,7 @@ export const PATHS = {
 };
 
 export function ensureDirs() {
-  for (const key of ["home", "gatewayData", "browsers", "telemetry", "logs", "opencode", "downloads"]) {
+  for (const key of ["home", "gatewayData", "browsers", "telemetry", "logs", "opencode", "downloads", "decisions"]) {
     fs.mkdirSync(PATHS[key], { recursive: true });
   }
   return PATHS;

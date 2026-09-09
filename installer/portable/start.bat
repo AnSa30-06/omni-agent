@@ -1,5 +1,5 @@
 @echo off
-rem Omni Agent - portable launcher.
+rem Vireo - portable launcher.
 setlocal
 set "HERE=%~dp0"
 if not exist "%HERE%node\node.exe" (
@@ -9,6 +9,6 @@ if not exist "%HERE%node\node.exe" (
   exit /b 1
 )
 set "PATH=%HERE%node;%PATH%"
-"%HERE%node\node.exe" "%HERE%app\bin\omni-agent.mjs" %*
+"%HERE%node\node.exe" "%HERE%app\bin\vireo.mjs" %*
 if errorlevel 1 pause
 endlocal

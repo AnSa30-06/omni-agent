@@ -56,10 +56,10 @@ machine cannot decrypt them.
 This was chosen over `keytar` and friends because it needs **no native module**: nothing to
 compile, nothing to go wrong in the installer, no prebuilt binary to trust.
 
-- Stored at `%LOCALAPPDATA%\OmniAgent\credentials.dat`, mode 0600.
+- Stored at `%LOCALAPPDATA%\Vireo\credentials.dat`, mode 0600.
 - On non-Windows the store falls back to a 0600 file — the same guarantee the OpenCode and
   omniroute CLIs give their own auth files, and no more.
-- `omni-agent config show` prints credential **names**, never values.
+- `vireo config show` prints credential **names**, never values.
 - Environment variables are honoured as a fallback for CI and technical users; the store
   wins when both are present.
 
@@ -75,7 +75,7 @@ Every log write goes through [`src/util/redact.mjs`](../src/util/redact.mjs), wh
 values by key name (`apiKey`, `token`, `password`, `authorization`, `cookie`, …) and by
 value shape (`sk-ant-…`, `sk-proj-…`, `AIza…`, `ghp_…`, `oma_live_…`, `Bearer …`).
 
-`omni-agent diagnostics` produces a bundle for bug reports. It redacts, then **re-scans the
+`vireo diagnostics` produces a bundle for bug reports. It redacts, then **re-scans the
 rendered text** and aborts rather than write a file that still matches a secret pattern. A
 "sanitised" bundle that is not sanitised is worse than none.
 
@@ -110,7 +110,7 @@ exclusion.
 ## Network and data
 
 - **Telemetry is local only.** Token counts, latencies and model choices are written to
-  `%LOCALAPPDATA%\OmniAgent\telemetry\*.jsonl` and never transmitted anywhere.
+  `%LOCALAPPDATA%\Vireo\telemetry\*.jsonl` and never transmitted anywhere.
 - The gateway binds to `127.0.0.1`. It is not exposed to your network.
 - Provider usage adapters talk only to the provider's own documented endpoint.
 - Web search defaults to DuckDuckGo, which needs no account.

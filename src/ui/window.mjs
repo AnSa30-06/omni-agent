@@ -84,7 +84,7 @@ export function canOpenAppWindow() {
       reason: sxs
         ? "the bundled browser cannot start on this machine (missing Visual C++ runtime)"
         : r.error.message,
-      remedy: sxs ? "Install the Microsoft Visual C++ Redistributable (x64), then reopen Omni Agent." : null,
+      remedy: sxs ? "Install the Microsoft Visual C++ Redistributable (x64), then reopen Vireo." : null,
     };
   }
   if (r.status !== 0) return { ok: false, reason: `the bundled browser exited ${r.status}` };

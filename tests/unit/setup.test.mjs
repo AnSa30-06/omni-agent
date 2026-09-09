@@ -101,7 +101,7 @@ test("every missing component is installed in ONE npm run", () => {
 
 test("a locked file is not reported as a network problem", () => {
   // ENOTEMPTY on Windows is antivirus, an open Explorer window, or a running
-  // Omni Agent - telling someone to check their connection sends them the
+  // Vireo - telling someone to check their connection sends them the
   // wrong way entirely.
   const src = fs.readFileSync(pkg("scripts", "bootstrap.mjs"), "utf8");
   assert.match(src, /ENOTEMPTY\|EPERM\|EBUSY\|EACCES/);
@@ -113,7 +113,7 @@ test("the installer allows the command line to choose the install mode", () => {
   // With `dialog` alone, Inno IGNORES /CURRENTUSER and shows "Select install
   // mode" anyway - which /VERYSILENT then renders invisible, so an unattended
   // install looks exactly like a hang. Measured 2026-08-28 against 1.1.3.
-  const iss = fs.readFileSync(pkg("installer", "omni-agent.iss"), "utf8");
+  const iss = fs.readFileSync(pkg("installer", "vireo.iss"), "utf8");
   assert.match(iss, /PrivilegesRequiredOverridesAllowed=dialog commandline/);
 });
 
@@ -134,13 +134,13 @@ test("stopping the gateway does not trust a stale pid file", () => {
 
 test("the wizard's last words fit the person who installed the exe", () => {
   // They have a desktop shortcut and no terminal, and this block used to tell
-  // them to type `omni-agent`.
+  // them to type `vireo`.
   const src = fs.readFileSync(pkg("src", "setup", "wizard.mjs"), "utf8");
   const ready = src.slice(src.indexOf('say("  Ready.")'));
-  assert.match(ready, /Open Omni Agent from your Desktop or Start Menu/);
+  assert.match(ready, /Open Vireo from your Desktop or Start Menu/);
   assert.ok(ready.indexOf("fs.existsSync(exe)") !== -1, "the desktop wording is shown only when the exe exists");
-  assert.match(ready, /omni-agent ui/, "a source checkout is told the command that opens the app");
-  assert.ok(!/Start the agent with:   omni-agent"/.test(ready), "the terminal command is no longer the headline");
+  assert.match(ready, /vireo ui/, "a source checkout is told the command that opens the app");
+  assert.ok(!/Start the agent with:   vireo"/.test(ready), "the terminal command is no longer the headline");
 });
 
 test("the agent's file tools cannot silently read the gateway's secrets", () => {
@@ -177,7 +177,7 @@ test("the agent's file tools cannot silently read the gateway's secrets", () => 
   // And the broad allows are gone from the source.
   const src = fs.readFileSync(pkg("src", "setup", "opencode-config.mjs"), "utf8");
   assert.ok(!/\[glob\(PATHS\.home\)\]: "allow"/.test(src), "the whole-home allow is removed");
-  assert.ok(!/"\*\*\/OmniAgent\/\*\*": "allow"/.test(src), "the broad OmniAgent name-net is removed");
+  assert.ok(!/"\*\*\/Vireo\/\*\*": "allow"/.test(src), "the broad Vireo name-net is removed");
 });
 
 test("a busy free pool does not fail first-run setup", () => {
@@ -191,14 +191,14 @@ test("a busy free pool does not fail first-run setup", () => {
   const exec = fs.readFileSync(pkg("src", "routing", "execute.mjs"), "utf8");
   assert.match(exec, /SWITCH_MODEL = new Set\(\[401, 402, 403, 429, 500, 502, 503, 504\]\)/, "401 walks to the next model");
   // doctor finishes what a rate-limited setup could not.
-  const bin = fs.readFileSync(pkg("bin", "omni-agent.mjs"), "utf8");
+  const bin = fs.readFileSync(pkg("bin", "vireo.mjs"), "utf8");
   const dcmd = bin.slice(bin.indexOf('case "doctor":'), bin.indexOf('case "usage":'));
   assert.match(dcmd, /if \(result\.ok\) \{\s*\n\s*updateConfig\(\{ configured: true \}\)/, "a passing doctor marks the install configured");
   assert.match(dcmd, /rememberVerifiedModel\(result\.servedModel\)/, "and remembers the model that answered");
 });
 
 test("the health check reports each result as it happens, and its window stays open", () => {
-  // Every error message in this product points at "Check Omni Agent health".
+  // Every error message in this product points at "Check Vireo health".
   // It ran node.exe directly, so the console closed on the same millisecond
   // the report appeared, and nothing printed for the 83 s before that
   // (measured 2026-09-02) - a blank window that then vanished.
@@ -211,20 +211,20 @@ test("the health check reports each result as it happens, and its window stays o
   assert.match(doctor, /export function renderSummary/);
 
   // The CLI prints them live, and only --json stays silent so it stays parseable.
-  const bin = fs.readFileSync(pkg("bin", "omni-agent.mjs"), "utf8");
+  const bin = fs.readFileSync(pkg("bin", "vireo.mjs"), "utf8");
   const cmd = bin.slice(bin.indexOf('case "doctor":'), bin.indexOf('case "usage":'));
   assert.match(cmd, /onRow: asJson \? undefined : \(r\) => say\(renderRow\(r\)\)/);
   assert.match(cmd, /ensureReady\(\{ quiet: asJson \}\)/, "the gateway's own slow start is narrated too");
 
   // And the shortcut goes through a .cmd that pauses.
-  const doc = fs.readFileSync(pkg("installer", "OmniAgentDoctor.cmd"), "utf8");
-  assert.match(doc, /omni-agent\.mjs" doctor/);
+  const doc = fs.readFileSync(pkg("installer", "VireoDoctor.cmd"), "utf8");
+  assert.match(doc, /vireo\.mjs" doctor/);
   assert.match(doc, /\npause\r?\n/, "the console must wait before closing");
-  const iss = fs.readFileSync(pkg("installer", "omni-agent.iss"), "utf8");
-  assert.match(iss, /Source: "OmniAgentDoctor\.cmd";/, "the .cmd is installed");
+  const iss = fs.readFileSync(pkg("installer", "vireo.iss"), "utf8");
+  assert.match(iss, /Source: "VireoDoctor\.cmd";/, "the .cmd is installed");
   assert.match(
     iss,
-    /Name: "\{group\}\\Check \{#AppName\} health"; Filename: "\{app\}\\OmniAgentDoctor\.cmd"/,
+    /Name: "\{group\}\\Check \{#AppName\} health"; Filename: "\{app\}\\VireoDoctor\.cmd"/,
     "the shortcut runs the .cmd, not node.exe directly",
   );
 });

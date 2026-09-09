@@ -114,7 +114,7 @@ export async function gatewayFreeTier(client = new GatewayClient()) {
     return {
       state: "unavailable",
       reason: "Free-tier figures need a management-scoped gateway key",
-      remedy: "Create a key with the 'manage' scope in the OmniRoute dashboard, then run: omni-agent config set-management-key",
+      remedy: "Create a key with the 'manage' scope in the OmniRoute dashboard, then run: vireo config set-management-key",
     };
   }
   if (r.reason === "unauthorized") {

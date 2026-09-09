@@ -185,7 +185,7 @@ export async function runGatewayAction(action, args = {}, opts = {}) {
         url,
         page,
         label: PAGES[page].label,
-        instruction: "The dashboard asks for a password. Tell the user to run `omni-agent dashboard` to see it.",
+        instruction: "The dashboard asks for a password. Tell the user to run `vireo dashboard` to see it.",
       });
     }
 

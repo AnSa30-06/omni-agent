@@ -23,10 +23,16 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { credentials, oc, start as startOpencode, stop as stopOpencode } from "./opencode-server.mjs";
 import { routes } from "./api.mjs";
+// The Decisions product adds its own routes. Merged once, here, rather than
+// edited into the 1,200-line api.mjs: two independent tables, one dispatcher,
+// and the token / loopback / 400 rules below apply to both without restating.
+import { decisionRoutes } from "../decisions/routes.mjs";
 import { logger } from "../util/log.mjs";
 
 const log = logger("ui/server");
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+/** Every /x/ action. Built once at load, never from a request path. */
+const ALL_ROUTES = { ...routes, ...decisionRoutes };
 const PUBLIC = path.join(HERE, "public");
 
 const TYPES = {
@@ -62,8 +68,13 @@ export function serverPort() {
   return _port;
 }
 
-export function uiUrl() {
-  return _server ? `http://127.0.0.1:${_port}/?t=${_token}` : null;
+/**
+ * The address of the window, optionally onto a specific product surface.
+ * @param {string} [pathname] e.g. "/decisions/" - defaults to the app shell.
+ */
+export function uiUrl(pathname = "/") {
+  const p = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  return _server ? `http://127.0.0.1:${_port}${p}?t=${_token}` : null;
 }
 
 function send(res, status, body, headers = {}) {
@@ -153,7 +164,10 @@ async function proxyJson(req, res, target) {
 }
 
 function serveStatic(res, urlPath) {
-  const rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");
+  // A directory URL serves its index.html. Without this "/decisions/" resolves
+  // to a directory, fails the isFile() check below, and 404s - which looks
+  // exactly like the page not existing.
+  const rel = urlPath === "/" || urlPath.endsWith("/") ? urlPath.replace(/^\/+/, "") + "index.html" : urlPath.replace(/^\/+/, "");
   // Resolve then confirm containment, so "..%2f" cannot escape the directory.
   const file = path.resolve(PUBLIC, rel);
   if (!file.startsWith(PUBLIC)) return send(res, 403, { error: "forbidden" });
@@ -184,12 +198,12 @@ async function handle(req, res) {
   }
 
   /* Instance handshake. Deliberately NOT token-guarded, and deliberately
-   * useless without one: it says only that Omni Agent owns this port, and asks
+   * useless without one: it says only that Vireo owns this port, and asks
    * it to show its own window. No secret is disclosed and the agent cannot be
    * driven through it, so a second copy can hand over without the token ever
    * being written to disk. Loopback is already enforced above. */
   if (p === "/instance") {
-    return send(res, 200, { omniAgent: true, pid: process.pid });
+    return send(res, 200, { vireo: true, pid: process.pid });
   }
   if (p === "/instance/show") {
     // Debounced: a local process should not be able to flap the window.
@@ -212,8 +226,8 @@ async function handle(req, res) {
 
   if (p.startsWith("/x/")) {
     const name = p.slice(3);
-    const fn = routes[name];
-    if (!fn) return send(res, 404, { error: `unknown action "${name}"`, known: Object.keys(routes) });
+    const fn = ALL_ROUTES[name];
+    if (!fn) return send(res, 404, { error: `unknown action "${name}"`, known: Object.keys(ALL_ROUTES) });
     try {
       const body = ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? await readBody(req) : undefined;
       const out = await fn({ body: body ?? {}, query: Object.fromEntries(url.searchParams), method: req.method });

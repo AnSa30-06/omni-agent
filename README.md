@@ -1,4 +1,4 @@
-# Omni Agent
+# Vireo
 
 ## What is this?
 
@@ -12,15 +12,58 @@ You install one program. It sets itself up. Then you ask it to do things, in pla
 pay for Claude, ChatGPT, Gemini, DeepSeek or Kimi, you can add your key and it will be
 faster — but that is an upgrade, not a requirement.
 
+It also does a second thing: **[Decisions](docs/decisions/)** reads spreadsheets about your
+customers and tells you which ones need your attention this week, why, and what to do.
+
 ---
 
-## Download
+# ⬇ Download
 
-**[⬇ Download OmniAgentSetup-1.2.0.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgentSetup-1.2.0.exe)** — 74.6 MB, Windows 10/11 (64-bit)
+### **[VireoSetup-1.2.0.exe](https://github.com/AnSa30-06/vireo/releases/download/v1.2.0/VireoSetup-1.2.0.exe)** — 71 MB
 
-That link always gives you version 1.2.0. The
-[Releases page](https://github.com/AnSa30-06/omni-agent/releases/latest) has the newest
-version and the release notes.
+One file. No account. No API key.
+Windows 10 or 11, 64-bit. No administrator password needed.
+
+Prefer no installer? **[Vireo-Portable-1.2.0.zip](https://github.com/AnSa30-06/vireo/releases/download/v1.2.0/Vireo-Portable-1.2.0.zip)** — 117 MB. Extract it anywhere, run `setup.bat` once, then `app.bat`.
+
+### 📖 **[Read the manual](MANUAL.md)**
+
+Everything in one page, in plain English. Start there.
+
+> **Windows will say "Windows protected your PC".** That is expected — click
+> **More info**, then **Run anyway**. It means nobody has paid for a signing
+> certificate, not that the file is bad. The section below explains it properly.
+>
+> **The first run downloads about 4 GB and takes 10 to 30 minutes.** Once, ever.
+
+---
+
+## Where this came from
+
+Vireo is a fork of [omni-agent](https://github.com/AnSa30-06/omni-agent), the same
+codebase under its previous name. That project's releases are still there and
+still work; this one adds **Decisions** and is where new work happens.
+
+The [Releases page](https://github.com/AnSa30-06/vireo/releases/latest) has every
+version and its release notes.
+
+### Checking you got the right file
+
+Run this in PowerShell in your Downloads folder before opening it:
+
+```powershell
+Get-FileHash .\VireoSetup-1.2.0.exe -Algorithm SHA256
+```
+
+It should print:
+
+```
+E083A07DB082A68E66C7E90A0D52E1CD3F5C41E18CD67E89F41F68013B0C5681
+```
+
+The portable zip is `D1A8BC0F87C4D68CAC5A85CB55F9EA0D908079694FA6C1A900EF061EBB98D723`.
+
+If either prints anything else, delete the file and download it again.
 
 | | |
 |---|---|
@@ -60,7 +103,7 @@ If it prints anything else, delete the file and download it again.
 1. **Run the file you downloaded.** No administrator password needed.
 2. When it finishes, it opens a setup window that downloads the rest and checks everything
    works. This takes a while and needs about 4 GB — see [Disk and download](#disk-and-download).
-3. **Launch** *Omni Agent* from your Desktop or Start Menu — `OmniAgent.exe`, a real
+3. **Launch** *Vireo* from your Desktop or Start Menu — `Vireo.exe`, a real
    application, not a terminal. It opens as a window: Chat on one side, Code on the
    other, with everything else a click away in the sidebar.
    See [The desktop app](docs/desktop-app.md).
@@ -77,7 +120,7 @@ That's it. Ask it something.
 
 ### If you would rather not use an installer
 
-**[⬇ Download OmniAgent-Portable-1.2.0.zip](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgent-Portable-1.2.0.zip)** — 123.3 MB
+**[⬇ Download the portable zip](https://github.com/AnSa30-06/vireo/releases/latest)** — from the releases page, alongside the installer.
 
 Extract it anywhere, run `setup.bat` once, then `app.bat` to open the app (or `start.bat`
 for the terminal interface). Nothing is written outside the folder and your own data
@@ -99,6 +142,7 @@ Its SHA-256 is `b59c59c9261317b3cc70219b06bc7ea522674c876ba44fd317af2cdd2743af76
 | **Data analysis** | Profiles a spreadsheet — types, missing values, statistics — without spending tokens on it. |
 | **Git and GitHub** | Branches, commits, pull requests, issues. |
 | **Choose its own model** | Picks a cheap fast model for simple work and a strong one for hard work. |
+| **Turn customer data into decisions** | **Decisions**: reads your customer spreadsheets, finds the accounts where several things changed at once, and gives you a short list of things to act on — with the evidence. [Read more](docs/decisions/). |
 
 ### It stops before doing anything irreversible
 
@@ -129,7 +173,7 @@ rather than bundled, because an installer carrying them would be unusable.
 
 ## Usage and cost
 
-Run `omni-agent usage`, or just ask the agent "what model am I on and what is this
+Run `vireo usage`, or just ask the agent "what model am I on and what is this
 costing?".
 
 **The numbers you see are real or they are absent.** This product never estimates a quota
@@ -156,7 +200,7 @@ Free tiers have limits, and most of what an agent spends is tool output — test
 runs, file reads, search results — not conversation.
 
 ```bash
-omni-agent saving
+vireo saving
 ```
 
 That lists every tier with the saving **measured on your own recent requests**,
@@ -177,7 +221,7 @@ sent exactly as written. Code, URLs and structured data are never compressed at
 any tier.
 
 ```bash
-omni-agent saving max
+vireo saving max
 ```
 
 > The seven underlying modes are not one dial — some target prose and some
@@ -190,21 +234,21 @@ omni-agent saving max
 ## More free capacity
 
 ```bash
-omni-agent provider
+vireo provider
 ```
 
 Fifteen providers with a genuine free tier, what each one gives you, and where
 to get the key. Add one and it is tested immediately with a real call:
 
 ```bash
-omni-agent provider add cerebras csk-...
+vireo provider add cerebras csk-...
 ```
 
 Already paying for Claude, ChatGPT, Copilot, Cursor or Gemini? Sign in and the
 agent uses that subscription — nothing is charged twice:
 
 ```bash
-omni-agent provider signin claude
+vireo provider signin claude
 ```
 
 ### Anything else the gateway knows
@@ -214,8 +258,8 @@ them can be added by id — `mistral`, `cerebras`, `groq`, `cohere`, `together`,
 `sambanova`, `nebius`, `novita`, `deepinfra`, `hyperbolic`, `openrouter`:
 
 ```bash
-omni-agent provider setup mistral      # the steps
-omni-agent provider add mistral YOUR-KEY
+vireo provider setup mistral      # the steps
+vireo provider add mistral YOUR-KEY
 ```
 
 Its models then appear in the picker under **From your keys**. A full worked
@@ -241,7 +285,7 @@ research looks like. A key removes that.
 Every provider comes with step-by-step instructions:
 
 ```bash
-omni-agent provider setup brave
+vireo provider setup brave
 ```
 
 ```
@@ -251,9 +295,9 @@ Brave Search - Free credits every month on an independent web index
   2. Create a Brave account, or sign in.
   3. $5 of free credit every month, applied automatically.
   4. In the developer dashboard, create a subscription token.
-  5. Run:  omni-agent provider add brave YOUR-KEY
+  5. Run:  vireo provider add brave YOUR-KEY
 
-  Check it worked:  omni-agent doctor
+  Check it worked:  vireo doctor
 ```
 
 Once a key is stored it is used **first**, automatically — nothing to
@@ -268,9 +312,9 @@ The bundled gateway is a full web application running on your own machine —
 providers, compression, analytics, search tools, settings.
 
 ```bash
-omni-agent dashboard          # overview
-omni-agent dashboard search   # search and scraping providers
-omni-agent dashboard free     # every provider with a free allowance
+vireo dashboard          # overview
+vireo dashboard search   # search and scraping providers
+vireo dashboard free     # every provider with a free allowance
 ```
 
 It asks for a password, which setup generated for you. The command prints it and
@@ -292,14 +336,14 @@ The agent routes automatically. Five modes:
 | `cheap` | The cheapest model that can still do the job |
 
 ```bash
-omni-agent config mode smart
+vireo config mode smart
 ```
 
 The mode picks the agent's own model as well as the models it uses internally, so changing
 it prints which model you will be on and asks you to restart — OpenCode reads its
 configuration at launch and does not reload it.
 
-Or ask it: *"switch to the cheapest model"*. To pin one specific model, `omni-agent models`
+Or ask it: *"switch to the cheapest model"*. To pin one specific model, `vireo models`
 lists what is available right now, and the agent's `agent_status` tool can pin it.
 
 Simple work (classifying, naming, extracting a field) is deliberately sent to a cheap fast
@@ -311,22 +355,25 @@ to waste a budget.
 ## Commands
 
 ```bash
-omni-agent ui              # open the desktop app (same as OmniAgent.exe)
-omni-agent ui --no-window  # ...and use your own browser instead
-omni-agent                 # start the agent in the terminal instead
-omni-agent routine list    # scheduled routines
-omni-agent routine run ID  # run one now
-omni-agent dashboard       # open the gateway's own web dashboard
-omni-agent dashboard search   # ...straight to the search-tools page
-omni-agent saving          # what each token-saving tier really saves
-omni-agent provider        # free providers you can add, and what each gives
-omni-agent doctor          # check everything works, with real probes
-omni-agent usage           # model, quota and token usage
-omni-agent models          # what the gateway currently serves
-omni-agent route           # which model each kind of task would get
-omni-agent setup           # re-run the setup wizard
-omni-agent gateway status  # is the model gateway running
-omni-agent diagnostics     # export a sanitised report for bug reports
+vireo ui              # open the desktop app (same as Vireo.exe)
+vireo ui --no-window  # ...and use your own browser instead
+vireo decisions       # open Decisions: customer data -> decisions
+vireo decisions seed demo    # load a demo company to try it on
+vireo decisions run          # run the analysis without opening a window
+vireo                 # start the agent in the terminal instead
+vireo routine list    # scheduled routines
+vireo routine run ID  # run one now
+vireo dashboard       # open the gateway's own web dashboard
+vireo dashboard search   # ...straight to the search-tools page
+vireo saving          # what each token-saving tier really saves
+vireo provider        # free providers you can add, and what each gives
+vireo doctor          # check everything works, with real probes
+vireo usage           # model, quota and token usage
+vireo models          # what the gateway currently serves
+vireo route           # which model each kind of task would get
+vireo setup           # re-run the setup wizard
+vireo gateway status  # is the model gateway running
+vireo diagnostics     # export a sanitised report for bug reports
 ```
 
 ---
@@ -336,13 +383,13 @@ omni-agent diagnostics     # export a sanitised report for bug reports
 ```
                     You
                      |
-              omni-agent  (launcher, setup, health, usage)
+              vireo  (launcher, setup, health, usage)
                      |
                  OpenCode  (the agent harness and TUI)
                      |
         +------------+--------------------------+
         |                                       |
-  Built-in tools                     Omni Agent plugin
+  Built-in tools                     Vireo plugin
   files, shell, git                  8 high-level tools
                                        |
         +----------+----------+--------+---------+----------+
@@ -371,10 +418,51 @@ browser — navigate, snapshot, click, type, select, upload, tabs, extract, scre
 download, wait — is *one* tool with an `action` argument, not eighteen tools. Eight tools
 total.
 
+---
+
+## Decisions
+
+A second thing in the same window, for anyone who has customers rather than a
+codebase.
+
+You give it a folder of spreadsheets — accounts, daily usage, contacts, support
+tickets, invoices. It works out what changed for every customer, finds the ones
+where **several** things moved together, and asks an AI to explain what it means
+and what to do. You get a short list. Each item carries its evidence and the
+money at stake.
+
+Then it remembers. A decision stays until you close it, tells you when it is
+overdue, and asks what actually happened.
+
+```bash
+vireo decisions              # open it
+vireo decisions seed demo    # 48 made-up customers to try it on
+vireo decisions run          # analyse, from a terminal
+```
+
+Two rules it does not break:
+
+- **Every number was computed from your data, not written by an AI.** The
+  software does the arithmetic; the model only reads sentences the software wrote
+  and writes the explanation. An answer containing a figure that is not in your
+  data is thrown away and asked for again.
+- **One thing changing is never a decision.** It takes a combination. That rule
+  is in code, so it holds even when the model is unavailable — and when it is,
+  the decision is still raised, from the rules, and says so.
+
+Nothing is sent anywhere. There is no code in it that can send an email, and the
+only thing that leaves your machine is a short, name-free fact sheet about one
+customer, and only when you run an analysis.
+[Privacy](docs/decisions/privacy.md) shows exactly what that is.
+
+**Start with [Getting started](docs/decisions/getting-started.md)**, and read
+[Limitations](docs/decisions/limitations.md) before relying on it.
+
 ### Documentation
 
 | | |
 |---|---|
+| [Decisions](docs/decisions/) | Turning customer data into decisions: setup, the screens, privacy and limits |
 | [The desktop app](docs/desktop-app.md) | The window: Chat and Code, the working folder, routines, transcripts, models |
 | [Installation](docs/installation.md) | Every install path, and what each one does |
 | [Architecture](docs/architecture.md) | How the pieces fit, and the decisions behind them |
@@ -384,6 +472,7 @@ total.
 | [Security](docs/security.md) | The confirmation boundary, credential storage, permissions |
 | [Troubleshooting](docs/troubleshooting.md) | When something breaks |
 | [Development](docs/development.md) | Running from source, tests, building the installer |
+| [Sending it to someone](docs/sharing.md) | Shipping a build with a provider key already in it, so it works for them on first run |
 
 ---
 
@@ -408,7 +497,7 @@ Details in [docs/security.md](docs/security.md).
 - ~6 GB free disk
 - An internet connection for setup
 
-macOS and Linux work from source (`npm install && node bin/omni-agent.mjs setup`); only the
+macOS and Linux work from source (`npm install && node bin/vireo.mjs setup`); only the
 Windows installer is built today.
 
 ---

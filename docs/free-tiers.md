@@ -7,7 +7,7 @@ Everything below was read from the running gateway on **2026-08-28**, not copied
 from anyone's marketing. Reproduce it yourself:
 
 ```bash
-omni-agent dashboard free
+vireo dashboard free
 ```
 
 ---
@@ -72,8 +72,8 @@ with a real password to look after.
 Every command above is the same shape:
 
 ```bash
-omni-agent provider setup mistral        # the steps for one provider
-omni-agent provider add mistral YOUR-KEY # store it, and test it with a real call
+vireo provider setup mistral        # the steps for one provider
+vireo provider add mistral YOUR-KEY # store it, and test it with a real call
 ```
 
 The key is tested immediately against the provider, and the models it unlocks

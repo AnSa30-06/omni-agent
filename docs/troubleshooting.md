@@ -3,7 +3,7 @@
 Start here:
 
 ```bash
-omni-agent doctor
+vireo doctor
 ```
 
 Every row is a live probe — a real model request, a real search, a real page fetch, a real
@@ -12,10 +12,10 @@ browser launch. Nothing reports OK because a file exists.
 For a bug report:
 
 ```bash
-omni-agent diagnostics
+vireo diagnostics
 ```
 
-Writes a sanitised JSON bundle to `%LOCALAPPDATA%\OmniAgent\logs\`. Secrets are redacted,
+Writes a sanitised JSON bundle to `%LOCALAPPDATA%\Vireo\logs\`. Secrets are redacted,
 and the exporter **refuses to write the file** if anything in it still matches a secret
 pattern. Look at it before you send it.
 
@@ -29,7 +29,7 @@ The free model pool is rate-limited right now.
   every model in the chain refused at once.
 - **Add a provider key.** One paid key removes this permanently:
   ```bash
-  omni-agent config key deepseek sk-...
+  vireo config key deepseek sk-...
   ```
 
 This is the most common failure on a fresh install and it is not a bug — it is what a free
@@ -38,18 +38,18 @@ tier under load looks like.
 ## "Gateway running — FAIL"
 
 ```bash
-omni-agent gateway status
-omni-agent gateway start
+vireo gateway status
+vireo gateway start
 ```
 
-If it will not start, read `%LOCALAPPDATA%\OmniAgent\logs\gateway.log`.
+If it will not start, read `%LOCALAPPDATA%\Vireo\logs\gateway.log`.
 
 - **Port 20129 already taken** — change it in
-  `%LOCALAPPDATA%\OmniAgent\config.json` (`gateway.port`) and re-run
-  `omni-agent setup`.
+  `%LOCALAPPDATA%\Vireo\config.json` (`gateway.port`) and re-run
+  `vireo setup`.
 - **First start is slow.** It is a Next.js application with database migrations; a cold
   first start can take a minute. The supervisor allows 180 s.
-- **`omniroute-not-installed`** — the bootstrap did not finish. Run *Set up Omni Agent* from
+- **`omniroute-not-installed`** — the bootstrap did not finish. Run *Set up Vireo* from
   the Start Menu again.
 
 ## OpenCode shows no models / "undefined is not an object (evaluating '$.models')"
@@ -57,7 +57,7 @@ If it will not start, read `%LOCALAPPDATA%\OmniAgent\logs\gateway.log`.
 The gateway credential is missing, so the OmniRoute plugin registered no provider.
 
 ```bash
-omni-agent setup --non-interactive
+vireo setup --non-interactive
 ```
 
 That re-mints the gateway token and rewrites the OpenCode configuration.
@@ -69,16 +69,16 @@ To confirm what the plugin saw, look for this line when OpenCode starts:
 ```
 
 If you see it, the plugin could not find `auth.json`. It resolves that path from
-`OPENCODE_DATA_DIR` — which the launcher sets. Launch through `omni-agent`, not by running
+`OPENCODE_DATA_DIR` — which the launcher sets. Launch through `vireo`, not by running
 `opencode` directly.
 
 ## Browser tasks fail
 
 ```bash
-omni-agent setup --browser
+vireo setup --browser
 ```
 
-Re-downloads Chromium into `%LOCALAPPDATA%\OmniAgent\browsers`.
+Re-downloads Chromium into `%LOCALAPPDATA%\Vireo\browsers`.
 
 - **"ref eN is not on the current page"** — expected and self-correcting. The page changed
   and the agent must re-snapshot. If it keeps happening the page is re-rendering constantly.
@@ -88,11 +88,11 @@ Re-downloads Chromium into `%LOCALAPPDATA%\OmniAgent\browsers`.
   yourself.
 - **"the browser needs a Node.js runtime and none was found"** — the browser runs in a
   separate Node process (see [architecture.md](architecture.md#playwright-runs-in-its-own-process)).
-  Launch through `omni-agent`, which uses the bundled runtime, rather than starting
+  Launch through `vireo`, which uses the bundled runtime, rather than starting
   `opencode` yourself.
 - **"the browser host did not start within 30s"** — look for `browser-host` lines in
-  `%LOCALAPPDATA%\OmniAgent\logs\`. A stale handshake file is safe to delete:
-  `%LOCALAPPDATA%\OmniAgent\browser-host.json`.
+  `%LOCALAPPDATA%\Vireo\logs\`. A stale handshake file is safe to delete:
+  `%LOCALAPPDATA%\Vireo\browser-host.json`.
 
 ## "Every keyless search provider is currently throttling this machine"
 
@@ -111,9 +111,9 @@ When you see this message:
 - **Add a search key.** This removes the limit permanently. Brave and Tavily both have free
   tiers:
   ```bash
-  omni-agent config key brave BSA...
+  vireo config key brave BSA...
   ```
-  Then put it first in `search.order` in `%LOCALAPPDATA%\OmniAgent\config.json`.
+  Then put it first in `search.order` in `%LOCALAPPDATA%\Vireo\config.json`.
 - **Point at your own SearXNG.** `SEARXNG_INSTANCE=https://my-searxng.example.com` stops the
   product depending on volunteer-run public instances.
 
@@ -152,7 +152,7 @@ The bootstrap is resumable: components already installed are skipped.
 It is unsigned. Check the published SHA-256 first:
 
 ```powershell
-Get-FileHash .\OmniAgentSetup-1.1.9.exe -Algorithm SHA256
+Get-FileHash .\VireoSetup-1.1.9.exe -Algorithm SHA256
 ```
 
 Then *More info* → *Run anyway*.
@@ -164,14 +164,14 @@ Free models are slow — 57 s for a short reply has been measured. The fix is a 
 You can also trade quality for speed:
 
 ```bash
-omni-agent config mode fast
+vireo config mode fast
 ```
 
 Check what it is actually doing:
 
 ```bash
-omni-agent usage      # measured tokens/sec per model, on your machine
-omni-agent route      # which model each kind of task gets
+vireo usage      # measured tokens/sec per model, on your machine
+vireo route      # which model each kind of task gets
 ```
 
 ## Antivirus interferes
@@ -183,8 +183,8 @@ appears in `gateway.log` as an immediate exit.
 ## Starting over
 
 ```bash
-omni-agent gateway stop
+vireo gateway stop
 ```
 
-Then delete `%LOCALAPPDATA%\OmniAgent` and re-run setup. That discards settings, saved
+Then delete `%LOCALAPPDATA%\Vireo` and re-run setup. That discards settings, saved
 keys, telemetry and the downloaded browser — the program files are untouched.
