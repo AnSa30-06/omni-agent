@@ -41,8 +41,12 @@ Everything runs on your own computer.
 
 ### 1. Download
 
-Get `VireoSetup-1.2.0.exe` from the
+**[⬇ VireoSetup-1.2.0.exe](https://github.com/AnSa30-06/vireo/releases/download/v1.2.0/VireoSetup-1.2.0.exe)** — 71 MB, from the
 [releases page](https://github.com/AnSa30-06/vireo/releases).
+
+To check you got the right file, run `Get-FileHash .\VireoSetup-1.2.0.exe -Algorithm SHA256`
+in PowerShell. It should print
+`E083A07DB082A68E66C7E90A0D52E1CD3F5C41E18CD67E89F41F68013B0C5681`.
 
 ### 2. Windows will warn you. This is expected.
 
