@@ -42,7 +42,7 @@ Everything runs on your own computer.
 ### 1. Download
 
 Get `VireoSetup-1.2.0.exe` from the
-[releases page](https://github.com/AnSa30-06/omni-agent/releases).
+[releases page](https://github.com/AnSa30-06/vireo/releases).
 
 ### 2. Windows will warn you. This is expected.
 

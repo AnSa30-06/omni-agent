@@ -19,7 +19,7 @@ customers and tells you which ones need your attention this week, why, and what 
 
 # ⬇ Download
 
-### **[Get Vireo for Windows](https://github.com/AnSa30-06/omni-agent/releases/latest)**
+### **[Get Vireo for Windows](https://github.com/AnSa30-06/vireo/releases/latest)**
 
 One file. No account. No API key.
 Windows 10 or 11, 64-bit. No administrator password needed.
@@ -36,12 +36,14 @@ Everything in one page, in plain English. Start there.
 
 ---
 
-## The older release
+## Where this came from
 
-**[⬇ OmniAgentSetup-1.2.0.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgentSetup-1.2.0.exe)** — 74.6 MB, published under the project's previous name.
+Vireo is a fork of [omni-agent](https://github.com/AnSa30-06/omni-agent), the same
+codebase under its previous name. That project's releases are still there and
+still work; this one adds **Decisions** and is where new work happens.
 
-The [Releases page](https://github.com/AnSa30-06/omni-agent/releases/latest) has the newest
-version and the release notes.
+The [Releases page](https://github.com/AnSa30-06/vireo/releases/latest) has every
+version and its release notes.
 
 | | |
 |---|---|
@@ -98,7 +100,7 @@ That's it. Ask it something.
 
 ### If you would rather not use an installer
 
-**[⬇ Download OmniAgent-Portable-1.2.0.zip](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgent-Portable-1.2.0.zip)** — 123.3 MB
+**[⬇ Download the portable zip](https://github.com/AnSa30-06/vireo/releases/latest)** — from the releases page, alongside the installer.
 
 Extract it anywhere, run `setup.bat` once, then `app.bat` to open the app (or `start.bat`
 for the terminal interface). Nothing is written outside the folder and your own data
