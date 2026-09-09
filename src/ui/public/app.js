@@ -131,6 +131,10 @@ const state = {
   // away the only record of what the old conversation was about.
   // { session, summary, from }
   carryOver: null,
+  // The release the reader has waved away. Kept per version, so dismissing one
+  // update does not silence the next.
+  updateDismissed: null,
+  update: null,
 };
 
 /**
@@ -1330,6 +1334,69 @@ function retryOnAnotherModel() {
  * the brief to it. ⚠️ The old conversation is NEVER deleted - it stays in the
  * sidebar - because "make this shorter" must not mean "lose my work".
  */
+/**
+ * Tell the reader an update exists, and take it when they say so.
+ *
+ * ⚠️ Announce, never apply on its own. Updating restarts the app, and a restart
+ * that arrives unasked in the middle of a piece of work destroys the thing the
+ * reader was doing. Their machine, their moment.
+ */
+async function checkForUpdate({ quiet = true } = {}) {
+  const r = await api("updateCheck");
+  const bar = $("update-bar");
+  if (!bar) return;
+  if (!r?.ok || !r.available) {
+    bar.hidden = true;
+    if (!quiet) toast(r?.unreachable ? "Could not reach GitHub to check" : "This is the latest version");
+    return;
+  }
+  if (state.updateDismissed === r.latest) return;
+  state.update = r;
+  // A release that changes the shape of the install cannot be copied in. Say
+  // so plainly and point at the download rather than offering a button that
+  // would refuse.
+  $("update-text").textContent = r.blocked
+    ? `Version ${r.latest} is available. It needs the full installer.`
+    : `Version ${r.latest} is ready. ${r.files} file${r.files === 1 ? "" : "s"} to update.`;
+  const go = $("btn-update");
+  go.textContent = r.blocked ? "Open the download page" : "Update and restart";
+  bar.hidden = false;
+}
+
+async function applyUpdate() {
+  const r = state.update;
+  if (!r) return;
+  if (r.blocked) {
+    // Nothing is installed from here. The reasons matter to someone who is
+    // about to be told to download 74 MB, so they are shown, not swallowed.
+    toast(r.reasons?.[0] ? `This version ${r.reasons[0]}` : "This version needs the full installer");
+    if (r.url) window.open(r.url, "_blank", "noopener");
+    return;
+  }
+  if (state.busy) return toast("Wait for the current answer to finish", "bad");
+  const go = $("btn-update");
+  go.disabled = true;
+  go.textContent = "Updating\u2026";
+  const res = await api("updateApply", { method: "POST" });
+  if (!res?.ok) {
+    go.disabled = false;
+    go.textContent = "Update and restart";
+    return toast(res?.error ?? "The update did not work, and nothing was changed", "bad");
+  }
+  if (res.needsInstaller) {
+    go.disabled = false;
+    go.textContent = "Open the download page";
+    toast("This version needs the full installer");
+    if (res.url) window.open(res.url, "_blank", "noopener");
+    return;
+  }
+  $("update-text").textContent = `Updated to ${res.to}. Starting again\u2026`;
+  go.hidden = true;
+  // The app is replacing itself. The page it is served from is about to go, so
+  // wait for the new copy to take the port rather than reloading into nothing.
+  setTimeout(() => location.reload(), 9000);
+}
+
 async function runCompact() {
   if (!state.sessionID) return toast("Open a conversation first", "bad");
   if (state.busy) return toast("Wait for the current answer to finish", "bad");
@@ -2922,6 +2989,17 @@ function wire() {
   $("folder-btn").onclick = openFolderPicker;
   $("mode-btn").onclick = openModePicker;
   $("btn-compact").onclick = () => runCompact();
+  $("btn-update").onclick = () => applyUpdate();
+  $("btn-update-hide").onclick = () => {
+    $("update-bar").hidden = true;
+    state.updateDismissed = state.update?.latest ?? null;
+    savePrefs({ updateDismissed: state.updateDismissed });
+  };
+  // Once on the way in, then once a day for a copy that is left open. The
+  // check is one request and it never blocks anything - a machine that is
+  // offline simply keeps the bar hidden.
+  setTimeout(() => checkForUpdate().catch(() => {}), 8000);
+  setInterval(() => checkForUpdate().catch(() => {}), 24 * 60 * 60 * 1000);
   $("btn-stop").onclick = async () => {
     if (!state.sessionID) return;
     // The route that actually stops a turn started on the legacy message
@@ -2982,6 +3060,7 @@ async function boot() {
   state.model = prefs.model ?? null;
   state.unhealthy = prefs.unhealthy ?? {};
   state.carryOver = prefs.carryOver ?? null;
+  state.updateDismissed = prefs.updateDismissed ?? null;
   state.verifiedModel = prefs.verifiedModel ?? null;
   state.showReasoning = prefs.showReasoning === true;
   setSurface(prefs.surface === "code" ? "code" : "chat");
