@@ -1036,6 +1036,69 @@ export const routes = {
     });
   },
 
+  /**
+   * Is there a newer version, and could it be installed by copying files?
+   *
+   * Answers both in one call because they are one question to the reader: an
+   * update they cannot take is not an update, it is a download link.
+   */
+  async updateCheck() {
+    const up = await import("../update/updater.mjs");
+    const chk = await up.checkForUpdate();
+    if (!chk.ok) return ok({ available: false, unreachable: true, reason: chk.reason });
+    if (!chk.updateAvailable) {
+      return ok({ available: false, current: chk.current, latest: chk.latest });
+    }
+    const plan = await up.planUpdate({ to: chk.latest });
+    return ok({
+      available: true,
+      current: chk.current,
+      latest: chk.latest,
+      url: chk.url,
+      publishedAt: chk.publishedAt,
+      notes: chk.notes,
+      files: plan.ok ? (plan.files?.length ?? 0) : 0,
+      // `blocked` is not a failure. It means this particular release changes
+      // the shape of the install, so it has to come from the full installer.
+      blocked: plan.ok ? plan.blocked === true : true,
+      reasons: plan.ok ? (plan.reasons ?? []) : [plan.reason],
+    });
+  },
+
+  /**
+   * Take the update, then start the app again.
+   *
+   * ⚠️ The restart is scheduled AFTER this answer has been written. Restarting
+   * inside the handler kills the process holding the socket, so the page would
+   * see a dropped connection and could not tell success from failure.
+   */
+  async updateApply() {
+    const up = await import("../update/updater.mjs");
+    const chk = await up.checkForUpdate();
+    if (!chk.ok) return bad(chk.reason);
+    if (!chk.updateAvailable) return bad("this copy is already up to date");
+    const plan = await up.planUpdate({ to: chk.latest });
+    if (!plan.ok) return bad(plan.reason);
+    if (plan.blocked) {
+      return ok({
+        applied: false,
+        needsInstaller: true,
+        latest: chk.latest,
+        url: chk.url,
+        reasons: plan.reasons,
+      });
+    }
+    const res = await up.applyUpdate(plan);
+    if (!res.ok) return bad(res.reason);
+    setTimeout(() => {
+      up.restartApp().catch(() => {});
+      // The replacement is already starting; this copy has to let go of the
+      // port and the data directory or the new one refuses to boot.
+      setTimeout(() => process.exit(0), 1500);
+    }, 700);
+    return ok({ applied: true, from: res.from, to: res.to, files: res.files, restarting: true });
+  },
+
   async folderCheck({ query }) {
     const p = typeof query.path === "string" ? query.path : "";
     return ok({ path: p, exists: !!p && fs.existsSync(p) });
