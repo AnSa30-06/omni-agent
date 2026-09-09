@@ -16,8 +16,8 @@
 // with an app that will not start and no obvious way back. Every such release
 // is refused here and sent to the full installer instead.
 //
-// That is not hypothetical. While this was being written, HEAD of this very
-// repository had renamed the product, moved its data directory and added a
+// That is not hypothetical. While this was being written, a live branch of this
+// very repository had renamed the product, moved its data directory and added a
 // `zod` dependency across 90 files. A naive file-copier would have replaced
 // `bin/omni-agent.mjs` with nothing, pointed the app at an empty data folder,
 // and imported a package that is not installed.
@@ -121,10 +121,10 @@ async function gh(pathname) {
 /**
  * Is there a newer RELEASE?
  *
- * ⚠️ Releases, never commits. A commit on the main branch is work in progress:
- * HEAD of this repository currently renames the product and would break every
- * install that took it. A release is the point at which someone decided a
- * version was fit to hand out.
+ * ⚠️ Releases, never commits. A commit on any branch is work in progress: a
+ * branch of this repository renames the product, and following commits rather
+ * than releases would push that to every install. A release is the point at
+ * which someone decided a version was fit to hand out.
  */
 export async function checkForUpdate() {
   const current = installedVersion();
