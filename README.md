@@ -12,14 +12,35 @@ You install one program. It sets itself up. Then you ask it to do things, in pla
 pay for Claude, ChatGPT, Gemini, DeepSeek or Kimi, you can add your key and it will be
 faster — but that is an upgrade, not a requirement.
 
+It also does a second thing: **[Decisions](docs/decisions/)** reads spreadsheets about your
+customers and tells you which ones need your attention this week, why, and what to do.
+
 ---
 
-## Download
+# ⬇ Download
 
-**[⬇ Download OmniAgentSetup-1.2.0.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgentSetup-1.2.0.exe)** — 74.6 MB, Windows 10/11 (64-bit)
+### **[Get Vireo for Windows](https://github.com/AnSa30-06/omni-agent/releases/latest)**
 
-That link always gives you version 1.2.0. The
-[Releases page](https://github.com/AnSa30-06/omni-agent/releases/latest) has the newest
+One file. No account. No API key.
+Windows 10 or 11, 64-bit. No administrator password needed.
+
+### 📖 **[Read the manual](MANUAL.md)**
+
+Everything in one page, in plain English. Start there.
+
+> **Windows will say "Windows protected your PC".** That is expected — click
+> **More info**, then **Run anyway**. It means nobody has paid for a signing
+> certificate, not that the file is bad. The section below explains it properly.
+>
+> **The first run downloads about 4 GB and takes 10 to 30 minutes.** Once, ever.
+
+---
+
+## The older release
+
+**[⬇ OmniAgentSetup-1.2.0.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgentSetup-1.2.0.exe)** — 74.6 MB, published under the project's previous name.
+
+The [Releases page](https://github.com/AnSa30-06/omni-agent/releases/latest) has the newest
 version and the release notes.
 
 | | |
