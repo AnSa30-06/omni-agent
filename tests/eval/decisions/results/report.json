@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-08T23:45:23.118Z",
+  "at": "2026-09-09T02:40:02.781Z",
   "mode": "recorded",
   "runs": 1,
   "targets": {
@@ -49,7 +49,7 @@
         "ruleOnlyDecisions": 0,
         "inputTokens": 11200,
         "outputTokens": 3160,
-        "wallMs": 79,
+        "wallMs": 174,
         "model": "recorded/model"
       },
       "summary": {
@@ -120,7 +120,7 @@
         "ruleOnlyDecisions": 1,
         "inputTokens": 10500,
         "outputTokens": 2960,
-        "wallMs": 41,
+        "wallMs": 180,
         "model": "recorded/model"
       },
       "summary": {
@@ -181,7 +181,7 @@
         "ruleOnlyDecisions": 0,
         "inputTokens": 3500,
         "outputTokens": 980,
-        "wallMs": 14,
+        "wallMs": 31,
         "model": "recorded/model"
       },
       "summary": {

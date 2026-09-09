@@ -82,7 +82,7 @@ const DIALOG_OWNER = [
 export const FOLDER_DIALOG = [
   ...DIALOG_OWNER,
   "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
-  "$d.Description = 'Choose the folder Omni Agent should work in'",
+  "$d.Description = 'Choose the folder Vireo should work in'",
   "$d.ShowNewFolderButton = $true",
   "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.SelectedPath }",
   "$owner.Dispose()",
@@ -306,17 +306,17 @@ export const routes = {
   /**
    * "Finish setup" on the startup screen.
    *
-   * The installed layout puts OmniAgentSetup.cmd beside OmniAgent.exe, one
+   * The installed layout puts VireoSetup.cmd beside Vireo.exe, one
    * directory above the app. It opens its own console - the same thing the
    * installer's "Finish setup now" runs - so a person who unticked that box
    * gets exactly the flow they skipped, from the button in front of them.
    */
   async setupRun() {
-    const script = path.join(APP_ROOT, "..", "OmniAgentSetup.cmd");
+    const script = path.join(APP_ROOT, "..", "VireoSetup.cmd");
     if (!fs.existsSync(script)) {
       return bad(
-        'Open the Start Menu and run "Set up Omni Agent". ' +
-          "(A source checkout has no setup script: run node scripts/bootstrap.mjs, then node bin/omni-agent.mjs setup.)",
+        'Open the Start Menu and run "Set up Vireo". ' +
+          "(A source checkout has no setup script: run node scripts/bootstrap.mjs, then node bin/vireo.mjs setup.)",
       );
     }
     const { spawn } = await import("node:child_process");
@@ -921,7 +921,7 @@ export const routes = {
       await ensureRunning().catch(() => {});
       return bad(
         `The damaged database could not be moved aside: ${failed.join(", ")}. ` +
-          "Something still has the file open - close Omni Agent everywhere, then try again."
+          "Something still has the file open - close Vireo everywhere, then try again."
       );
     }
     // A rebuilt database runs every migration from scratch, which takes far

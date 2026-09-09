@@ -1,6 +1,6 @@
 # Omni Decisions: MVP plan
 
-*Written 2026-09-09 after a full read of the `omni-agent` repository at 1.2.0 (commit `5ab3c0a`).
+*Written 2026-09-09 after a full read of the `vireo` repository at 1.2.0 (commit `5ab3c0a`).
 This is a plan, not an implementation. Nothing in the repository was changed to produce it.
 It is written for the engineer who will build it (Claude Opus) and assumes they have never
 seen the product concept or this conversation.*
@@ -16,7 +16,7 @@ next action with evidence, act inside the tools the team already uses.*
 ## Table of contents
 
 1. Executive summary
-2. What Omni Agent already provides (measured, not assumed)
+2. What Vireo already provides (measured, not assumed)
 2A. Cobi, and Shiplog beside it: what they built, what they claim, and the gaps this clone takes
 3. What the new product is
 4. Core user problem
@@ -53,7 +53,7 @@ Appendix A: the Opus execution specification (self-contained)
 
 ## 1. Executive summary
 
-**Build a second product surface inside the existing Omni Agent desktop app, called
+**Build a second product surface inside the existing Vireo desktop app, called
 Decisions.** It reads a small set of customer-data tables (accounts, usage, tickets,
 invoices, contacts), computes signals deterministically, combines them into candidate
 situations with declarative rules, sends only the top candidates to one model call each,
@@ -71,7 +71,7 @@ action, an owner, a due date, a status, a history, and eventually an outcome.
 - the CSV/XLSX readers in `src/tools/documents.mjs`, the Windows folder picker in
   `src/ui/api.mjs`, the DPAPI secret store, the redacting logger, the in-app scheduler
   pattern in `src/ui/routines.mjs`, the hermetic `node --test` unit-test convention, and
-  the CLI dispatcher in `bin/omni-agent.mjs`.
+  the CLI dispatcher in `bin/vireo.mjs`.
 
 **What is new:** a `src/decisions/` module (database, ingest, synthetic data, signal engine,
 situation rules, LLM packet/prompt/validator, decision lifecycle, follow-up scheduler,
@@ -95,7 +95,7 @@ demo. All eleven phases are in scope for the MVP; nothing beyond them is.
 
 ---
 
-## 2. What Omni Agent already provides (measured, not assumed)
+## 2. What Vireo already provides (measured, not assumed)
 
 Everything below was read from the code, not from the README. Where the README and the
 code disagree, the code is stated.
@@ -103,7 +103,7 @@ code disagree, the code is stated.
 ### 2.1 Shape
 
 ```
-OmniAgent.exe (Node SEA)  -> src/ui/launch.mjs
+Vireo.exe (Node SEA)  -> src/ui/launch.mjs
   starts OmniRoute gateway  (127.0.0.1:20129, isolated DATA_DIR)
   starts `opencode serve`   (random port, HTTP Basic, per-launch password)
   starts src/ui/server.mjs  (random loopback port, per-launch token)
@@ -168,8 +168,8 @@ OpenCode's built-in `plan` (Chat) and `build` (Code). Instructions in
   combo`, then walks a fallback chain (`auto/smart`, `auto/chat`, `auto/fast`,
   `auto/best-free`) on 401/402/403/429/5xx/timeouts. Every attempt is recorded by
   `recordCall()` in `src/usage/telemetry.mjs` as JSONL under
-  `%LOCALAPPDATA%\OmniAgent\telemetry\`.
-- Keyless reality (dev-log `omni-agent-free-model-pool`, 2026-09-03): **without a provider
+  `%LOCALAPPDATA%\Vireo\telemetry\`.
+- Keyless reality (dev-log `vireo-free-model-pool`, 2026-09-03): **without a provider
   key only the six `oc/*` models answer.** They are slow and mostly non-reasoning. A
   provider key (Mistral, Gemini, DeepSeek, OpenRouter) is what makes the model layer
   dependable. This matters for the LLM design in section 12.
@@ -184,7 +184,7 @@ are importable from `src/tools/` without OpenCode: `documents.mjs` exports `pars
 
 ### 2.7 Persistence
 
-JSON files under `%LOCALAPPDATA%\OmniAgent\` (`config.json`, `ui-prefs.json`,
+JSON files under `%LOCALAPPDATA%\Vireo\` (`config.json`, `ui-prefs.json`,
 `routines.json`, `transcripts/index.json`, telemetry JSONL). **No application database.**
 The gateway keeps its own `storage.sqlite`. `node:sqlite` (`DatabaseSync`) is available
 without a flag on the bundled Node and is already imported in `api.mjs` (`gatewayRepair`).
@@ -201,7 +201,7 @@ DPAPI-encrypted `credentials.dat` via `src/util/secrets.mjs`.
 
 `src/ui/routines.mjs`: a saved prompt plus a schedule. In-app scheduler is a 30-second
 `setInterval` started from `launch.mjs`; "even when closed" registers a Windows Scheduled
-Task running `omni-agent routine run <id>`. **A routine runs an agent session**, so it is
+Task running `vireo routine run <id>`. **A routine runs an agent session**, so it is
 the wrong primitive for deterministic analysis; its scheduler pattern is the right one to
 copy.
 
@@ -211,7 +211,7 @@ copy.
 
 ### 2.11 APIs
 
-`/x/*` (above) and OpenCode's own server through `/oc/*`. CLI in `bin/omni-agent.mjs`:
+`/x/*` (above) and OpenCode's own server through `/oc/*`. CLI in `bin/vireo.mjs`:
 `ui`, `setup`, `doctor`, `usage`, `models`, `route`, `provider`, `dashboard`, `saving`,
 `routine`, `gateway`, `config`, `diagnostics`.
 
@@ -255,11 +255,11 @@ Three options were weighed:
    page under `src/ui/public/decisions/`, its own server module under `src/decisions/`,
    served by the same UI server with the same token.** Reuses everything server-side,
    keeps `app.js` untouched, gives the product its own information architecture.
-3. **A separate application** importing omni-agent as a library. Duplicates the gateway
+3. **A separate application** importing vireo as a library. Duplicates the gateway
    lifecycle, the installer, the single-instance lock and setup for no MVP benefit.
 
-**Decision: option 2.** The product opens from a nav item in Omni Agent ("Decisions") and
-from `omni-agent decisions`. Nothing about Omni Agent's existing behaviour changes.
+**Decision: option 2.** The product opens from a nav item in Vireo ("Decisions") and
+from `vireo decisions`. Nothing about Vireo's existing behaviour changes.
 
 ### 2.16 What is not reusable
 
@@ -619,7 +619,7 @@ Points where the user could be confused, and the design answer for each:
 10. Settings: workspace name, owners list, a "Business context" note the model is shown,
     thresholds (read, and a few editable), per-run LLM cap, pseudonymise-names switch,
     demo clock, re-import, delete data.
-11. CLI: `omni-agent decisions open|run|seed|eval`.
+11. CLI: `vireo decisions open|run|seed|eval`.
 12. Evaluation harness with a labelled benchmark and a committed report.
 13. User manual and getting-started guide.
 
@@ -648,7 +648,7 @@ Points where the user could be confused, and the design answer for each:
 One SQLite file per workspace, via `node:sqlite`:
 
 ```
-%LOCALAPPDATA%\OmniAgent\decisions\
+%LOCALAPPDATA%\Vireo\decisions\
   workspaces.json                       [{id, name, createdAt, lastRunAt}]
   <workspaceId>\
     decisions.sqlite                    everything below
@@ -1103,7 +1103,7 @@ cannot burn an hour).
 
 - All calls go through `complete()` in `src/routing/execute.mjs`, so provider choice,
   mode, pinning and fallback are inherited unchanged. The Decisions settings page shows
-  the current mode and links to Omni Agent's Settings; it does not add a second selector.
+  the current mode and links to Vireo's Settings; it does not add a second selector.
 - Two new tasks are added to `config/models/metadata.json` `tasks`:
   `"decision-brief": "smart"` and `"decision-draft": "fast"`. That is the whole of model
   routing for the MVP: reasoning goes to the smart combo, email drafting to the fast one.
@@ -1231,7 +1231,7 @@ Started from `launch.mjs` next to `startScheduler()`, same shape as `routines.mj
    Off by default in the MVP so the person sees the Run button do the work.
 
 All in-app. "Even when closed" is BUILD LATER (a Windows task running
-`omni-agent decisions run`, mirroring `registerTask()` in `routines.mjs`).
+`vireo decisions run`, mirroring `registerTask()` in `routines.mjs`).
 
 ### 14.3 What the person sees
 
@@ -1273,7 +1273,7 @@ and adds a hash router (`#/today`, `#/decisions`, `#/decisions/<id>`,
 
 Layout: left sidebar (220 px): product mark and workspace name; nav Today, Decisions,
 Customers, Activity, Settings; footer: "Last analysis 2 h ago", a "Run analysis" button,
-"Back to Omni Agent". Main: a 46 px top bar (view title, filters, primary button) and the
+"Back to Vireo". Main: a 46 px top bar (view title, filters, primary button) and the
 view. Max content width 920 px for lists, 760 px for the detail's reading column with a
 280 px right rail.
 
@@ -1430,7 +1430,7 @@ actions, empty state, loading state, error state.
   three editable numbers: usage drop band 1, renewal band 1, ticket rise band 1; reset
   to defaults), Privacy (pseudonymise customer names before sending to the model: on by
   default; the sentence explains that free models are third-party services), Model (the
-  current Omni Agent routing mode and served model, read-only, link to Omni Agent's
+  current Vireo routing mode and served model, read-only, link to Vireo's
   Settings), Demo (demo mode switch, "Advance the clock by [7] days", "Reload the demo
   company"), About (version, prompt version, data folder path, "Open folder").
 - Error: any failed save shows the message inline next to the control.
@@ -1440,7 +1440,7 @@ actions, empty state, loading state, error state.
 - Analysis running: the Run button becomes a progress pill in the sidebar footer, visible
   from every view; a second click is refused ("already running").
 - Model unavailable: a banner on Today: "The model gateway is not answering. Decisions
-  will be raised from rules only until it is back." with a link to Omni Agent's Free
+  will be raised from rules only until it is back." with a link to Vireo's Free
   capacity page.
 - Data stale for the whole workspace (last usage day > 7 days before as_of): a banner
   "Usage data ends on <date>. Import fresher data or, in demo mode, advance the clock."
@@ -1696,9 +1696,9 @@ Sizes: S = under a day, M = one to two days, L = three to four days of focused w
   (merge route tables), `src/decisions/routes.mjs` (empty table + `decisionsStatus`),
   `src/ui/public/decisions/index.html` + `decisions.js` + `decisions.css` (shell with nav
   and a "coming soon" Today), `src/ui/public/index.html` + `app.js` (one nav link),
-  `bin/omni-agent.mjs` (`decisions open`).
+  `bin/vireo.mjs` (`decisions open`).
 - Verify: `npm test` passes; the app opens; the Decisions link opens `/decisions/` with
-  the token and the shell renders; `omni-agent decisions open` prints the URL.
+  the token and the shell renders; `vireo decisions open` prints the URL.
 - Depends on: nothing.
 
 ### Phase 1: data model and ingest (M)
@@ -1761,7 +1761,7 @@ Sizes: S = under a day, M = one to two days, L = three to four days of focused w
   `decisionsUpdate`, `decisionsSnooze`, `decisionsDismiss`, `decisionsResolve`,
   `decisionsReopen`, `decisionsNote`, `decisionsRereason`, `decisionsActivity`; CLI
   `decisions run`; tests `decisions-run`, `decisions-lifecycle`.
-- Verify: `omni-agent decisions run` on the demo workspace creates decisions and prints
+- Verify: `vireo decisions run` on the demo workspace creates decisions and prints
   the run summary; running twice creates none and reports cached; the lifecycle tests.
 - Depends on: Phase 5.
 
@@ -1824,7 +1824,7 @@ Sizes: S = under a day, M = one to two days, L = three to four days of focused w
 | `src/ui/launch.mjs` | call `startFollowup()` after `startScheduler()` and `stopFollowup()` in `shutdown()` | the follow-up tick lives with the other in-app timers |
 | `src/ui/public/index.html` | one nav button `data-page="decisions"` labelled "Decisions" | the entry point |
 | `src/ui/public/app.js` | `pages.decisions = async () => { location.href = "/decisions/?t=" + encodeURIComponent(TOKEN); }` | three lines; nothing else in the file changes |
-| `bin/omni-agent.mjs` | `case "decisions"` with `open | run | seed | eval` subcommands; `usage()` gets four lines | headless runs and the demo seed without the window |
+| `bin/vireo.mjs` | `case "decisions"` with `open | run | seed | eval` subcommands; `usage()` gets four lines | headless runs and the demo seed without the window |
 | `config/models/metadata.json` | add `"decision-brief": "smart"` and `"decision-draft": "fast"` to `tasks` | routing for the two new call purposes |
 | `package.json` | `dependencies.zod` (pin to the version already in `node_modules/zod/package.json`); `scripts["test:eval"]` | declare what is used; the harness command |
 | `README.md` | a "Decisions" row in the capabilities table and a short section linking `docs/decisions/` | discoverability |
@@ -1921,7 +1921,7 @@ one it depends on is checked.
 3. Add the two tasks to `metadata.json`. Check: `selectModel({task:"decision-brief", catalogue: synthetic})` picks a smart combo in the routing test's synthetic catalogue (add one assertion to `routing.test.mjs`).
 4. Create `src/decisions/routes.mjs` exporting `decisionRoutes = { decisionsStatus }`. Merge in `server.mjs`. Check: `GET /x/decisionsStatus?t=` returns `{ok:true}`; an existing route still works.
 5. Create the shell files; add the nav link and `pages.decisions`. Check: clicking Decisions in the app opens the shell with the token; Back returns.
-6. Add `omni-agent decisions open`. Check: it starts the stack and prints the `/decisions/` URL.
+6. Add `vireo decisions open`. Check: it starts the stack and prints the `/decisions/` URL.
 7. `npm test` and `npm run scan:secrets` pass.
 
 **Phase 1**
@@ -1957,7 +1957,7 @@ one it depends on is checked.
 26. `decisions.mjs`: upsert/dedupe rules from 13.4, transitions from 13.3, events, outcomes, notes, reopen. Check: `decisions-lifecycle.test.mjs`.
 27. `run.mjs`: end to end with progress, budget, single-flight, run row. Check: `decisions-run.test.mjs`.
 28. Routes: run, run status, overview, list, get, update, snooze, dismiss, resolve, reopen, note, re-reason, activity. Check: `decisions-routes.test.mjs` (names) and manual calls.
-29. `omni-agent decisions run`. Check: prints the run summary; second run reports cached.
+29. `vireo decisions run`. Check: prints the run summary; second run reports cached.
 
 **Phase 7**
 30. Shell: sidebar, top bar, router, helpers, skeletons, banners, modal, toasts.
@@ -2054,7 +2054,7 @@ probe with the gateway up and a provider key configured, and records the result 
 
 ### 27.2 Model quality on a keyless install
 
-Six working keyless models, mostly non-reasoning (dev-log `omni-agent-free-model-pool`).
+Six working keyless models, mostly non-reasoning (dev-log `vireo-free-model-pool`).
 Expect a low first-attempt validity rate and slow runs without a key. Mitigations: the
 rule-only path; the run budget; a banner recommending a free-tier key with a link to
 Free capacity; the evaluation is run with a key and says so.
@@ -2075,7 +2075,7 @@ the clock.
 ### 27.5 SQLite and concurrency
 
 One process, one writer. A second copy of the app is already refused by the instance
-lock. `omni-agent decisions run` from a terminal while the app is open would be a second
+lock. `vireo decisions run` from a terminal while the app is open would be a second
 writer: WAL mode makes it safe, and the run uses a `meta.run_lock` row with a timestamp so
 two runs cannot overlap.
 
@@ -2181,7 +2181,7 @@ then a Windows task for daily headless runs, then the external-context step for
 
 ## 30. Final recommendation
 
-Build it as a second surface inside Omni Agent, in the order of section 23, with the
+Build it as a second surface inside Vireo, in the order of section 23, with the
 demo company as the only data source and the rules engine as the thing that decides what
 the model is allowed to see. The smallest version worth showing to another person is the
 end of Phase 8: demo data in, five decisions out, handle one, advance the clock, see the
@@ -2203,7 +2203,7 @@ document, though the rest is the reference.*
 
 ## A.1 Product objective
 
-Add **Decisions** to Omni Agent: a local workspace that reads customer-data CSVs, finds
+Add **Decisions** to Vireo: a local workspace that reads customer-data CSVs, finds
 situations with deterministic rules, has a model explain and recommend for the top ones,
 and keeps each resulting decision alive (owner, due date, reminders, history, outcome)
 until a person resolves it. Prove that software can turn existing data into decisions a
@@ -2228,7 +2228,7 @@ call per situation, in-app reminders only.
   and `decision-draft`; `complete` is injectable for tests.
 - Rules: `config/decisions/rules.json`.
 - Scheduling: `followup.mjs` tick every 5 minutes in-app, started from `launch.mjs`.
-- CLI: `omni-agent decisions open|run|seed|eval` in `bin/omni-agent.mjs`.
+- CLI: `vireo decisions open|run|seed|eval` in `bin/vireo.mjs`.
 
 ## A.4 Data model
 
@@ -2305,7 +2305,7 @@ suite's model. The eval harness runs `--recorded` in CI and `--live` before rele
   `docs/decisions/getting-started.md`.
 - `npm test`, `npm run test:integration`, `npm run scan:secrets`, `npm run build:installer`
   pass (the existing pre-push gate).
-- No existing Omni Agent behaviour changes except the added nav link and CLI command.
+- No existing Vireo behaviour changes except the added nav link and CLI command.
 
 ## A.12 Documentation requirements
 

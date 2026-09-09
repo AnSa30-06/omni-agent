@@ -125,7 +125,7 @@ export async function provisionGatewayToken(opts = {}) {
       remedy:
         "The gateway's generated .env is missing. Delete " +
         PATHS.gatewayData +
-        " and run `omni-agent setup` again to regenerate it.",
+        " and run `vireo setup` again to regenerate it.",
     };
   }
 
@@ -133,7 +133,7 @@ export async function provisionGatewayToken(opts = {}) {
   const connect = () =>
     postJson(
       `${base}/api/cli/connect`,
-      { password: pw, name: "omni-agent", scope: "admin" },
+      { password: pw, name: "vireo", scope: "admin" },
       { timeoutMs: 20000 }
     );
 
@@ -151,7 +151,7 @@ export async function provisionGatewayToken(opts = {}) {
         ok: false,
         reason: "the gateway is rate-limiting sign-in attempts",
         remedy:
-          "Too many failed attempts in a row. Close Omni Agent, reopen it, and try again - " +
+          "Too many failed attempts in a row. Close Vireo, reopen it, and try again - " +
           "restarting the gateway clears this. Nothing is wrong with your key or your settings.",
       };
     }
@@ -173,7 +173,7 @@ export async function provisionGatewayToken(opts = {}) {
         ok: false,
         reason: `the gateway rejected its own generated password and it could not be reset (${reset.reason})`,
         remedy:
-          "Stop the gateway, delete " + PATHS.gatewayData + " and run `omni-agent setup` again. " +
+          "Stop the gateway, delete " + PATHS.gatewayData + " and run `vireo setup` again. " +
           "That discards gateway history but not your saved keys.",
       };
     }

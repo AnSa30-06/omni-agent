@@ -59,8 +59,8 @@ function onAgentExit(code, say) {
       title: "The agent keeps stopping",
       detail:
         "It has stopped several times in a row. Your conversations are safe. " +
-        "Try again restarts it; if it keeps happening, close Omni Agent and open it again, " +
-        "or run \"Check Omni Agent health\" from the Start Menu.",
+        "Try again restarts it; if it keeps happening, close Vireo and open it again, " +
+        "or run \"Check Vireo health\" from the Start Menu.",
       action: "retry",
       actionLabel: "Try again",
     });
@@ -86,7 +86,7 @@ function componentsMissing(reason) {
 function problemFor(reason, detail) {
   if (componentsMissing(reason)) {
     return {
-      title: "Omni Agent has not finished setting itself up",
+      title: "Vireo has not finished setting itself up",
       detail:
         "The parts it downloads after installing are missing. Finishing setup downloads them " +
         "(about 3 GB, one time) and can take 10-30 minutes. It opens in its own window; come " +
@@ -107,7 +107,7 @@ function problemFor(reason, detail) {
   }
   const tail = detail ? "\n" + String(detail).split("\n").slice(-4).join("\n") : "";
   return {
-    title: "Omni Agent could not start",
+    title: "Vireo could not start",
     detail: `${String(reason ?? "unknown reason")}${tail}\n\nDetails are in ${PATHS.logs}`,
     action: "retry",
     actionLabel: "Try again",
@@ -198,7 +198,7 @@ async function runningInstance() {
     });
     if (!r.ok) return null;
     const body = await r.json();
-    return body?.omniAgent === true ? { ...lock, ...body } : null;
+    return body?.vireo === true ? { ...lock, ...body } : null;
   } catch {
     return null; // nothing answering: the lock is stale
   }
@@ -231,11 +231,11 @@ export async function launchUI(opts = {}) {
 
   // One copy per data directory. A second double-click used to start a whole
   // second stack; now it asks the copy that is already running to show itself
-  // and stops. OMNI_AGENT_ALLOW_MULTIPLE=1 is the escape hatch for debugging.
-  if (process.env.OMNI_AGENT_ALLOW_MULTIPLE !== "1") {
+  // and stops. VIREO_ALLOW_MULTIPLE=1 is the escape hatch for debugging.
+  if (process.env.VIREO_ALLOW_MULTIPLE !== "1") {
     const other = await runningInstance();
     if (other) {
-      say(`Omni Agent is already running (pid ${other.pid}).`);
+      say(`Vireo is already running (pid ${other.pid}).`);
       if (opts.open === false) {
         say("  Use that copy's own window. Close it first if you want a fresh one.");
       } else {
@@ -258,7 +258,7 @@ export async function launchUI(opts = {}) {
   say("Starting the interface...");
   startupBegin(STEPS);
   const ui = await startServer();
-  // `page` lets `omni-agent decisions` open straight onto that surface rather
+  // `page` lets `vireo decisions` open straight onto that surface rather
   // than the chat shell with an extra click.
   const url = uiUrl(opts.page === "decisions" ? "/decisions/" : "/");
 
@@ -290,14 +290,14 @@ export async function launchUI(opts = {}) {
       if (w.remedy) say(`  ${w.remedy}`);
       say(`    ${url}`);
     } else {
-      say(`  Omni Agent is open (via ${w.via}).`);
+      say(`  Vireo is open (via ${w.via}).`);
       // Closing the window closes the app. Without this the agent server and
       // the UI server keep running after the user thinks they have quit, which
       // is exactly the complaint people have about local web apps.
       //
       // The gateway is deliberately NOT stopped: it takes half a minute to
       // boot, `ensureRunning` is idempotent, and the CLI shares it. It runs
-      // with no window and is stopped with `omni-agent gateway stop`.
+      // with no window and is stopped with `vireo gateway stop`.
       const openedAt = Date.now();
       w.child?.once?.("exit", () => {
         // A browser launched against a profile that is already open hands the

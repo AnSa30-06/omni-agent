@@ -30,8 +30,8 @@ software; only the written explanation is missing.
 Causes, most likely first:
 
 - **The free model was busy.** Click **Try the AI again** on the decision.
-- **No provider key.** Omni Agent's free model pool is small and slow. Adding one
-  free key fixes most of this: open Omni Agent, go to **Free capacity**, pick a
+- **No provider key.** Vireo's free model pool is small and slow. Adding one
+  free key fixes most of this: open Vireo, go to **Free capacity**, pick a
   provider, paste a key.
 - **The model kept producing invalid answers.** It gets one retry with the
   problem explained, then the product stops rather than spending your allowance
@@ -46,10 +46,10 @@ which part it is on.
 
 If it has been more than five minutes:
 
-- Check the gateway is running: `omni-agent doctor`.
+- Check the gateway is running: `vireo doctor`.
 - Run without the AI to confirm everything else works:
   ```bash
-  omni-agent decisions run --no-model
+  vireo decisions run --no-model
   ```
   If that finishes quickly, the problem is the model, not the data.
 - A run that crashed leaves a lock that clears itself after ten minutes.
@@ -119,8 +119,8 @@ re-import. The decisions and outcomes are gone.
 
 - **Activity** shows every run: how many customers, how many model calls, how
   many failed, and which model answered.
-- Logs are in `%LOCALAPPDATA%\OmniAgent\logs\`.
-- `omni-agent doctor` checks the gateway, the models and the network with real
+- Logs are in `%LOCALAPPDATA%\Vireo\logs\`.
+- `vireo doctor` checks the gateway, the models and the network with real
   requests.
-- `omni-agent diagnostics` writes a report with secrets stripped, for a bug
+- `vireo diagnostics` writes a report with secrets stripped, for a bug
   report.

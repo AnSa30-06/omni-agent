@@ -495,7 +495,7 @@ export function hasSearchKey(id) {
  *
  * The steps are written for the terminal, and in the app they were shown
  * verbatim - so the "How?" button told someone who has never opened a terminal
- * to `Run: omni-agent provider add openrouter YOUR-KEY`, directly above a box
+ * to `Run: vireo provider add openrouter YOUR-KEY`, directly above a box
  * that already takes the key. That is the whole "I didn't know how to add it"
  * half of the problem.
  */
@@ -508,7 +508,7 @@ function forTheApp(steps, kind) {
   for (const step of steps) {
     const text = String(step);
     // Any step whose whole job is the CLI command becomes the in-app action.
-    if (/Run:\s*omni-agent provider (add|signin)/i.test(text)) {
+    if (/Run:\s*vireo provider (add|signin)/i.test(text)) {
       if (!out.includes(inApp)) out.push(inApp);
       continue;
     }
@@ -550,7 +550,7 @@ export function setupSteps(id, opts = {}) {
       gives: "Works with no key at all",
       note: keyless.note,
       steps: keyless.setup ?? ["Nothing to set up. This one is already in use."],
-      verify: "omni-agent doctor",
+      verify: "vireo doctor",
     };
   }
   if (model) {
@@ -567,18 +567,18 @@ export function setupSteps(id, opts = {}) {
       steps: (inApp ? (x) => forTheApp(x, model.auth === "oauth" ? "signin" : "model") : (x) => x)(
         model.setup ??
         (model.auth === "none"
-          ? [`Run:  omni-agent provider add ${id}`, "No account and no key are needed."]
+          ? [`Run:  vireo provider add ${id}`, "No account and no key are needed."]
           : model.auth === "oauth"
-            ? [`Run:  omni-agent provider signin ${id}`, "Approve the sign-in in the browser it opens."]
+            ? [`Run:  vireo provider signin ${id}`, "Approve the sign-in in the browser it opens."]
             : [
                 model.signup ? `Open ${model.signup} and create a free account.` : "Create a free account with the provider.",
                 "Copy the API key from their dashboard.",
-                `Run:  omni-agent provider add ${id} YOUR-KEY`,
+                `Run:  vireo provider add ${id} YOUR-KEY`,
               ]),
       ),
       verify: inApp
         ? "The app tries the key on a real model and tells you if it was accepted."
-        : "omni-agent models",
+        : "vireo models",
     };
   }
   if (signIn) {
@@ -589,10 +589,10 @@ export function setupSteps(id, opts = {}) {
       gives: signIn.gives,
       note: signIn.note,
       steps: (inApp ? (x) => forTheApp(x, "signin") : (x) => x)([
-        `Run:  omni-agent provider signin ${id}`,
+        `Run:  vireo provider signin ${id}`,
         "Approve the sign-in in the browser it opens. Nothing is charged twice.",
       ]),
-      verify: inApp ? "This page shows it as connected once it works." : "omni-agent provider list",
+      verify: inApp ? "This page shows it as connected once it works." : "vireo provider list",
     };
   }
   return { ok: false, reason: `nothing called "${id}" in the catalogue` };
@@ -664,8 +664,8 @@ export function render(all) {
   L.push("  What each gives is described in kind, not in numbers - allowances change,");
   L.push("  and the signup page is the authority.");
   L.push("");
-  L.push("  Step-by-step:   omni-agent provider setup <id>");
-  L.push("  Add one with:   omni-agent provider add <id> <key>");
-  L.push("  Sign in with:   omni-agent provider signin <id>");
+  L.push("  Step-by-step:   vireo provider setup <id>");
+  L.push("  Add one with:   vireo provider add <id> <key>");
+  L.push("  Sign in with:   vireo provider signin <id>");
   return L.join("\n");
 }

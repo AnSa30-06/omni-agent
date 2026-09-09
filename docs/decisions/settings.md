@@ -105,7 +105,7 @@ workspace name to confirm. It cannot be undone and there is no bin.
 
 ## Where the model settings are
 
-There are none here. Decisions uses whatever model Omni Agent is set to use, and
+There are none here. Decisions uses whatever model Vireo is set to use, and
 inherits its routing, fallback and provider keys. To change the model, or add a
-free provider key to make runs faster, use Omni Agent's own **Free capacity** and
+free provider key to make runs faster, use Vireo's own **Free capacity** and
 **Settings** pages.

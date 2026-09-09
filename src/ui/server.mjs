@@ -198,12 +198,12 @@ async function handle(req, res) {
   }
 
   /* Instance handshake. Deliberately NOT token-guarded, and deliberately
-   * useless without one: it says only that Omni Agent owns this port, and asks
+   * useless without one: it says only that Vireo owns this port, and asks
    * it to show its own window. No secret is disclosed and the agent cannot be
    * driven through it, so a second copy can hand over without the token ever
    * being written to disk. Loopback is already enforced above. */
   if (p === "/instance") {
-    return send(res, 200, { omniAgent: true, pid: process.pid });
+    return send(res, 200, { vireo: true, pid: process.pid });
   }
   if (p === "/instance/show") {
     // Debounced: a local process should not be able to flap the window.

@@ -1,7 +1,7 @@
 # The desktop app
 
-**OmniAgent.exe** — the Omni Agent shortcut on your desktop and in the Start
-Menu. `omni-agent ui` starts the same thing from a terminal.
+**Vireo.exe** — the Vireo shortcut on your desktop and in the Start
+Menu. `vireo ui` starts the same thing from a terminal.
 
 Before this existed the product was a terminal interface (OpenCode's TUI) plus a
 handful of CLI commands. The app is a real window with the same engine behind it,
@@ -32,14 +32,14 @@ and it exposes the parts of the system the terminal never showed.
 ## How it is built
 
 ```
-OmniAgent.exe                               one process, no console
+Vireo.exe                               one process, no console
   ├─ the model gateway (OmniRoute)          started first, always
   ├─ `opencode serve`                       the agent, as an HTTP server
   ├─ the UI server (src/ui/server.mjs)      serves the page, proxies the rest
   └─ a browser window in --app mode         chromeless, its own taskbar entry
 ```
 
-**`OmniAgent.exe` is a real executable**, built by `scripts/build-exe.mjs`: a
+**`Vireo.exe` is a real executable**, built by `scripts/build-exe.mjs`: a
 [Node Single Executable Application](https://nodejs.org/api/single-executable-applications.html)
 made from the same Node runtime the installer already bundles, with its PE
 subsystem flipped from CONSOLE to WINDOWS so double-clicking it opens the app
@@ -49,8 +49,8 @@ so the exe loads `src/ui/launch.mjs` in-process. One process, one taskbar entry,
 no `node.exe` anywhere on screen.
 
 Because there is no console attached, everything it would have printed goes to
-`%LOCALAPPDATA%\OmniAgent\logs\launcher.log`, and a start-up failure raises a
-dialog rather than doing nothing. *Omni Agent in a terminal* in the Start Menu
+`%LOCALAPPDATA%\Vireo\logs\launcher.log`, and a start-up failure raises a
+dialog rather than doing nothing. *Vireo in a terminal* in the Start Menu
 runs the identical thing with the console visible.
 
 **The window opens first, then the slow parts start.** The page is served and
@@ -64,7 +64,7 @@ second copy of everything. Now the window is up in about a second.
 
 When a step fails the same screen says what happened in plain words and offers
 the one thing the reader can do: **Finish setup** when the downloaded components
-are missing (it runs `OmniAgentSetup.cmd`, the same thing the installer's
+are missing (it runs `VireoSetup.cmd`, the same thing the installer's
 "Finish setup now" runs), or **Try again** for anything else, which re-runs the
 start in place. `launchUI` returns `ok: true` in that state - the window is open
 and showing the problem - so the exe only raises its dialog when no page could
@@ -132,7 +132,7 @@ launcher exits. `start /B` is the only form that gives both.
 
 **The pid recorded for the gateway is the launcher, not whatever holds the
 port.** OmniRoute serves from a worker child, and killing that worker does not
-stop it: the launcher starts another one within seconds. `omni-agent gateway
+stop it: the launcher starts another one within seconds. `vireo gateway
 stop` therefore resolves the launcher from the process list — `start /B` means
 the handle we hold belongs to a `cmd` that has already exited.
 
@@ -219,7 +219,7 @@ the picker sets where your *next* conversation will work, and says so when one
 is already open rather than offering a control that quietly does nothing. An
 open conversation shows its own folder, not the one you have queued up.
 
-The default is `%USERPROFILE%\OmniAgent Workspace`. Recently used folders are
+The default is `%USERPROFILE%\Vireo Workspace`. Recently used folders are
 remembered, and any that have since been deleted or unplugged are dropped from
 the list instead of being offered as a choice that will fail.
 
@@ -269,7 +269,7 @@ in the finished message rather than arriving token by token.
 ## Transcripts
 
 Every conversation is exported with `opencode export` into
-`%LOCALAPPDATA%\OmniAgent\transcripts\` once a minute, and again immediately
+`%LOCALAPPDATA%\Vireo\transcripts\` once a minute, and again immediately
 before you delete one. Restoring is `opencode import`. Using the tool's own
 round trip means the archive cannot drift into a shape OpenCode will not accept.
 
@@ -285,7 +285,7 @@ Two ways to run, and the difference is stated in the UI:
 
 - **while the app is open** — nothing to install, does nothing when closed.
 - **even when closed** — registers a Windows Scheduled Task that runs
-  `omni-agent routine run <id>`.
+  `vireo routine run <id>`.
 
 ## If the window does not open
 
@@ -295,5 +295,5 @@ failed to start because its side-by-side configuration is incorrect"*, which
 means the **Microsoft Visual C++ Redistributable (x64)** is missing. Installing
 it fixes the window. Everything else works either way.
 
-`omni-agent ui --no-window` starts the same stack and prints the address, if you
+`vireo ui --no-window` starts the same stack and prints the address, if you
 would rather use your own browser.

@@ -4,10 +4,10 @@
 
 ```bash
 git clone https://github.com/AnSa30-06/omni-agent.git
-cd omni-agent
+cd vireo
 npm install
 node scripts/bootstrap.mjs        # gateway + harness into ./runtime
-node bin/omni-agent.mjs setup
+node bin/vireo.mjs setup
 ```
 
 Node 22+. No build step: everything is plain ESM JavaScript, deliberately. An installer that
@@ -17,7 +17,7 @@ there is no `dist/` to drift out of sync with `src/`.
 ## Layout
 
 ```
-bin/omni-agent.mjs          launcher and CLI
+bin/vireo.mjs          launcher and CLI
 plugin/index.mjs            the 8 tools, exposed to OpenCode
 src/
   config.mjs                settings (never secrets)
@@ -62,8 +62,8 @@ Those are the only automated proof that the confirmation boundary holds.
 ## Building
 
 ```bash
-npm run build:installer   # dist/OmniAgentSetup-<version>.exe   (~46 MB)
-npm run build:portable    # dist/OmniAgent-Portable-<version>.zip (~76 MB)
+npm run build:installer   # dist/VireoSetup-<version>.exe   (~46 MB)
+npm run build:portable    # dist/Vireo-Portable-<version>.zip (~76 MB)
 ```
 
 `build:installer` downloads the pinned Node runtime, **verifies it against nodejs.org's own
@@ -102,7 +102,7 @@ Edit `SKILLS` in `scripts/write-skills.mjs`, then:
 
 ```bash
 node scripts/write-skills.mjs
-node bin/omni-agent.mjs setup --non-interactive   # reinstall into the config dir
+node bin/vireo.mjs setup --non-interactive   # reinstall into the config dir
 ```
 
 The `description` decides whether a skill ever fires — write what it does *and* when to use
@@ -116,8 +116,8 @@ a reason and remedy, `error` — and **no fourth state that fabricates a number*
 ## Working on routing
 
 ```bash
-node bin/omni-agent.mjs route     # what each task gets, and why
-node bin/omni-agent.mjs models    # what the gateway serves right now
+node bin/vireo.mjs route     # what each task gets, and why
+node bin/vireo.mjs models    # what the gateway serves right now
 ```
 
 `tests/unit/routing.test.mjs` runs against a synthetic catalogue. If you change the

@@ -1,4 +1,4 @@
-; Omni Agent - Windows installer (Inno Setup 6)
+; Vireo - Windows installer (Inno Setup 6)
 ;
 ; Deliberately a PER-USER install into LocalAppData:
 ;   * no UAC prompt, so a non-admin user can install it;
@@ -11,12 +11,12 @@
 ; on first run, with progress shown. The welcome page says so plainly rather
 ; than surprising the user with a 4 GB download.
 
-#define AppName "Omni Agent"
-#define AppExeName "OmniAgent.exe"
+#define AppName "Vireo"
+#define AppExeName "Vireo.exe"
 #ifndef AppVersion
   #define AppVersion "1.2.0"
 #endif
-#define AppPublisher "Omni Agent contributors"
+#define AppPublisher "Vireo contributors"
 #define AppURL "https://github.com/AnSa30-06/omni-agent"
 
 [Setup]
@@ -27,7 +27,7 @@ AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}/issues
-DefaultDirName={localappdata}\Programs\OmniAgent
+DefaultDirName={localappdata}\Programs\Vireo
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -37,7 +37,7 @@ PrivilegesRequired=lowest
 ; exactly like a hang. Measured 2026-08-28 against 1.1.3.
 PrivilegesRequiredOverridesAllowed=dialog commandline
 OutputDir=..\dist
-OutputBaseFilename=OmniAgentSetup-{#AppVersion}
+OutputBaseFilename=VireoSetup-{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -62,38 +62,38 @@ Source: "..\staging\app\*";  DestDir: "{app}\app";  Flags: ignoreversion recurse
 Source: "..\staging\node\*"; DestDir: "{app}\node"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Launcher shims.
 ; The application executable itself (built by scripts/build-exe.mjs).
-Source: "..\staging\OmniAgent.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "OmniAgent.cmd";     DestDir: "{app}"; Flags: ignoreversion
-Source: "OmniAgentApp.cmd";  DestDir: "{app}"; Flags: ignoreversion
-Source: "OmniAgentSetup.cmd";DestDir: "{app}"; Flags: ignoreversion
-Source: "OmniAgentDoctor.cmd";DestDir: "{app}"; Flags: ignoreversion
+Source: "..\staging\Vireo.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "Vireo.cmd";     DestDir: "{app}"; Flags: ignoreversion
+Source: "VireoApp.cmd";  DestDir: "{app}"; Flags: ignoreversion
+Source: "VireoSetup.cmd";DestDir: "{app}"; Flags: ignoreversion
+Source: "VireoDoctor.cmd";DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md";      DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; A real executable, built as a Windows-subsystem binary, so it opens the app
 ; and never a console. IconFilename is still set because the icon cannot always
 ; be stamped into the exe at build time (see scripts/build-exe.mjs).
-Name: "{group}\{#AppName}";              Filename: "{app}\OmniAgent.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
+Name: "{group}\{#AppName}";              Filename: "{app}\Vireo.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\vireo.ico"
 ; The same app, but in a visible console - the thing to run when the exe starts
-; nothing and you need to see why. OmniAgent.cmd is the general CLI shim and
+; nothing and you need to see why. Vireo.cmd is the general CLI shim and
 ; takes arguments, so it is not a shortcut target.
-Name: "{group}\{#AppName} in a terminal"; Filename: "{app}\OmniAgentApp.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
-Name: "{group}\Set up {#AppName}";       Filename: "{app}\OmniAgentSetup.cmd"; WorkingDir: "{app}"
+Name: "{group}\{#AppName} in a terminal"; Filename: "{app}\VireoApp.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\app\installer\assets\vireo.ico"
+Name: "{group}\Set up {#AppName}";       Filename: "{app}\VireoSetup.cmd"; WorkingDir: "{app}"
 ; Through a .cmd so the console stays open - run directly, node.exe closed
 ; the window in the same millisecond the report appeared.
-Name: "{group}\Check {#AppName} health"; Filename: "{app}\OmniAgentDoctor.cmd"; WorkingDir: "{app}"
+Name: "{group}\Check {#AppName} health"; Filename: "{app}\VireoDoctor.cmd"; WorkingDir: "{app}"
 Name: "{group}\Uninstall {#AppName}";    Filename: "{uninstallexe}"
-Name: "{userdesktop}\{#AppName}";        Filename: "{app}\OmniAgent.exe"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\app\installer\assets\omni-agent.ico"
+Name: "{userdesktop}\{#AppName}";        Filename: "{app}\Vireo.exe"; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\app\installer\assets\vireo.ico"
 
 [Run]
-Filename: "{app}\OmniAgentSetup.cmd"; Description: "Finish setup"; Flags: shellexec postinstall skipifsilent; Tasks: runsetup
+Filename: "{app}\VireoSetup.cmd"; Description: "Finish setup"; Flags: shellexec postinstall skipifsilent; Tasks: runsetup
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\node"
 Type: filesandordirs; Name: "{app}\app"
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nOmni Agent is an AI assistant that can write code, browse the web, do research, fill in web forms and work with your documents.%n%nAfter installing, it downloads the model gateway and a browser engine (about 4 GB). You need an internet connection for that step, but you do NOT need an API key - it works with free models out of the box.
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nVireo is an AI assistant that can write code, browse the web, do research, fill in web forms and work with your documents.%n%nAfter installing, it downloads the model gateway and a browser engine (about 4 GB). You need an internet connection for that step, but you do NOT need an API key - it works with free models out of the box.
 
 [Code]
 // Warn about disk space before we get halfway through a 4 GB download.
@@ -107,7 +107,7 @@ begin
   begin
     if FreeMB < 6000 then
     begin
-      Result := MsgBox('Omni Agent needs about 6 GB of free disk space once fully set up,' + #13#10 +
+      Result := MsgBox('Vireo needs about 6 GB of free disk space once fully set up,' + #13#10 +
                        'and this drive reports only ' + IntToStr(FreeMB) + ' MB free.' + #13#10#13#10 +
                        'Install anyway?', mbConfirmation, MB_YESNO) = IDYES;
     end;
@@ -120,7 +120,7 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    DataDir := ExpandConstant('{localappdata}\OmniAgent');
+    DataDir := ExpandConstant('{localappdata}\Vireo');
     // Only ever on an explicit Yes from a human.
     //
     // /SUPPRESSMSGBOXES makes MsgBox return the DEFAULT button without showing
@@ -131,7 +131,7 @@ begin
     // data and the user can delete the directory themselves.
     if DirExists(DataDir) and (not UninstallSilent) then
     begin
-      if MsgBox('Also delete your Omni Agent settings, saved API keys, logs and downloaded browser?' + #13#10#13#10 +
+      if MsgBox('Also delete your Vireo settings, saved API keys, logs and downloaded browser?' + #13#10#13#10 +
                 DataDir + #13#10#13#10 +
                 'Choose No to keep them for a future reinstall.', mbConfirmation, MB_YESNO) = IDYES then
         DelTree(DataDir, True, True, True);

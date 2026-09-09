@@ -1,4 +1,4 @@
-# Omni Agent
+# Vireo
 
 ## What is this?
 
@@ -60,7 +60,7 @@ If it prints anything else, delete the file and download it again.
 1. **Run the file you downloaded.** No administrator password needed.
 2. When it finishes, it opens a setup window that downloads the rest and checks everything
    works. This takes a while and needs about 4 GB — see [Disk and download](#disk-and-download).
-3. **Launch** *Omni Agent* from your Desktop or Start Menu — `OmniAgent.exe`, a real
+3. **Launch** *Vireo* from your Desktop or Start Menu — `Vireo.exe`, a real
    application, not a terminal. It opens as a window: Chat on one side, Code on the
    other, with everything else a click away in the sidebar.
    See [The desktop app](docs/desktop-app.md).
@@ -130,7 +130,7 @@ rather than bundled, because an installer carrying them would be unusable.
 
 ## Usage and cost
 
-Run `omni-agent usage`, or just ask the agent "what model am I on and what is this
+Run `vireo usage`, or just ask the agent "what model am I on and what is this
 costing?".
 
 **The numbers you see are real or they are absent.** This product never estimates a quota
@@ -157,7 +157,7 @@ Free tiers have limits, and most of what an agent spends is tool output — test
 runs, file reads, search results — not conversation.
 
 ```bash
-omni-agent saving
+vireo saving
 ```
 
 That lists every tier with the saving **measured on your own recent requests**,
@@ -178,7 +178,7 @@ sent exactly as written. Code, URLs and structured data are never compressed at
 any tier.
 
 ```bash
-omni-agent saving max
+vireo saving max
 ```
 
 > The seven underlying modes are not one dial — some target prose and some
@@ -191,21 +191,21 @@ omni-agent saving max
 ## More free capacity
 
 ```bash
-omni-agent provider
+vireo provider
 ```
 
 Fifteen providers with a genuine free tier, what each one gives you, and where
 to get the key. Add one and it is tested immediately with a real call:
 
 ```bash
-omni-agent provider add cerebras csk-...
+vireo provider add cerebras csk-...
 ```
 
 Already paying for Claude, ChatGPT, Copilot, Cursor or Gemini? Sign in and the
 agent uses that subscription — nothing is charged twice:
 
 ```bash
-omni-agent provider signin claude
+vireo provider signin claude
 ```
 
 ### Anything else the gateway knows
@@ -215,8 +215,8 @@ them can be added by id — `mistral`, `cerebras`, `groq`, `cohere`, `together`,
 `sambanova`, `nebius`, `novita`, `deepinfra`, `hyperbolic`, `openrouter`:
 
 ```bash
-omni-agent provider setup mistral      # the steps
-omni-agent provider add mistral YOUR-KEY
+vireo provider setup mistral      # the steps
+vireo provider add mistral YOUR-KEY
 ```
 
 Its models then appear in the picker under **From your keys**. A full worked
@@ -242,7 +242,7 @@ research looks like. A key removes that.
 Every provider comes with step-by-step instructions:
 
 ```bash
-omni-agent provider setup brave
+vireo provider setup brave
 ```
 
 ```
@@ -252,9 +252,9 @@ Brave Search - Free credits every month on an independent web index
   2. Create a Brave account, or sign in.
   3. $5 of free credit every month, applied automatically.
   4. In the developer dashboard, create a subscription token.
-  5. Run:  omni-agent provider add brave YOUR-KEY
+  5. Run:  vireo provider add brave YOUR-KEY
 
-  Check it worked:  omni-agent doctor
+  Check it worked:  vireo doctor
 ```
 
 Once a key is stored it is used **first**, automatically — nothing to
@@ -269,9 +269,9 @@ The bundled gateway is a full web application running on your own machine —
 providers, compression, analytics, search tools, settings.
 
 ```bash
-omni-agent dashboard          # overview
-omni-agent dashboard search   # search and scraping providers
-omni-agent dashboard free     # every provider with a free allowance
+vireo dashboard          # overview
+vireo dashboard search   # search and scraping providers
+vireo dashboard free     # every provider with a free allowance
 ```
 
 It asks for a password, which setup generated for you. The command prints it and
@@ -293,14 +293,14 @@ The agent routes automatically. Five modes:
 | `cheap` | The cheapest model that can still do the job |
 
 ```bash
-omni-agent config mode smart
+vireo config mode smart
 ```
 
 The mode picks the agent's own model as well as the models it uses internally, so changing
 it prints which model you will be on and asks you to restart — OpenCode reads its
 configuration at launch and does not reload it.
 
-Or ask it: *"switch to the cheapest model"*. To pin one specific model, `omni-agent models`
+Or ask it: *"switch to the cheapest model"*. To pin one specific model, `vireo models`
 lists what is available right now, and the agent's `agent_status` tool can pin it.
 
 Simple work (classifying, naming, extracting a field) is deliberately sent to a cheap fast
@@ -312,25 +312,25 @@ to waste a budget.
 ## Commands
 
 ```bash
-omni-agent ui              # open the desktop app (same as OmniAgent.exe)
-omni-agent ui --no-window  # ...and use your own browser instead
-omni-agent decisions       # open Decisions: customer data -> decisions
-omni-agent decisions seed demo    # load a demo company to try it on
-omni-agent decisions run          # run the analysis without opening a window
-omni-agent                 # start the agent in the terminal instead
-omni-agent routine list    # scheduled routines
-omni-agent routine run ID  # run one now
-omni-agent dashboard       # open the gateway's own web dashboard
-omni-agent dashboard search   # ...straight to the search-tools page
-omni-agent saving          # what each token-saving tier really saves
-omni-agent provider        # free providers you can add, and what each gives
-omni-agent doctor          # check everything works, with real probes
-omni-agent usage           # model, quota and token usage
-omni-agent models          # what the gateway currently serves
-omni-agent route           # which model each kind of task would get
-omni-agent setup           # re-run the setup wizard
-omni-agent gateway status  # is the model gateway running
-omni-agent diagnostics     # export a sanitised report for bug reports
+vireo ui              # open the desktop app (same as Vireo.exe)
+vireo ui --no-window  # ...and use your own browser instead
+vireo decisions       # open Decisions: customer data -> decisions
+vireo decisions seed demo    # load a demo company to try it on
+vireo decisions run          # run the analysis without opening a window
+vireo                 # start the agent in the terminal instead
+vireo routine list    # scheduled routines
+vireo routine run ID  # run one now
+vireo dashboard       # open the gateway's own web dashboard
+vireo dashboard search   # ...straight to the search-tools page
+vireo saving          # what each token-saving tier really saves
+vireo provider        # free providers you can add, and what each gives
+vireo doctor          # check everything works, with real probes
+vireo usage           # model, quota and token usage
+vireo models          # what the gateway currently serves
+vireo route           # which model each kind of task would get
+vireo setup           # re-run the setup wizard
+vireo gateway status  # is the model gateway running
+vireo diagnostics     # export a sanitised report for bug reports
 ```
 
 ---
@@ -340,13 +340,13 @@ omni-agent diagnostics     # export a sanitised report for bug reports
 ```
                     You
                      |
-              omni-agent  (launcher, setup, health, usage)
+              vireo  (launcher, setup, health, usage)
                      |
                  OpenCode  (the agent harness and TUI)
                      |
         +------------+--------------------------+
         |                                       |
-  Built-in tools                     Omni Agent plugin
+  Built-in tools                     Vireo plugin
   files, shell, git                  8 high-level tools
                                        |
         +----------+----------+--------+---------+----------+
@@ -392,9 +392,9 @@ Then it remembers. A decision stays until you close it, tells you when it is
 overdue, and asks what actually happened.
 
 ```bash
-omni-agent decisions              # open it
-omni-agent decisions seed demo    # 48 made-up customers to try it on
-omni-agent decisions run          # analyse, from a terminal
+vireo decisions              # open it
+vireo decisions seed demo    # 48 made-up customers to try it on
+vireo decisions run          # analyse, from a terminal
 ```
 
 Two rules it does not break:
@@ -429,6 +429,7 @@ customer, and only when you run an analysis.
 | [Security](docs/security.md) | The confirmation boundary, credential storage, permissions |
 | [Troubleshooting](docs/troubleshooting.md) | When something breaks |
 | [Development](docs/development.md) | Running from source, tests, building the installer |
+| [Sending it to someone](docs/sharing.md) | Shipping a build with a provider key already in it, so it works for them on first run |
 
 ---
 
@@ -453,7 +454,7 @@ Details in [docs/security.md](docs/security.md).
 - ~6 GB free disk
 - An internet connection for setup
 
-macOS and Linux work from source (`npm install && node bin/omni-agent.mjs setup`); only the
+macOS and Linux work from source (`npm install && node bin/vireo.mjs setup`); only the
 Windows installer is built today.
 
 ---

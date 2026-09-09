@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Omni Agent launcher.
+// Vireo launcher.
 //
 // With no arguments this is the thing a desktop shortcut runs: make sure the
 // gateway is up, make sure configuration exists, then hand over to OpenCode
@@ -34,36 +34,41 @@ const args = rest.filter((a) => !a.startsWith("--"));
 
 function usage() {
   say(`
-Omni Agent ${VERSION}
+Vireo ${VERSION}
 
-  omni-agent ui              Open the Omni Agent desktop app (recommended)
-  omni-agent [folder]        Start the agent in the terminal instead
-  omni-agent setup           First-run setup wizard
-  omni-agent doctor          Check that everything works
-  omni-agent usage           Show model, quota and token usage
-  omni-agent models          List the models available right now
-  omni-agent route           Show which model would be chosen and why
+  vireo ui              Open the Vireo desktop app (recommended)
+  vireo [folder]        Start the agent in the terminal instead
+  vireo setup           First-run setup wizard
+  vireo doctor          Check that everything works
+  vireo usage           Show model, quota and token usage
+  vireo models          List the models available right now
+  vireo route           Show which model would be chosen and why
 
-  omni-agent provider [list]   Free providers you can add, and what each gives you
-  omni-agent provider setup <id>    Step-by-step instructions for one provider
-  omni-agent provider add <id> <key>
-  omni-agent provider signin <id>
-  omni-agent dashboard [page]  Open the gateway's own web dashboard
-  omni-agent saving [tier]     Show or set how hard it compresses to save tokens
-  omni-agent routine list      Scheduled routines
-  omni-agent routine run <id>  Run one now
+  vireo provider [list]   Free providers you can add, and what each gives you
+  vireo provider setup <id>    Step-by-step instructions for one provider
+  vireo provider add <id> <key>
+  vireo provider signin <id>
+  vireo dashboard [page]  Open the gateway's own web dashboard
+  vireo saving [tier]     Show or set how hard it compresses to save tokens
+  vireo routine list      Scheduled routines
+  vireo routine run <id>  Run one now
 
-  omni-agent decisions         Open Decisions: turn customer data into decisions
-  omni-agent decisions run     Run the analysis now, without opening a window
-  omni-agent decisions seed [demo|demo-cohort|edge]   Load a demo company
-  omni-agent decisions list    Show the open decisions
+  vireo decisions         Open Decisions: turn customer data into decisions
+  vireo decisions run     Run the analysis now, without opening a window
+  vireo decisions seed [demo|demo-cohort|edge]   Load a demo company
+  vireo decisions list    Show the open decisions
 
-  omni-agent gateway start|stop|status
-  omni-agent config mode <fast|balanced|smart|quality|cheap>
-  omni-agent config key <provider> <api-key>
-  omni-agent config management-key <key>
-  omni-agent config show
-  omni-agent diagnostics                Export a sanitised diagnostics bundle
+  vireo gateway start|stop|status
+  vireo config mode <fast|balanced|smart|quality|cheap>
+  vireo config key <provider> <api-key>
+  vireo config management-key <key>
+  vireo config show
+  vireo diagnostics                Export a sanitised diagnostics bundle
+  vireo bundle-key <provider> <key>   Ship a provider key inside your builds, so
+                                      whoever you send this to has working
+                                      models on first run. Never committed.
+  vireo bundle-key show               Which providers are bundled (names only)
+  vireo bundle-key clear              Remove the bundled key
 
 Options
   --non-interactive   Never prompt (for installers and CI)
@@ -98,7 +103,7 @@ async function start() {
     say("");
     say(`The model gateway did not start (${gw.reason}).`);
     say(`Log: ${path.join(PATHS.logs, "gateway.log")}`);
-    say("Run `omni-agent doctor` for details. Starting anyway - models will not work.");
+    say("Run `vireo doctor` for details. Starting anyway - models will not work.");
     say("");
   }
 
@@ -162,7 +167,7 @@ async function main() {
       // install configured and remember the model that actually answered, so
       // the app stops printing "First run: writing configuration..." and starts
       // on a model this machine has proven works. Setup tells people to run
-      // `omni-agent doctor` after a failure, and before this that never cleared
+      // `vireo doctor` after a failure, and before this that never cleared
       // the failure state.
       if (result.ok) {
         updateConfig({ configured: true });
@@ -261,7 +266,7 @@ async function main() {
           return process.exit(1);
         }
         if (!key) {
-          say("Usage: omni-agent config key <provider> <api-key>");
+          say("Usage: vireo config key <provider> <api-key>");
           return process.exit(1);
         }
         setSecret(a.secretName, key);
@@ -269,7 +274,7 @@ async function main() {
       }
       if (sub === "management-key") {
         if (!args[1]) {
-          say("Usage: omni-agent config management-key <key>");
+          say("Usage: vireo config management-key <key>");
           return process.exit(1);
         }
         setSecret("omniroute.managementKey", args[1]);
@@ -282,7 +287,7 @@ async function main() {
         say(`Credentials stored (names only): ${listSecretNames().join(", ") || "none"}`);
         return;
       }
-      say("Usage: omni-agent config <mode|key|management-key|show> ...");
+      say("Usage: vireo config <mode|key|management-key|show> ...");
       return process.exit(1);
     }
 
@@ -304,7 +309,7 @@ async function main() {
       if (sub === "add") {
         const [id, key] = [args[1], args[2]];
         if (!id) {
-          say("Usage: omni-agent provider add <id> <key>");
+          say("Usage: vireo provider add <id> <key>");
           return process.exit(1);
         }
         // A search key is a local secret, not a gateway connection.
@@ -319,7 +324,7 @@ async function main() {
           // credentials exist, and the keyed providers sit ahead of the keyless
           // ones - so storing the key is the whole job.
           say("It is now used FIRST for searches. No configuration to edit.");
-          say("Check it with:  omni-agent doctor");
+          say("Check it with:  vireo doctor");
           return;
         }
         const r = await providers.addModelProvider(id, key);
@@ -338,7 +343,7 @@ async function main() {
             if (t.remedy) say(`  ${t.remedy}`);
           }
         }
-        say("Run `omni-agent models` to see what it added.");
+        say("Run `vireo models` to see what it added.");
         return;
       }
 
@@ -354,7 +359,7 @@ async function main() {
           say("  Models:      " + cat.models.map((x) => x.id).join(", "));
           say("  Sign-in:     " + cat.signIn.map((x) => x.id).join(", "));
           say("");
-          say("  omni-agent provider setup <id>");
+          say("  vireo provider setup <id>");
           return;
         }
         const st = providers.setupSteps(id);
@@ -371,7 +376,7 @@ async function main() {
       if (sub === "signin") {
         const id = args[1];
         if (!id) {
-          say("Usage: omni-agent provider signin <id>");
+          say("Usage: vireo provider signin <id>");
           return process.exit(1);
         }
         const u = await providers.signInUrl(id);
@@ -388,11 +393,11 @@ async function main() {
         say("");
         const opened = openInBrowser(u.url);
         if (!opened.ok) say(`Could not open a browser automatically (${opened.reason}). Paste the URL above.`);
-        say("When it is done, check with:  omni-agent provider list");
+        say("When it is done, check with:  vireo provider list");
         return;
       }
 
-      say("Usage: omni-agent provider <list|setup|add|signin> ...");
+      say("Usage: vireo provider <list|setup|add|signin> ...");
       return process.exit(1);
     }
 
@@ -407,7 +412,7 @@ async function main() {
       const { gw } = await ensureReady({ quiet: true });
       if (gw.ok === false) {
         say(`The gateway is not running (${gw.reason}), so the dashboard has nothing to serve.`);
-        say("Try `omni-agent gateway start`.");
+        say("Try `vireo gateway start`.");
         return process.exit(1);
       }
       const pw = dashPassword();
@@ -426,7 +431,7 @@ async function main() {
         say("  It is stored on this machine only, and the dashboard is not reachable");
         say("  from any other computer.");
       } else {
-        say("  No dashboard password was found. Run `omni-agent setup --non-interactive` first.");
+        say("  No dashboard password was found. Run `vireo setup --non-interactive` first.");
       }
       say("");
       const opened = openInBrowser(url);
@@ -466,7 +471,97 @@ async function main() {
       say("");
       say(renderTiers({ current: cur.tier, measured }));
       say("");
-      say("  Change it with:  omni-agent saving <tier>");
+      say("  Change it with:  vireo saving <tier>");
+      return;
+    }
+
+    /**
+     * A provider key that travels inside the build you hand to someone else.
+     *
+     * 🔴 It is written to a GITIGNORED file, and `tests/unit/bundled-key.test.mjs`
+     * asserts that it stays ignored. This repository is public: a key committed
+     * here is scraped within minutes, and `npm run scan:secrets` only reads what
+     * git tracks, so an ignored file is invisible to it. The test is what closes
+     * that gap.
+     */
+    case "bundle-key": {
+      const bundled = await import("../src/setup/bundled-key.mjs");
+      const sub = args[0];
+
+      if (!sub || sub === "show") {
+        const d = bundled.describe();
+        const found = bundled.read();
+        say("");
+        if (!d.present) {
+          say("  No key is bundled with this build.");
+          say("");
+          say("  Add one so whoever you send this to has working models immediately:");
+          say("    vireo bundle-key mistral YOUR-KEY");
+          say("");
+          return;
+        }
+        // Names only. The value is never printed, the same rule `config show`
+        // follows.
+        say(`  Bundled providers: ${d.providers.join(", ")}`);
+        say(`  File: ${found.file}`);
+        say("");
+        say("  This file is gitignored. It is copied into the installer and the");
+        say("  portable zip when you build, and nowhere else.");
+        say("");
+        return;
+      }
+
+      if (sub === "clear") {
+        const found = bundled.read();
+        if (!found) {
+          say("Nothing is bundled.");
+          return;
+        }
+        fs.rmSync(found.file, { force: true });
+        say(`Removed ${found.file}.`);
+        return;
+      }
+
+      const [provider, key] = [args[0], args[1]];
+      if (!provider || !key) {
+        say("Usage: vireo bundle-key <provider> <key>");
+        say("       vireo bundle-key show | clear");
+        return process.exit(1);
+      }
+      const known = providers.catalogue().models.map((p) => p.id);
+      if (!known.includes(provider)) {
+        say(`"${provider}" is not one of the providers this knows about.`);
+        say(`Choose one of: ${known.join(", ")}`);
+        return process.exit(1);
+      }
+
+      // Prove it works BEFORE writing it, so a mistyped key is caught here
+      // rather than on someone else's machine an hour later.
+      say(`Checking the ${provider} key...`);
+      const check = await providers.verifyModelProvider([], provider, key);
+      if (check.state === "rejected") {
+        say(`  ${provider} refused that key. Nothing was saved.`);
+        say("  Check you copied the whole key and that it is still active.");
+        return process.exit(1);
+      }
+      if (check.state !== "ok") {
+        say(`  It could not be checked right now (${check.reason ?? "no answer"}).`);
+        say("  Saving it anyway - this is usually the provider being busy, not a bad key.");
+      } else {
+        say("  It works.");
+      }
+
+      const existing = bundled.read()?.providers ?? [];
+      const next = [...existing.filter((p) => p.id !== provider), { id: provider, key }];
+      const dest = bundled.write(next);
+      say("");
+      say(`Bundled: ${next.map((p) => p.id).join(", ")}`);
+      say(`Written to ${dest}`);
+      say("");
+      say("  This file is GITIGNORED and must stay that way - this repository is public.");
+      say("  It is copied into the build by `npm run build:installer`, so the person");
+      say("  you send the installer to gets working models with no setup at all.");
+      say("");
       return;
     }
 
@@ -489,7 +584,7 @@ async function main() {
       if (r.alreadyRunning) return process.exit(0);
       say("");
       if (r.ready === false) say("The start hit a problem. The window says what happened and what to do.");
-      say("Omni Agent is open. Close the window when you are done.");
+      say("Vireo is open. Close the window when you are done.");
       say("Leave this running - closing it stops the agent.");
       // Nothing else to do; the HTTP servers hold the process open.
       return;
@@ -508,7 +603,7 @@ async function main() {
       if (sub === "run") {
         const id = args[1];
         if (!id) {
-          say("Usage: omni-agent routine run <id>");
+          say("Usage: vireo routine run <id>");
           return process.exit(1);
         }
         // Scheduled Tasks run this with no app open, so bring up what it needs.
@@ -525,7 +620,7 @@ async function main() {
         stopAgent();
         return process.exit(r.ok ? 0 : 1);
       }
-      say("Usage: omni-agent routine [list|run <id>]");
+      say("Usage: vireo routine [list|run <id>]");
       return process.exit(1);
     }
 
@@ -540,7 +635,7 @@ async function main() {
         if (!r.ok) return process.exit(1);
         if (r.alreadyRunning) return process.exit(0);
         say("");
-        say("Omni Agent is open on Decisions. Close the window when you are done.");
+        say("Vireo is open on Decisions. Close the window when you are done.");
         return;
       }
 
@@ -548,8 +643,8 @@ async function main() {
       // (and only when a model is actually needed).
       const { workspaces, selected } = ws.list();
       if (!selected && sub !== "seed") {
-        say("There is no workspace yet. Run `omni-agent decisions seed` to load the demo company,");
-        say("or open the app with `omni-agent decisions` and import your own data.");
+        say("There is no workspace yet. Run `vireo decisions seed` to load the demo company,");
+        say("or open the app with `vireo decisions` and import your own data.");
         return process.exit(1);
       }
 
@@ -571,7 +666,7 @@ async function main() {
           return process.exit(1);
         }
         say(`Loaded the "${variantName}" demo company: ${r.accounts} customers.`);
-        say("Now run:  omni-agent decisions run");
+        say("Now run:  vireo decisions run");
         return;
       }
 
@@ -643,7 +738,7 @@ async function main() {
         return process.exit(code);
       }
 
-      say("Usage: omni-agent decisions [open|run|seed|list|eval]");
+      say("Usage: vireo decisions [open|run|seed|list|eval]");
       return process.exit(1);
     }
 
@@ -651,7 +746,7 @@ async function main() {
       return start();
 
     default:
-      // `omni-agent ./some/folder` should just start there.
+      // `vireo ./some/folder` should just start there.
       if (!cmd.startsWith("-") && fs.existsSync(cmd)) {
         args.unshift(cmd);
         return start();
@@ -664,7 +759,7 @@ async function main() {
 
 main().catch((err) => {
   say(`\nError: ${err.message}`);
-  if (process.env.OMNI_AGENT_DEBUG) say(err.stack);
-  say(`\nRun \`omni-agent doctor\` to diagnose, or \`omni-agent diagnostics\` to export a report.`);
+  if (process.env.VIREO_DEBUG) say(err.stack);
+  say(`\nRun \`vireo doctor\` to diagnose, or \`vireo diagnostics\` to export a report.`);
   process.exit(1);
 });

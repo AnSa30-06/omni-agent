@@ -1,4 +1,4 @@
-/* Omni Agent desktop UI.
+/* Vireo desktop UI.
    Light by default, dark when the OS asks for it. No web fonts, no CDN - the
    window runs under a content-security-policy that forbids loading anything
    from the network, so everything here is local or a system font. */

@@ -39,7 +39,7 @@ function globalNodeModulesDirs() {
 
 function candidateRoots() {
   const roots = [];
-  if (process.env.OMNI_AGENT_OMNIROUTE_HOME) roots.push(process.env.OMNI_AGENT_OMNIROUTE_HOME);
+  if (process.env.VIREO_OMNIROUTE_HOME) roots.push(process.env.VIREO_OMNIROUTE_HOME);
   // Installed by scripts/bootstrap.mjs into the app's private prefix. Checked
   // BEFORE the machine's global npm root, so the version this build was tested
   // against wins over whatever the user happens to have installed globally.
@@ -74,7 +74,7 @@ export function locateOmniRoute() {
  * which shell quoting mangles. The .exe takes argv directly.
  */
 export function locateOpenCode() {
-  if (process.env.OMNI_AGENT_OPENCODE_BIN) return process.env.OMNI_AGENT_OPENCODE_BIN;
+  if (process.env.VIREO_OPENCODE_BIN) return process.env.VIREO_OPENCODE_BIN;
 
   const exeName = process.platform === "win32" ? "opencode.exe" : "opencode";
   // Package roots that may contain the real binary, private prefix first.

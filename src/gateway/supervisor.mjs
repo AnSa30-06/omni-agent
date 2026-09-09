@@ -40,7 +40,7 @@ export function ensureGatewayEnv() {
   const rand = (n) => crypto.randomBytes(n).toString("base64url");
   const adminPassword = rand(18);
   const lines = [
-    "# Generated per-install by omni-agent. Do not copy between machines.",
+    "# Generated per-install by vireo. Do not copy between machines.",
     `JWT_SECRET=${rand(32)}`,
     `API_KEY_SECRET=${rand(32)}`,
     `STORAGE_ENCRYPTION_KEY=${crypto.randomBytes(32).toString("hex")}`,
@@ -126,7 +126,7 @@ export async function ensureRunning({ onProgress = () => {}, startTimeoutMs = nu
 
   if (await client.isUp()) return { started: false, baseUrl, reason: "already-running" };
 
-  if (cfg.gateway.externalBaseUrl || process.env.OMNI_AGENT_GATEWAY_URL) {
+  if (cfg.gateway.externalBaseUrl || process.env.VIREO_GATEWAY_URL) {
     return { started: false, baseUrl, ok: false, reason: "external-gateway-unreachable" };
   }
   if (!cfg.gateway.autoStart) {

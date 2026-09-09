@@ -1406,7 +1406,7 @@ views.settings = async (params, token) => {
   // Docs
   const b8 = el("div", "block");
   b8.append(el("h3", null, "How to use this"));
-  b8.append(el("p", "note", "The full instructions are in the docs/decisions folder where Omni Agent is installed. Start with getting-started.md."));
+  b8.append(el("p", "note", "The full instructions are in the docs/decisions folder where Vireo is installed. Start with getting-started.md."));
   wrap.append(b8);
 };
 

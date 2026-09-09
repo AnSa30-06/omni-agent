@@ -79,7 +79,7 @@ export function retry() {
   retrying = true;
   Promise.resolve()
     .then(() => retryFn())
-    .catch((err) => startupProblem({ title: "Omni Agent could not start", detail: String(err?.message ?? err) }))
+    .catch((err) => startupProblem({ title: "Vireo could not start", detail: String(err?.message ?? err) }))
     .finally(() => {
       retrying = false;
     });

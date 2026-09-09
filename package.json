@@ -1,5 +1,5 @@
 {
-  "name": "omni-agent",
+  "name": "vireo",
   "version": "1.2.0",
   "private": false,
   "description": "A downloadable, model-agnostic coding agent: OpenCode as the harness, OmniRoute as the model gateway, with browser automation, web research, scraping and document tools preconfigured.",
@@ -9,7 +9,7 @@
     "node": ">=22.12.0"
   },
   "bin": {
-    "omni-agent": "bin/omni-agent.mjs"
+    "vireo": "bin/vireo.mjs"
   },
   "main": "src/index.mjs",
   "files": [
@@ -24,10 +24,10 @@
     "src/"
   ],
   "scripts": {
-    "start": "node bin/omni-agent.mjs",
-    "setup": "node bin/omni-agent.mjs setup",
-    "doctor": "node bin/omni-agent.mjs doctor",
-    "usage": "node bin/omni-agent.mjs usage",
+    "start": "node bin/vireo.mjs",
+    "setup": "node bin/vireo.mjs setup",
+    "doctor": "node bin/vireo.mjs doctor",
+    "usage": "node bin/vireo.mjs usage",
     "test": "node --test tests/unit/*.test.mjs",
     "test:unit": "node --test tests/unit/*.test.mjs",
     "test:integration": "node --test tests/integration/*.test.mjs",

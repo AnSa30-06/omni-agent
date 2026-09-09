@@ -25,7 +25,7 @@ one paid key and both problems disappear.
 During setup, or later:
 
 ```bash
-omni-agent config key deepseek sk-...
+vireo config key deepseek sk-...
 ```
 
 `anthropic` · `openai` · `google` · `deepseek` · `moonshot` · `openrouter`
@@ -58,7 +58,7 @@ Notes that matter:
 - **OpenRouter's `limit: null` means "no spending limit set"**, not "zero remaining". The
   adapter distinguishes these; conflating them would show a full bar as empty.
 - **Anthropic and OpenAI usage needs an *Admin* key**, which is a different credential from
-  your API key. Add one with `omni-agent config key anthropic.admin sk-ant-admin-…` if you
+  your API key. Add one with `vireo config key anthropic.admin sk-ant-admin-…` if you
   want those figures. Without it: "unavailable", with the reason and how to fix it.
 - **Google publishes nothing** for Gemini API keys. Quota is visible only in AI Studio.
 
@@ -134,7 +134,7 @@ reliability improvement available, and Brave and Tavily both have free tiers.
 Change the order:
 
 ```jsonc
-// %LOCALAPPDATA%\OmniAgent\config.json
+// %LOCALAPPDATA%\Vireo\config.json
 { "search": { "order": ["tavily", "brave", "duckduckgo", "searxng", "browser"] } }
 ```
 
@@ -185,7 +185,7 @@ model gets `tierSource: "unknown"` rather than being guessed into a tier.
 
 ## Adding free capacity
 
-`omni-agent provider` lists providers with a genuine free tier. Every id in
+`vireo provider` lists providers with a genuine free tier. Every id in
 `config/providers/free.json` is verified to exist in the gateway's own provider
 manifest (`GET /api/v1/provider-plugin-manifest`, 222 providers), and base URLs
 and auth mechanics are read from that manifest rather than hardcoded — so the
@@ -225,12 +225,12 @@ consent screen on anyone's behalf.
 
 ## Adding one of the free providers yourself
 
-`omni-agent provider list` shows a **curated** set. The gateway itself knows
+`vireo provider list` shows a **curated** set. The gateway itself knows
 **222**, so anything in its manifest can be added by id whether or not it is in
 that list:
 
 ```bash
-omni-agent provider add <id> YOUR-KEY
+vireo provider add <id> YOUR-KEY
 ```
 
 The base URL and auth mechanics come from the gateway's manifest, so an id it
@@ -249,7 +249,7 @@ providers people ask about most: `mistral` · `cerebras` · `groq` · `cohere` �
 ### Worked example: Mistral
 
 ```bash
-omni-agent provider setup mistral      # the steps, without leaving the terminal
+vireo provider setup mistral      # the steps, without leaving the terminal
 ```
 
 1. Open <https://console.mistral.ai/> and sign in. Signed out it redirects
@@ -258,7 +258,7 @@ omni-agent provider setup mistral      # the steps, without leaving the terminal
 2. Read their plan page before picking one. Mistral's free tier has changed more
    than once; **their page is the authority**, not this one.
 3. Create a key under **API Keys** in the console's left-hand menu.
-4. `omni-agent provider add mistral YOUR-KEY`
+4. `vireo provider add mistral YOUR-KEY`
 
 The command creates a **gateway provider connection**, then asks the gateway to
 make a real call against it and reports the verdict — so a bad key is caught
@@ -298,7 +298,7 @@ BYOK were fully retired on **2026-07-30**. The gateway's manifest still carries
 advertises it. **Being in the manifest is not evidence that a provider works.**
 
 GitHub *Copilot* is a different product and is still live — it is the `github`
-OAuth entry, `omni-agent provider signin github`, and it needs a paid seat.
+OAuth entry, `vireo provider signin github`, and it needs a paid seat.
 
 ## About that "1.6 billion tokens a month"
 
@@ -313,7 +313,7 @@ with one-time signup credits included.
 
 **It is a sum over ~40 separate accounts you would have to open yourself.** It
 is not a pool, and nothing hands you any part of it. Each row is one signup, one
-key, one `omni-agent provider add`. **Two thirds of it is Mistral alone**, and
+key, one `vireo provider add`. **Two thirds of it is Mistral alone**, and
 six signups reach 93% of it.
 
 The figures come from `GET /api/free-tier/summary` — **there is an API, contrary
@@ -380,7 +380,7 @@ doing research looks like. A key removes that.
 Every provider carries step-by-step instructions:
 
 ```bash
-omni-agent provider setup brave
+vireo provider setup brave
 ```
 
 Once a key is stored it is used **first**, automatically — there is no

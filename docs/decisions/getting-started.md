@@ -7,12 +7,12 @@ do not need to know anything about AI.
 
 ## Step 1. Open Decisions
 
-Open **Omni Agent**, then click **Decisions** in the list on the left.
+Open **Vireo**, then click **Decisions** in the list on the left.
 
 Or, from a terminal:
 
 ```bash
-omni-agent decisions
+vireo decisions
 ```
 
 The first time, it asks you three questions. That is the whole setup.
@@ -50,7 +50,7 @@ Click **Run the analysis**.
 It reads every customer, works out what changed, and asks the AI about the ones
 that matter. A progress line tells you which part it is on.
 
-**It can take a minute.** Omni Agent works with free AI models by default, and
+**It can take a minute.** Vireo works with free AI models by default, and
 free models are slow. If you have added a provider key, it is much faster. See
 [Troubleshooting](troubleshooting.md) if it seems stuck.
 

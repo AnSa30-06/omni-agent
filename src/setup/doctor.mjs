@@ -63,7 +63,7 @@ export async function runDoctor(opts = {}) {
   add(
     fs.existsSync(ocCfg)
       ? row("OpenCode config", OK, ocCfg)
-      : row("OpenCode config", FAIL, "not generated yet", "Run: omni-agent setup")
+      : row("OpenCode config", FAIL, "not generated yet", "Run: vireo setup")
   );
 
   // --- Gateway -------------------------------------------------------------
@@ -79,7 +79,7 @@ export async function runDoctor(opts = {}) {
   add(
     up
       ? row("Gateway running", OK, gatewayBaseUrl(cfg))
-      : row("Gateway running", FAIL, `nothing answering at ${gatewayBaseUrl(cfg)}`, "Run: omni-agent gateway start")
+      : row("Gateway running", FAIL, `nothing answering at ${gatewayBaseUrl(cfg)}`, "Run: vireo gateway start")
   );
 
   let catalogue = [];
@@ -166,14 +166,14 @@ export async function runDoctor(opts = {}) {
               WARN,
               `the free models are busy right now (${String(err.message).slice(0, 120)})`,
               "This is normal on a fresh install under load - the app retries automatically. " +
-                "Adding a provider key with `omni-agent config key <provider> <key>` removes the wait."
+                "Adding a provider key with `vireo config key <provider> <key>` removes the wait."
             )
           : row(
               "Model responds",
               FAIL,
               err.message,
               "Every model in the fallback chain refused. If this persists, add a provider API key " +
-                "with `omni-agent config key <provider> <key>`."
+                "with `vireo config key <provider> <key>`."
             )
       );
     }
@@ -205,7 +205,7 @@ export async function runDoctor(opts = {}) {
             "Provider keys",
             WARN,
             "could not be checked - the model gateway did not answer",
-            "This does NOT mean you have no keys. Start the gateway with `omni-agent gateway start` and run this again."
+            "This does NOT mean you have no keys. Start the gateway with `vireo gateway start` and run this again."
           )
         : row(
             "Provider keys",
@@ -213,7 +213,7 @@ export async function runDoctor(opts = {}) {
             "none added",
             "Worth adding one. Measured 2026-09-03: eight of the nine providers that need no key answer " +
               "nothing at all, leaving six working models. Open the app's Providers page, or run " +
-              "`omni-agent provider list` to see the free tiers."
+              "`vireo provider list` to see the free tiers."
           )
   );
 
@@ -254,7 +254,7 @@ export async function runDoctor(opts = {}) {
 
   // --- Browser -------------------------------------------------------------
   if (!chromiumInstalled()) {
-    add(row("Browser", FAIL, "Chromium is not installed", "Run: omni-agent setup --browser"));
+    add(row("Browser", FAIL, "Chromium is not installed", "Run: vireo setup --browser"));
   } else if (deep) {
     try {
       const browser = await import("../tools/browser.mjs");
@@ -267,7 +267,7 @@ export async function runDoctor(opts = {}) {
           : row("Browser", WARN, `loaded with status ${nav.status}`)
       );
     } catch (err) {
-      add(row("Browser", FAIL, err.message, "Run: omni-agent setup --browser"));
+      add(row("Browser", FAIL, err.message, "Run: vireo setup --browser"));
     }
   } else {
     add(row("Browser", OK, "Chromium present at " + PATHS.browsers));

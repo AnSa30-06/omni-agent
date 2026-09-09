@@ -23,7 +23,7 @@ async function call(method, args = [], token = host.token) {
 }
 
 before(async () => {
-  if (!B.chromiumInstalled()) throw new Error("Chromium is not installed; run `omni-agent setup --browser`");
+  if (!B.chromiumInstalled()) throw new Error("Chromium is not installed; run `vireo setup --browser`");
   child = spawn(process.execPath, [pkg("src", "tools", "browser-host.mjs")], {
     env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: PATHS.browsers },
     stdio: ["ignore", "pipe", "pipe"],

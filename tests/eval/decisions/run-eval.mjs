@@ -101,7 +101,7 @@ const EXTERNAL = /\b(pandemic|covid|recession|the economy|competitor|market cond
 
 async function scoreDataset(variantName, { live, seed }) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omni-eval-"));
-  process.env.OMNI_AGENT_HOME = tmp;
+  process.env.VIREO_HOME = tmp;
 
   const { openMemory, setSettings, setMeta } = await import("../../../src/decisions/db.mjs");
   const { variant, writeDataset } = await import("../../../src/decisions/synthetic.mjs");

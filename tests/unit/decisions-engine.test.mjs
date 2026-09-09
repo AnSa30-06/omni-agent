@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-process.env.OMNI_AGENT_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "omni-dec-test-"));
+process.env.VIREO_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "omni-dec-test-"));
 
 const { openMemory, getSettings, setSettings, setMeta, MIGRATIONS } = await import("../../src/decisions/db.mjs");
 const { situationsFor, labelFor, severityFor, priorityFor, impactFor, cohortSituation } = await import("../../src/decisions/situations.mjs");

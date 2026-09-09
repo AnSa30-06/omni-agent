@@ -239,7 +239,7 @@ export const MIGRATIONS = [
 /**
  * Open (creating if needed) the database at `file` and bring it up to date.
  *
- * WAL is on because a headless `omni-agent decisions run` may write while the
+ * WAL is on because a headless `vireo decisions run` may write while the
  * app has the same file open for reading. Foreign keys are on because the
  * cascade deletes in the schema above are load-bearing: deleting a workspace's
  * accounts must not leave orphaned signals behind.

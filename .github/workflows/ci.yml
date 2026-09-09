@@ -56,24 +56,24 @@ jobs:
       - run: npm ci --omit=dev --no-fund --no-audit
 
       # Into the directory the code will look in. browser.mjs sets
-      # PLAYWRIGHT_BROWSERS_PATH from OMNI_AGENT_HOME itself, deliberately, so
+      # PLAYWRIGHT_BROWSERS_PATH from VIREO_HOME itself, deliberately, so
       # that this product never shares or deletes a user's own Playwright
       # download - which means installing anywhere else here would be invisible
       # to the tests.
       - name: Install Chromium
         run: node node_modules/playwright-core/cli.js install chromium
         env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.omni-agent-home\browsers
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.vireo-home\browsers
 
       - name: Web integration tests
         run: node --test --test-timeout=120000 tests/integration/web.test.mjs
         env:
-          OMNI_AGENT_HOME: ${{ github.workspace }}\.omni-agent-home
+          VIREO_HOME: ${{ github.workspace }}\.vireo-home
 
       - name: Browser integration tests
         run: node --test --test-timeout=120000 tests/integration/browser.test.mjs
         env:
-          OMNI_AGENT_HOME: ${{ github.workspace }}\.omni-agent-home
+          VIREO_HOME: ${{ github.workspace }}\.vireo-home
 
       # Drives the browser over the loopback HTTP boundary the plugin uses,
       # rather than the module directly. That distinction is the whole point of
@@ -81,7 +81,7 @@ jobs:
       - name: Browser host integration tests
         run: node --test --test-timeout=120000 tests/integration/browser-host.test.mjs
         env:
-          OMNI_AGENT_HOME: ${{ github.workspace }}\.omni-agent-home
+          VIREO_HOME: ${{ github.workspace }}\.vireo-home
 
   installer:
     name: Build the installer
@@ -108,7 +108,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: omni-agent-dist
+          name: vireo-dist
           path: dist/*
           if-no-files-found: error
           retention-days: 14

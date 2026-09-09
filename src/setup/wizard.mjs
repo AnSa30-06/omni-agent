@@ -71,7 +71,7 @@ const CLOSED = Symbol("stdin-closed");
  * against a stdin that is already at EOF does not throw and does not resolve -
  * the interface emits 'close' and the promise is simply left PENDING FOREVER.
  * With nothing else keeping the loop alive, Node then exits normally, with
- * status 0. Measured 2026-08-28 on the shipped 1.1.0 build: `omni-agent setup`
+ * status 0. Measured 2026-08-28 on the shipped 1.1.0 build: `vireo setup`
  * printed its welcome banner, stopped at "Press Enter to continue...", and
  * exited 0 having installed nothing and having reported no error anywhere.
  *
@@ -114,7 +114,7 @@ export async function runSetup(opts = {}) {
   try {
     say();
     rule();
-    say("  Welcome to Omni Agent");
+    say("  Welcome to Vireo");
     rule();
     say();
     say("  This sets up an AI agent that can write code, browse the web, do");
@@ -152,7 +152,7 @@ export async function runSetup(opts = {}) {
       say("  below opens up hundreds more, and every one of these has a");
       say("  genuinely free tier that needs no card.");
       say();
-      say("  Skip all of it now and run `omni-agent provider` whenever you like.");
+      say("  Skip all of it now and run `vireo provider` whenever you like.");
       say();
       const freeCat = providerCatalogue();
       // The three worth a non-technical person's time on first run. The full
@@ -189,10 +189,10 @@ export async function runSetup(opts = {}) {
 
       say("  If you already PAY for Claude, ChatGPT, Copilot, Cursor or Gemini,");
       say("  you can sign in and use that subscription instead - nothing is");
-      say("  charged twice. Run `omni-agent provider signin <name>` when ready.");
+      say("  charged twice. Run `vireo provider signin <name>` when ready.");
       if (!enabled.length) {
         say("\n  Nothing added. The few keyless models that still answer will be used;");
-        say("  run `omni-agent provider` whenever you want the rest.");
+        say("  run `vireo provider` whenever you want the rest.");
       }
     }
     updateConfig({ providers: { enabled } });
@@ -257,7 +257,7 @@ export async function runSetup(opts = {}) {
         const r = await installBrowser({ onProgress: (m) => say("  " + m) });
         if (!r.ok) {
           say(`  Browser engine FAILED: ${r.reason}`);
-          say("  Browser tasks will not work. Re-run: omni-agent setup --browser");
+          say("  Browser tasks will not work. Re-run: vireo setup --browser");
           log.error("browser install failed", r);
         }
       }
@@ -284,6 +284,18 @@ export async function runSetup(opts = {}) {
       say(`  Could not create a gateway credential: ${prov.reason}`);
       if (prov.remedy) say(`  ${prov.remedy}`);
       say("  OpenCode will not see any models until this succeeds.");
+    }
+
+    // A provider key shipped inside this build, for whoever it was handed to.
+    // Runs once, skips any provider they have already connected themselves, and
+    // is silent when there is no bundled key - which is the normal case.
+    if (prov.ok) {
+      const { applyBundledKey } = await import("./bundled-key.mjs");
+      const bundled = await applyBundledKey({ onProgress: (m) => say("  " + m) });
+      if (bundled.added?.length) {
+        say(`  Connected the bundled ${bundled.added.join(", ")} key - models are ready with no setup.`);
+      }
+      for (const f of bundled.failed ?? []) say(`  The bundled ${f.id} key did not connect: ${f.reason}`);
     }
 
     // --- 4. Token saving ---------------------------------------------------
@@ -342,7 +354,7 @@ export async function runSetup(opts = {}) {
       }
       if (!result.ok) {
         say("  Setup finished with failures. Fix the items above, then run:");
-        say("    omni-agent doctor");
+        say("    vireo doctor");
         return { ok: false, doctor: result };
       }
     } else {
@@ -355,16 +367,16 @@ export async function runSetup(opts = {}) {
     rule();
     say();
     // The person who installed the .exe has a desktop shortcut and no
-    // terminal, and this block used to tell them to type `omni-agent`. Say
+    // terminal, and this block used to tell them to type `vireo`. Say
     // the thing they can actually do; keep the commands for a source checkout.
-    const exe = pkg("..", "OmniAgent.exe");
+    const exe = pkg("..", "Vireo.exe");
     if (fs.existsSync(exe)) {
-      say("  Open Omni Agent from your Desktop or Start Menu.");
+      say("  Open Vireo from your Desktop or Start Menu.");
       say(`  (or double-click ${exe})`);
     } else {
-      say("  Open the app with:      omni-agent ui");
-      say("  Check quota and usage:  omni-agent usage");
-      say("  Re-run these checks:    omni-agent doctor");
+      say("  Open the app with:      vireo ui");
+      say("  Check quota and usage:  vireo usage");
+      say("  Re-run these checks:    vireo doctor");
     }
     say();
     say(`  Your files live in: ${PATHS.home}`);

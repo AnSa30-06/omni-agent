@@ -9,8 +9,8 @@ product can be tested against data whose right answers are known.
 Load it from **Settings > Data**, or:
 
 ```bash
-omni-agent decisions seed demo
-omni-agent decisions run
+vireo decisions seed demo
+vireo decisions run
 ```
 
 ---

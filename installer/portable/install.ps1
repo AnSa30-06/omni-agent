@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Set up Omni Agent from the portable distribution, or from a source checkout.
+  Set up Vireo from the portable distribution, or from a source checkout.
 
 .DESCRIPTION
   Does what the EXE installer does, without installing anything system-wide:
@@ -21,7 +21,7 @@ function Fail($m) { Write-Host ""; Write-Host "ERROR: $m" -ForegroundColor Red; 
 
 # The portable zip ships a Node runtime beside the app; a source checkout does not.
 $BundledNode = Join-Path $Here 'node\node.exe'
-$AppDir = if (Test-Path (Join-Path $Here 'app\bin\omni-agent.mjs')) { Join-Path $Here 'app' } else { $Here }
+$AppDir = if (Test-Path (Join-Path $Here 'app\bin\vireo.mjs')) { Join-Path $Here 'app' } else { $Here }
 
 if (Test-Path $BundledNode) {
   $Node = $BundledNode
@@ -31,11 +31,11 @@ if (Test-Path $BundledNode) {
   if (-not $cmd) { Fail "Node.js is not installed and this copy has no bundled runtime.`nInstall Node 22 or newer from https://nodejs.org and run this again." }
   $Node = $cmd.Source
   $v = (& $Node --version).TrimStart('v').Split('.')[0]
-  if ([int]$v -lt 22) { Fail "Node $v is too old. Omni Agent needs Node 22 or newer." }
+  if ([int]$v -lt 22) { Fail "Node $v is too old. Vireo needs Node 22 or newer." }
   Say "Using Node $(& $Node --version) at $Node"
 }
 
-if (-not (Test-Path (Join-Path $AppDir 'bin\omni-agent.mjs'))) {
+if (-not (Test-Path (Join-Path $AppDir 'bin\vireo.mjs'))) {
   Fail "Could not find the application at $AppDir. Extract the whole zip, keeping its folder structure."
 }
 
@@ -53,7 +53,7 @@ if ($LASTEXITCODE -ne 0) { Fail "Could not download the required components. Che
 
 if (-not $SkipSetup) {
   Say ""
-  & $Node (Join-Path $AppDir 'bin\omni-agent.mjs') setup
+  & $Node (Join-Path $AppDir 'bin\vireo.mjs') setup
 }
 
 Say ""

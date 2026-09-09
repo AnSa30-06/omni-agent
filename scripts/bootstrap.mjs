@@ -77,7 +77,7 @@ async function main() {
   // parent, which would pollute the app's own dependency tree.
   const marker = path.join(RUNTIME, "package.json");
   if (!fs.existsSync(marker)) {
-    fs.writeFileSync(marker, JSON.stringify({ name: "omni-agent-runtime", private: true, version: "1.0.0" }, null, 2));
+    fs.writeFileSync(marker, JSON.stringify({ name: "vireo-runtime", private: true, version: "1.0.0" }, null, 2));
   }
 
   const missing = COMPONENTS.filter((c) => !isInstalled(c.name));
@@ -113,18 +113,18 @@ async function main() {
       say("");
       // Name the cause the message can actually tell apart, rather than
       // blaming the network for everything. ENOTEMPTY is a Windows lock -
-      // antivirus, an open Explorer window, or a still-running Omni Agent -
+      // antivirus, an open Explorer window, or a still-running Vireo -
       // and telling someone to check their connection sends them the wrong way.
       if (/ENOTEMPTY|EPERM|EBUSY|EACCES/.test(tail)) {
         say("  Windows would not let npm replace a folder that is still in use.");
-        say("  Close Omni Agent and any Explorer window inside its folder, then");
-        say("  run 'Set up Omni Agent' again. If it keeps happening, your");
+        say("  Close Vireo and any Explorer window inside its folder, then");
+        say("  run 'Set up Vireo' again. If it keeps happening, your");
         say("  antivirus is holding the files while they are being written.");
       } else if (/ENOSPC/.test(tail)) {
-        say("  The drive is full. Free up space and run 'Set up Omni Agent' again.");
+        say("  The drive is full. Free up space and run 'Set up Vireo' again.");
       } else {
         say("  This is usually a network problem or a proxy.");
-        say("  Fix that and run 'Set up Omni Agent' from the Start Menu again.");
+        say("  Fix that and run 'Set up Vireo' from the Start Menu again.");
       }
     }
   }

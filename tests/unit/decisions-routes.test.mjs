@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-process.env.OMNI_AGENT_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "omni-routes-test-"));
+process.env.VIREO_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "omni-routes-test-"));
 
 const { pkg } = await import("../../src/util/paths.mjs");
 const { decisionRoutes } = await import("../../src/decisions/routes.mjs");
@@ -54,7 +54,7 @@ test("a directory URL serves its index, so /decisions/ is reachable", () => {
 test("the page is reachable from the chat app and from the CLI", () => {
   assert.match(read("src", "ui", "public", "index.html"), /data-page="decisions"/);
   assert.match(read("src", "ui", "public", "app.js"), /pages\.decisions/);
-  assert.match(read("bin", "omni-agent.mjs"), /case "decisions"/);
+  assert.match(read("bin", "vireo.mjs"), /case "decisions"/);
 });
 
 test("nothing in the Decisions page writes model output as HTML", () => {

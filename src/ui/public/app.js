@@ -1,4 +1,4 @@
-// Omni Agent desktop UI.
+// Vireo desktop UI.
 //
 // Two surfaces over one engine:
 //   Chat  conversation. Runs the `plan` agent, which reads and searches but
@@ -358,7 +358,7 @@ function renderMessages(list) {
       turn = { user: m, assistantBody: null, assistantInfo: null, parts: [] };
     }
     const wrap = el("div", `msg ${role === "user" ? "user" : "assistant"}`);
-    wrap.append(el("div", "role", role === "user" ? "You" : "Omni Agent"));
+    wrap.append(el("div", "role", role === "user" ? "You" : "Vireo"));
     const body = el("div", "body");
     if (role !== "user" && turn) {
       turn.assistantBody = body;
@@ -653,7 +653,7 @@ function emptyState() {
   const wrap = el("div", "empty");
   const mark = el("img", "empty-mark");
   mark.src = "logo.svg";
-  mark.alt = "Omni Agent";
+  mark.alt = "Vireo";
   mark.width = 56;
   mark.height = 56;
   wrap.append(mark);
@@ -769,7 +769,7 @@ function liveTurn(messageID) {
   box.querySelector(".empty")?.remove();
   box.querySelector(".waiting-row")?.remove();
   const wrap = el("div", "msg assistant writing");
-  wrap.append(el("div", "role", "Omni Agent"));
+  wrap.append(el("div", "role", "Vireo"));
   const body = el("div", "body");
   // Announced as it is written, not re-read from the top on every token.
   body.setAttribute("aria-live", "polite");
@@ -1229,7 +1229,7 @@ function paintWaiting() {
   }
   box.querySelector(".empty")?.remove();
   const wrap = el("div", "msg assistant waiting-row");
-  wrap.append(el("div", "role", "Omni Agent"));
+  wrap.append(el("div", "role", "Vireo"));
   const body = el("div", "body");
   body.append(el("span", "waiting-text", label));
   wrap.append(body);
@@ -2300,7 +2300,7 @@ async function showSetup(id) {
     for (const s of r.steps) {
       const li = el("li");
       // Steps name exact commands; show them as commands, not prose.
-      const bits = String(s).split(/(omni-agent [^\s]+(?: [^\s]+)*|https?:\/\/\S+)/g);
+      const bits = String(s).split(/(vireo [^\s]+(?: [^\s]+)*|https?:\/\/\S+)/g);
       bits.forEach((b, i) => (i % 2 ? li.append(el("code", null, b)) : li.append(document.createTextNode(b))));
       ol.append(li);
     }
@@ -2564,8 +2564,8 @@ function routineForm() {
     "When should it be able to run?",
     (() => {
       const s = el("select");
-      s.append(Object.assign(el("option", null, "Only while Omni Agent is open"), { value: "in-app" }));
-      s.append(Object.assign(el("option", null, "Even when Omni Agent is closed"), { value: "always" }));
+      s.append(Object.assign(el("option", null, "Only while Vireo is open"), { value: "in-app" }));
+      s.append(Object.assign(el("option", null, "Even when Vireo is closed"), { value: "always" }));
       return s;
     })(),
   );
@@ -2796,7 +2796,7 @@ pages.dashboard = async () => {
  * The window opens before either of them is started (see launch.mjs), so for
  * the first half-minute of a cold start there is nothing behind this page. It
  * used to boot regardless: toast "the agent server is not running - restart
- * Omni Agent" at someone who had started it seconds earlier, and fetch the
+ * Vireo" at someone who had started it seconds earlier, and fetch the
  * model list into a 503. Now it shows each step as it happens and boots when
  * they are done. A failed step is shown with the one thing the reader can do.
  */

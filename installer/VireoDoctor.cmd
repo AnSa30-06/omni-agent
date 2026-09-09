@@ -8,12 +8,12 @@ rem so it has to be readable.
 setlocal
 set "HERE=%~dp0"
 set "PATH=%HERE%node;%PATH%"
-title Omni Agent - health check
+title Vireo - health check
 echo.
-echo   Checking Omni Agent. This takes about a minute - it really does
+echo   Checking Vireo. This takes about a minute - it really does
 echo   start the browser and ask a model a question.
 echo.
-"%HERE%node\node.exe" "%HERE%app\bin\omni-agent.mjs" doctor
+"%HERE%node\node.exe" "%HERE%app\bin\vireo.mjs" doctor
 echo.
 pause
 endlocal

@@ -6,14 +6,14 @@ import { PATHS } from "./paths.mjs";
 import { redact, redactString } from "./redact.mjs";
 
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40, silent: 99 };
-const level = LEVELS[(process.env.OMNI_AGENT_LOG_LEVEL || "info").toLowerCase()] ?? LEVELS.info;
+const level = LEVELS[(process.env.VIREO_LOG_LEVEL || "info").toLowerCase()] ?? LEVELS.info;
 
 let stream = null;
 function out() {
   if (stream) return stream;
   try {
     fs.mkdirSync(PATHS.logs, { recursive: true });
-    const file = path.join(PATHS.logs, `omni-agent-${new Date().toISOString().slice(0, 10)}.log`);
+    const file = path.join(PATHS.logs, `vireo-${new Date().toISOString().slice(0, 10)}.log`);
     stream = fs.createWriteStream(file, { flags: "a" });
   } catch {
     stream = { write() {} };
@@ -33,7 +33,7 @@ function emit(lvl, scope, msg, data) {
   try {
     out().write(JSON.stringify(line) + "\n");
   } catch {}
-  if (lvl === "error" || lvl === "warn" || process.env.OMNI_AGENT_LOG_STDERR === "1") {
+  if (lvl === "error" || lvl === "warn" || process.env.VIREO_LOG_STDERR === "1") {
     process.stderr.write(`[${lvl}] ${scope}: ${line.msg}\n`);
   }
 }

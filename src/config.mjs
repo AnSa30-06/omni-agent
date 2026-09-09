@@ -8,6 +8,11 @@ export const DEFAULTS = {
   version: 2,
   /** Set true by the setup wizard once it completes successfully. */
   configured: false,
+  /**
+   * Set true once a key shipped inside the build has been connected. Kept so a
+   * rebuild does not re-add a provider the user has since removed on purpose.
+   */
+  bundledKeyApplied: false,
   gateway: {
     /** Port for the bundled, isolated OmniRoute instance. */
     port: 20129,
@@ -133,7 +138,7 @@ export function updateConfig(mutator) {
 
 /** The base URL every client in this repo should talk to. */
 export function gatewayBaseUrl(cfg = loadConfig()) {
-  if (process.env.OMNI_AGENT_GATEWAY_URL) return process.env.OMNI_AGENT_GATEWAY_URL.replace(/\/$/, "");
+  if (process.env.VIREO_GATEWAY_URL) return process.env.VIREO_GATEWAY_URL.replace(/\/$/, "");
   if (cfg.gateway.externalBaseUrl) return cfg.gateway.externalBaseUrl.replace(/\/$/, "");
   return `http://127.0.0.1:${cfg.gateway.port}`;
 }

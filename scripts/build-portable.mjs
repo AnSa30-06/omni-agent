@@ -1,4 +1,4 @@
-// Build OmniAgent-Portable-<version>.zip.
+// Build Vireo-Portable-<version>.zip.
 //
 // The fallback and debugging distribution: same application, no installer, no
 // registry entries, no shortcuts. Unzip and run start.bat. It still bundles the
@@ -13,7 +13,7 @@ const say = (s = "") => process.stdout.write(s + "\n");
 const VERSION = JSON.parse(fs.readFileSync(path.join(APP_ROOT, "package.json"), "utf8")).version;
 const STAGING = path.join(APP_ROOT, "staging");
 const DIST = path.join(APP_ROOT, "dist");
-const OUT = path.join(DIST, `OmniAgent-Portable-${VERSION}.zip`);
+const OUT = path.join(DIST, `Vireo-Portable-${VERSION}.zip`);
 
 function main() {
   if (!fs.existsSync(path.join(STAGING, "app")) || !fs.existsSync(path.join(STAGING, "node"))) {
