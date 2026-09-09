@@ -10,15 +10,15 @@ You install one program. It sets itself up. Then you ask it to do things, in pla
 
 **You do not need an API key.** It works out of the box using free models. If you already
 pay for Claude, ChatGPT, Gemini, DeepSeek or Kimi, you can add your key and it will be
-faster — but that is an upgrade, not a requirement.
+faster â€” but that is an upgrade, not a requirement.
 
 ---
 
 ## Download
 
-**[⬇ Download OmniAgentSetup-1.2.0.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgentSetup-1.2.0.exe)** — 74.6 MB, Windows 10/11 (64-bit)
+**[â¬‡ Download OmniAgentSetup-1.2.1.exe](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.1/OmniAgentSetup-1.2.1.exe)** â€” 74.6 MB, Windows 10/11 (64-bit)
 
-That link always gives you version 1.2.0. The
+That link always gives you version 1.2.1. The
 [Releases page](https://github.com/AnSa30-06/omni-agent/releases/latest) has the newest
 version and the release notes.
 
@@ -31,8 +31,8 @@ version and the release notes.
 
 ### Windows will warn you, and here is why
 
-The download is not code-signed — a signing certificate costs a few hundred pounds a year
-and this project does not have one — so Windows SmartScreen shows
+The download is not code-signed â€” a signing certificate costs a few hundred pounds a year
+and this project does not have one â€” so Windows SmartScreen shows
 **"Windows protected your PC"** the first time you run it. That warning means *"nobody has
 paid to vouch for this file"*, not *"this file is known to be bad"*.
 
@@ -42,13 +42,13 @@ If you would rather check the file is exactly the one that was published, run th
 PowerShell in your Downloads folder before opening it:
 
 ```powershell
-Get-FileHash .\OmniAgentSetup-1.2.0.exe -Algorithm SHA256
+Get-FileHash .\OmniAgentSetup-1.2.1.exe -Algorithm SHA256
 ```
 
 It should print:
 
 ```
-C69D98347396626CFFDCA1E1AFD0A1AD611F0B85C84F7C0C195E11F8CF9C1DE8
+978856A5C03441BE5724566C08A6E82EAD7F1ED6FF571240195F516B2FAC2294
 ```
 
 If it prints anything else, delete the file and download it again.
@@ -59,8 +59,8 @@ If it prints anything else, delete the file and download it again.
 
 1. **Run the file you downloaded.** No administrator password needed.
 2. When it finishes, it opens a setup window that downloads the rest and checks everything
-   works. This takes a while and needs about 4 GB — see [Disk and download](#disk-and-download).
-3. **Launch** *Omni Agent* from your Desktop or Start Menu — `OmniAgent.exe`, a real
+   works. This takes a while and needs about 4 GB â€” see [Disk and download](#disk-and-download).
+3. **Launch** *Omni Agent* from your Desktop or Start Menu â€” `OmniAgent.exe`, a real
    application, not a terminal. It opens as a window: Chat on one side, Code on the
    other, with everything else a click away in the sidebar.
    See [The desktop app](docs/desktop-app.md).
@@ -77,13 +77,13 @@ That's it. Ask it something.
 
 ### If you would rather not use an installer
 
-**[⬇ Download OmniAgent-Portable-1.2.0.zip](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.0/OmniAgent-Portable-1.2.0.zip)** — 123.3 MB
+**[â¬‡ Download OmniAgent-Portable-1.2.1.zip](https://github.com/AnSa30-06/omni-agent/releases/download/v1.2.1/OmniAgent-Portable-1.2.1.zip)** â€” 123.3 MB
 
 Extract it anywhere, run `setup.bat` once, then `app.bat` to open the app (or `start.bat`
 for the terminal interface). Nothing is written outside the folder and your own data
 directory, and nothing is added to the registry or the Start Menu.
 
-Its SHA-256 is `b59c59c9261317b3cc70219b06bc7ea522674c876ba44fd317af2cdd2743af76`.
+Its SHA-256 is `f33bdf4ea0da3dfb3dfb6bf068e315691a79a3be0e4518eec7b38660518f69ef`.
 
 ---
 
@@ -96,7 +96,7 @@ Its SHA-256 is `b59c59c9261317b3cc70219b06bc7ea522674c876ba44fd317af2cdd2743af76
 | **Search and read the web** | Searches, then actually fetches the pages before quoting them. Cites the URL it really loaded. |
 | **Scrape and crawl** | Bulk extraction from one page or a whole site section. |
 | **Documents** | Reads PDF, Word, Excel, CSV, JSON, text and Markdown. Writes CSV, Excel, JSON, Markdown. |
-| **Data analysis** | Profiles a spreadsheet — types, missing values, statistics — without spending tokens on it. |
+| **Data analysis** | Profiles a spreadsheet â€” types, missing values, statistics â€” without spending tokens on it. |
 | **Git and GitHub** | Branches, commits, pull requests, issues. |
 | **Choose its own model** | Picks a cheap fast model for simple work and a strong one for hard work. |
 
@@ -135,10 +135,10 @@ costing?".
 **The numbers you see are real or they are absent.** This product never estimates a quota
 or a balance. Providers differ in what they publish, and the dashboard says which is which:
 
-- **DeepSeek** and **OpenRouter** publish a live balance — you see it.
-- **Anthropic** and **OpenAI** publish usage only to *Admin* keys — without one, it says
+- **DeepSeek** and **OpenRouter** publish a live balance â€” you see it.
+- **Anthropic** and **OpenAI** publish usage only to *Admin* keys â€” without one, it says
   "unavailable" and tells you why.
-- **Google** publishes nothing for Gemini API keys — it says so.
+- **Google** publishes nothing for Gemini API keys â€” it says so.
 - Token counts come from what each API response actually reported, and are labelled
   "provider-reported".
 - Speed is measured on your machine from real calls. A model you have not used yet shows
@@ -152,8 +152,8 @@ scores and are never presented as such.
 
 ## Spending fewer tokens
 
-Free tiers have limits, and most of what an agent spends is tool output — test
-runs, file reads, search results — not conversation.
+Free tiers have limits, and most of what an agent spends is tool output â€” test
+runs, file reads, search results â€” not conversation.
 
 ```bash
 omni-agent saving
@@ -180,7 +180,7 @@ any tier.
 omni-agent saving max
 ```
 
-> The seven underlying modes are not one dial — some target prose and some
+> The seven underlying modes are not one dial â€” some target prose and some
 > target tool output, which is why `high` saves less than `tools` here. The list
 > is ordered by what it actually measured rather than by an invented intensity
 > scale.
@@ -201,7 +201,7 @@ omni-agent provider add cerebras csk-...
 ```
 
 Already paying for Claude, ChatGPT, Copilot, Cursor or Gemini? Sign in and the
-agent uses that subscription — nothing is charged twice:
+agent uses that subscription â€” nothing is charged twice:
 
 ```bash
 omni-agent provider signin claude
@@ -210,7 +210,7 @@ omni-agent provider signin claude
 ### Anything else the gateway knows
 
 The fifteen are curated. The gateway itself knows **222 providers**, and any of
-them can be added by id — `mistral`, `cerebras`, `groq`, `cohere`, `together`,
+them can be added by id â€” `mistral`, `cerebras`, `groq`, `cohere`, `together`,
 `sambanova`, `nebius`, `novita`, `deepinfra`, `hyperbolic`, `openrouter`:
 
 ```bash
@@ -224,16 +224,16 @@ example and the id list are in
 
 **Chasing the dashboard's "1.6 billion free tokens"?** It is 1,526,225,000 **a
 month**, it is a sum over ~40 accounts you would open yourself, and **two thirds
-of it is Mistral alone** — six signups reach 93%. Which six, where to sign up,
+of it is Mistral alone** â€” six signups reach 93%. Which six, where to sign up,
 and what each is worth: **[docs/free-tiers.md](docs/free-tiers.md)**.
 
-⚠️ **Being in the gateway's manifest is not evidence that a provider works.**
+âš ï¸ **Being in the gateway's manifest is not evidence that a provider works.**
 GitHub Models is still listed there and was retired on 2026-07-30; its endpoint
 answers HTTP 410.
 
 ### Search keys
 
-Search works with **no key at all** — DuckDuckGo, then Brave's public results
+Search works with **no key at all** â€” DuckDuckGo, then Brave's public results
 page, then public SearXNG instances, then the bundled browser. Those free
 endpoints throttle a machine that searches in bursts, which is exactly what
 research looks like. A key removes that.
@@ -256,7 +256,7 @@ Brave Search - Free credits every month on an independent web index
   Check it worked:  omni-agent doctor
 ```
 
-Once a key is stored it is used **first**, automatically — nothing to
+Once a key is stored it is used **first**, automatically â€” nothing to
 configure. Brave is the one to add first: an independent index, so it does not
 fail at the same moment as DuckDuckGo.
 
@@ -264,7 +264,7 @@ fail at the same moment as DuckDuckGo.
 
 ## The dashboard
 
-The bundled gateway is a full web application running on your own machine —
+The bundled gateway is a full web application running on your own machine â€”
 providers, compression, analytics, search tools, settings.
 
 ```bash
@@ -296,7 +296,7 @@ omni-agent config mode smart
 ```
 
 The mode picks the agent's own model as well as the models it uses internally, so changing
-it prints which model you will be on and asks you to restart — OpenCode reads its
+it prints which model you will be on and asks you to restart â€” OpenCode reads its
 configuration at launch and does not reload it.
 
 Or ask it: *"switch to the cheapest model"*. To pin one specific model, `omni-agent models`
@@ -353,7 +353,7 @@ omni-agent diagnostics     # export a sanitised report for bug reports
                      |
                  OmniRoute  (model gateway: routing, fallback, quotas)
                      |
-     Claude · GPT · Gemini · DeepSeek · Kimi · 100+ free models
+     Claude Â· GPT Â· Gemini Â· DeepSeek Â· Kimi Â· 100+ free models
 ```
 
 **Composition, not forking.** OpenCode and OmniRoute are used unmodified, through their
@@ -367,8 +367,8 @@ existing `omniroute` or `opencode` setup, and uninstalling it cannot take theirs
 ### Tool count is a budget
 
 Every tool description is spent from the model's context on **every turn**. So the whole
-browser — navigate, snapshot, click, type, select, upload, tabs, extract, screenshot,
-download, wait — is *one* tool with an `action` argument, not eighteen tools. Eight tools
+browser â€” navigate, snapshot, click, type, select, upload, tabs, extract, screenshot,
+download, wait â€” is *one* tool with an `action` argument, not eighteen tools. Eight tools
 total.
 
 ### Documentation
@@ -391,7 +391,7 @@ total.
 
 - Credentials are encrypted with **Windows DPAPI**, bound to your Windows account. No
   native module, no plaintext key file.
-- Nothing is logged that looks like a secret — every log write and the diagnostics export
+- Nothing is logged that looks like a secret â€” every log write and the diagnostics export
   both pass through redaction, and the exporter **aborts** rather than emit a bundle that
   still matches a secret pattern.
 - Genuinely destructive shell commands are refused outright, whatever permission profile is
@@ -415,7 +415,7 @@ Windows installer is built today.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT â€” see [LICENSE](LICENSE).
 
 Built on [OpenCode](https://opencode.ai) (MIT) and
 [OmniRoute](https://github.com/diegosouzapw/OmniRoute) (MIT), both used unmodified.
